@@ -1,0 +1,25 @@
+{
+  "name": "ÁGORA · Compras y Producción · Dejavú Marketing",
+  "short_name": "ÁGORA Compras",
+  "description": "Presupuestos, muestras, pedidos y proveedores con guardado local en tu navegador.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#11100f",
+  "theme_color": "#11100f",
+  "lang": "es-MX",
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
