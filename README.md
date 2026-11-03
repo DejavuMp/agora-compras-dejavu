@@ -1,20 +1,13 @@
 # ÁGORA · Compras y Producción — Sitio web
 
-Proyecto Firebase Web: **agora-dejavu-38b8c**.
+Proyecto Firebase: **agora-dejavu-38b8c**.
 
-- Este repositorio contiene el frontend estático existente de ÁGORA, además de la configuración pública para inicializar el SDK Firebase Web (`firebase-init.js`).
-- El SDK se inicializa con Firebase Auth y Cloud Firestore, **pero esto no habilita sincronización**: por ahora los expedientes, fotografías y presupuestos **siguen guardándose en IndexedDB del navegador**, no en Firebase ni GitHub.
-- Conserva respaldos locales en JSON hasta concluir migración verificada.
-- El formulario de proveedor todavía descarga acuses y respuestas JSON; falta el backend de invitaciones, acuses y cotizaciones en línea.
-- `firestore.rules` niega toda lectura/escritura hasta desarrollar permisos por usuario y proveedor. No abrir permisos generales.
-- El código fuente es público. No subir claves privadas, tokens, expedientes, respaldos ni archivos sensibles.
+La aplicación original continúa funcionando y guardando en IndexedDB. Se agregó el módulo **ÁGORA · Nube** para iniciar sesión con Google, comprobar permisos por UID, exportar respaldo local y activar voluntariamente la sincronización de pedidos y expedientes por registro en Firestore.
 
-## Próximos pasos
+- **No se ha verificado un despliegue de Firebase Hosting** ni una prueba integral con cuentas reales.
+- Los cambios solo se sincronizan mientras esté abierta la sesión y el operador haya activado la nube desde el panel. No se sustituyen datos locales de forma silenciosa.
+- Los proveedores siguen usando formularios con respuesta JSON; la confirmación automática mediante enlace requiere un backend independiente, validación de invitaciones y pruebas de seguridad.
+- Las fotos embebidas grandes pueden sobrepasar el máximo admitido por documento y detener la sincronización; no se borran localmente.
+- El repositorio es público. **Jamás subir expedientes, datos de proveedores, llaves privadas, tokens ni respaldos.**
 
-1. En Firebase Console > Build > Firestore Database, crear base en modo producción.
-2. En Authentication > Sign-in method, habilitar proveedor Google para el personal interno y revisar dominios autorizados.
-3. Diseñar permisos y roles en Firestore + flujo de invitación segura a proveedor con backend.
-4. Integrar la persistencia con pruebas y un respaldo completo, **antes** de migrar cualquier pedido real.
-5. Publicar en Firebase Hosting tras iniciar sesión con el nuevo Gmail en Firebase CLI (proyecto preconfigurado en `.firebaserc`).
-
-Ver [FIREBASE_ACTIVACION.md](./FIREBASE_ACTIVACION.md) para instrucciones detalladas.
+**Guía paso a paso:** [PUESTA_EN_MARCHA_FIREBASE.md](./PUESTA_EN_MARCHA_FIREBASE.md).
