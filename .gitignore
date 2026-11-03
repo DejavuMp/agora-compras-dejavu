@@ -1,0 +1,19 @@
+# Dependencias, cachés y credenciales
+node_modules/
+.firebase/
+.env
+.env.*
+!.env.example
+*serviceAccount*.json
+*service-account*.json
+*private-key*.json
+*.pem
+*.p12
+
+# Datos operativos y respaldos (no subir expedientes ni cotizaciones)
+*RESPALDO*.json
+*respaldo*.json
+*BACKUP*.json
+*backup*.json
+RESPUESTA_*.json
+ACUSE_*.json
