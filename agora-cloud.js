@@ -5,7 +5,7 @@ import * as dbSdk from "https://www.gstatic.com/firebasejs/13.1.0/firebase-fires
   const groups=["rfqs","orders","samples","suppliers"];
   const authCol="agora_users",recordsCol="agora_records";
   const escape=s=>String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-  let fb=null,account=null,role=null,mode="local",busy=false,backupOk=false,panel=null,initialized=false;
+  let fb=null,account=null,role=null,mode="local",busy=false,backupOk=false,panel=null,initialized=false,collapsed=false;
   let note="El guardado local continúa funcionando. Activa la nube para sincronizar.";
   let revisions=new Map(),baseline=new Map(),timer=0,activeSync=false,pending=false;
   const canEdit=()=>role==="admin"||role==="coordinador";
@@ -115,8 +115,9 @@ import * as dbSdk from "https://www.gstatic.com/firebasejs/13.1.0/firebase-fires
   }
   function render(){
     if(!panel)return;
+    if(collapsed){panel.innerHTML='<button data-cloud="toggle" style="background:#9e7843;color:white;border:0;border-radius:7px;padding:7px 10px;cursor:pointer">☁ ÁGORA · Abrir nube</button>';return;}
     panel.innerHTML=`
-      <div style="display:flex;justify-content:space-between;gap:8px"><strong style="color:#eac58b">☁ ÁGORA · Nube</strong><span>${escape(mode)}</span></div>
+      <div style="display:flex;justify-content:space-between;gap:8px"><strong style="color:#eac58b">☁ ÁGORA · Nube</strong><button data-cloud="toggle" style="margin-left:auto;background:transparent;border:1px solid #9e7843;border-radius:5px;color:#eac58b;padding:3px 6px;cursor:pointer">Ocultar</button><span>${escape(mode)}</span></div>
       <div style="margin:8px 0">${escape(note)}</div>
       <div style="opacity:.8">${account?escape(account.email)+" · "+escape(role||"Sin autorización"):"Sin sesión"}</div>
       ${account&&!role?`<div style="margin:8px 0">Para autorizar tu cuenta, crea en Firestore la colección <b>agora_users</b> con un documento cuyo ID sea tu UID, y los campos <b>role = admin</b> (texto) y <b>active = true</b> (booleano).<p style="overflow-wrap:anywhere">UID: <code>${escape(account.uid)}</code></p></div>`:""}
@@ -134,6 +135,7 @@ import * as dbSdk from "https://www.gstatic.com/firebasejs/13.1.0/firebase-fires
     panel.addEventListener("click",async e=>{
       const action=e.target.closest("[data-cloud]")?.dataset.cloud;if(!action)return;
       try{
+        if(action==="toggle"){collapsed=!collapsed;render();return;}
         if(action==="login")await authSdk.signInWithPopup(fb.auth,new authSdk.GoogleAuthProvider());
         if(action==="logout"){mode="local";await authSdk.signOut(fb.auth);}
         if(action==="copy"&&account){await navigator.clipboard.writeText(account.uid);tell("UID copiado.");}
