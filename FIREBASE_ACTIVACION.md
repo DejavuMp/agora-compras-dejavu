@@ -1,7 +1,7 @@
 # ÁGORA · Activación de Firebase con cuenta institucional
 
 ## Estado actual (03/11/2026)
-Código de Ágora Compras en GitHub. El frontend actual es v9 (local-first), guarda expedientes en IndexedDB; **aún no guarda en Firebase ni registra automáticamente respuestas de proveedores**. El formulario de proveedor usa archivos ACUSE_/RESPUESTA_ JSON. Los archivos firebase.json y firestore.rules únicamente preparan despliegue seguro. Las reglas están cerradas expresamente mientras se implementa autenticación, invitaciones y permisos.
+Código de Ágora Compras en GitHub. Proyecto registrado como **agora-dejavu-38b8c**. El archivo `firebase-init.js` contiene la configuración pública del SDK para preparar Authentication y Firestore, y `.firebaserc` fija el proyecto de Hosting. El SDK inicializado **no guarda pedidos en la nube** por sí mismo. El frontend actual es v9 (local-first), guarda expedientes en IndexedDB; **aún no guarda en Firebase ni registra automáticamente respuestas de proveedores**. El formulario de proveedor usa archivos ACUSE_/RESPUESTA_ JSON. Los archivos firebase.json y firestore.rules únicamente preparan despliegue seguro. Las reglas están cerradas expresamente mientras se implementa autenticación, invitaciones y permisos.
 
 ## 1. Dar acceso al nuevo Gmail de Ágora
 1. En https://console.firebase.google.com/ inicia sesión con el propietario del proyecto Firebase existente, si lo hay.
