@@ -20,7 +20,7 @@ function notification(t){let node=$('#toast');if(!node)return;node.textContent=t
 function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(save,230)}
 function openDB(){return new Promise(resolve=>{if(!window.indexedDB){resolve(null);return}let req;try{req=indexedDB.open('AGORA_COMPRAS_LOCAL',1)}catch(err){resolve(null);return}req.onupgradeneeded=()=>req.result.createObjectStore('app');req.onsuccess=()=>resolve(req.result);req.onerror=()=>resolve(null)})}
 async function load(){db=await openDB();if(db){try{let payload=await new Promise((res,rej)=>{let req=db.transaction('app','readonly').objectStore('app').get('data');req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error)});if(payload&&payload.app==='agora-compras-v1')data=payload}catch(e){console.warn('BD local',e)}}else{try{let old=localStorage.getItem('AGORA_COMPRAS_LOCAL');if(old)data=JSON.parse(old)}catch{}}data.catalog=data.catalog||structuredClone(defaults);data.log=data.log||[];data.agency=data.agency||{name:'Dejavú Marketing',email:'',phone:'',defaultIva:false};['rfqs','orders','samples','suppliers'].forEach(k=>data[k]=data[k]||[])}
-function save(){if(db){try{let tx=db.transaction('app','readwrite');tx.objectStore('app').put(data,'data');tx.onerror=()=>notification('No se pudo guardar. Descarga un respaldo.')}catch(e){notification('Almacenamiento lleno. Exporta una copia.')}}else{try{localStorage.setItem('AGORA_COMPRAS_LOCAL',JSON.stringify(data))}catch{notification('Almacenamiento lleno. Exporta una copia.')}}}
+function save(){if(db){try{let tx=db.transaction('app','readwrite');tx.objectStore('app').put(data,'data');tx.onerror=()=>notification('No se pudo guardar. Descarga un respaldo.')}catch(e){notification('Almacenamiento lleno. Exporta una copia.')}}else{try{localStorage.setItem('AGORA_COMPRAS_LOCAL',JSON.stringify(data))}catch{notification('Almacenamiento lleno. Exporta una copia.')}}window.dispatchEvent(new CustomEvent('agora:local-saved'))}
 function log(type,ref,text){data.log.unshift({id:uid('EV'),type,ref,text,at:now()});if(data.log.length>700)data.log.length=700;scheduleSave()}
 const getRFQ=()=>data.rfqs.find(x=>x.id===current),getSample=()=>data.samples.find(x=>x.id===current),getOrder=()=>data.orders.find(x=>x.id===current);
 const supplier=id=>data.suppliers.find(x=>x.id===id)||null;
@@ -301,5 +301,12 @@ function delegateInput(e){let t=e.target;if(t.matches('[data-filter="query"]')){
 async function filesChanged(e){const t=e.target;if(t.matches('[data-image-id]')){let f=t.files?.[0];if(!f)return;try{let url=await imageFile(f),r=getRFQ(),x=r?.items.find(x=>x.id===t.dataset.imageId);if(x){x.image=url;scheduleSave();render();notification('Imagen cargada y optimizada para almacenamiento local.')}}catch(err){notification(err.message)}return}if(t.id==='restoreFile'||t.id==='responseFile'){const f=t.files?.[0];if(f){if(t.id==='responseFile')closeModal();await readJSON(f)}return}}
 function delegateClick(e){const b=e.target.closest('[data-action],[data-nav],[data-open],[data-tab]');if(!b)return;if(b.dataset.nav){routeTo(b.dataset.nav);return}if(b.dataset.open){let type=b.dataset.open;routeTo(type==='rfq'?'solicitudes':type==='sample'?'muestras':'pedidos',b.dataset.id,type==='rfq'?'informacion':'detalle');return}if(b.dataset.tab){tab=b.dataset.tab;render();return}if(b.dataset.action){e.preventDefault();doAction(b.dataset.action,b)}}
 document.addEventListener('click',delegateClick);document.addEventListener('input',delegateInput);document.addEventListener('change',e=>{delegateInput(e);filesChanged(e)});
-(async()=>{await load();render();if('serviceWorker'in navigator&&location.protocol.startsWith('http')){navigator.serviceWorker.register('./sw.js').catch(()=>{})}})();
+window.AGORA_LOCAL = Object.freeze({
+  snapshot:()=>structuredClone(data),
+  applyCloud:(next)=>{
+    if(!next || next.app!=='agora-compras-v1' || !['rfqs','orders','samples','suppliers'].every(k=>Array.isArray(next[k]))) throw new Error('Formato de nube incompatible');
+    data=structuredClone(next);save();render();
+  }
+});
+(async()=>{await load();render();window.dispatchEvent(new CustomEvent('agora:local-ready'));if('serviceWorker'in navigator&&location.protocol.startsWith('http')){navigator.serviceWorker.register('./sw.js').catch(()=>{})}})();
 })();
