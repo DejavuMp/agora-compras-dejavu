@@ -10,10 +10,18 @@ const css=document.createElement('style');css.textContent=`
 @media(max-width:650px){#agora-web-bar{bottom:7px;left:8px;right:8px;max-width:none}}
 `;document.head.append(css);
 const el=document.createElement('aside');el.id='agora-web-bar';el.setAttribute('aria-label','Estado del guardado local');
-el.innerHTML=`<div class="agora-row"><strong>✓ ÁGORA web · guardado en este navegador</strong><button class="agora-close" aria-label="Ocultar aviso" title="Ocultar">×</button></div><div class="agora-desc">No se sincroniza entre computadoras o celulares. Haz un respaldo para proteger tus expedientes.</div><div class="agora-row" style="margin-top:8px"><button class="agora-primary" id="agora-backup-shortcut">Descargar respaldo</button><button id="agora-protect">Proteger datos</button><span id="agora-net-status"></span></div>`;
+el.innerHTML=`<div class="agora-row"><strong>✓ ÁGORA web · guardado en este navegador</strong><button class="agora-close" aria-label="Ocultar aviso" title="Ocultar">×</button></div><div class="agora-desc">Firebase configurado para ÁGORA; la sincronización aún no está activa. Los expedientes siguen en este navegador. Haz un respaldo.</div><div class="agora-row" style="margin-top:8px"><button class="agora-primary" id="agora-backup-shortcut">Descargar respaldo</button><button id="agora-protect">Proteger datos</button><span id="agora-net-status"></span></div>`;
 document.body.append(el);
 const net=el.querySelector('#agora-net-status');function refresh(){net.textContent=navigator.onLine?'En línea':'Sin conexión';net.style.color=navigator.onLine?'#c8e5b1':'#f1d08b'}refresh();addEventListener('online',refresh);addEventListener('offline',refresh);
 el.querySelector('.agora-close').onclick=()=>{el.remove();};
 el.querySelector('#agora-backup-shortcut').onclick=()=>{ const b=document.querySelector('[data-action="backup"]'); if(b){b.click()}else{ const nav=document.querySelector('[data-nav="respaldo"]');if(nav)nav.click();setTimeout(()=>document.querySelector('[data-action="backup"]')?.click(),250);} };
 el.querySelector('#agora-protect').onclick=async e=>{if(!navigator.storage?.persist){e.target.textContent='No disponible en este navegador';return;}try{let granted=await navigator.storage.persist(); e.target.textContent=granted?'Protección solicitada ✓':'Usa respaldos frecuentes';}catch{e.target.textContent='Usa respaldos frecuentes';}};
 })();
+
+// Preparar el SDK modular de Firebase sin interferir con el funcionamiento local.
+// Activar la sincronización requerirá Auth, reglas de acceso y migración revisada.
+const agoraFirebaseScript = document.createElement('script');
+agoraFirebaseScript.type = 'module';
+agoraFirebaseScript.src = './firebase-init.js';
+agoraFirebaseScript.onerror = () => console.warn('ÁGORA: No se pudo cargar el módulo Firebase. La app local sigue disponible.');
+document.head.appendChild(agoraFirebaseScript);
