@@ -1,8 +1,52 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Cerrado por defecto: todavía no hay modelo de permisos ni flujo de proveedores.
-    // No cambiar a allow read, write: if true.
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function userPath() {
+      return /databases/$(database)/documents/agora_users/$(request.auth.uid);
+    }
+    function activeStaff() {
+      return signedIn() && exists(userPath()) &&
+        get(userPath()).data.active == true &&
+        get(userPath()).data.role in ['admin', 'coordinador', 'consulta'];
+    }
+    function role() { return get(userPath()).data.role; }
+    function canEdit() {
+      return activeStaff() && role() in ['admin', 'coordinador'];
+    }
+    function isAdmin() { return activeStaff() && role() == 'admin'; }
+    function validStaff() {
+      return request.resource.data.keys().hasOnly(['email','name','role','active','createdAt','updatedAt']) &&
+        request.resource.data.role in ['admin','coordinador','consulta'] &&
+        request.resource.data.active is bool;
+    }
+    match /agora_users/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      // El primer administrador se configura manualmente desde la consola Firebase.
+      allow create, update: if isAdmin() && validStaff();
+      allow delete: if isAdmin() && uid != request.auth.uid;
+    }
+    match /agora_records/{record} {
+      allow get, list: if activeStaff();
+      allow create: if canEdit() &&
+        request.resource.data.keys().hasOnly(['kind','recordId','payload','revision','updatedBy','updatedAt']) &&
+        request.resource.data.keys().hasAll(['kind','recordId','payload','revision','updatedBy','updatedAt']) &&
+        request.resource.data.kind in ['rfqs','orders','samples','suppliers','settings'] &&
+        request.resource.data.recordId is string &&
+        request.resource.data.revision == 1 &&
+        request.resource.data.updatedBy == request.auth.uid;
+      allow update: if canEdit() &&
+        request.resource.data.keys().hasOnly(['kind','recordId','payload','revision','updatedBy','updatedAt']) &&
+        request.resource.data.kind == resource.data.kind &&
+        request.resource.data.recordId == resource.data.recordId &&
+        request.resource.data.revision == resource.data.revision + 1 &&
+        request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if canEdit();
+    }
+    // Ni invitaciones de proveedores ni datos privados quedan abiertos al público.
     match /{document=**} {
       allow read, write: if false;
     }
