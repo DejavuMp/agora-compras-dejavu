@@ -25,3 +25,10 @@ agoraFirebaseScript.type = 'module';
 agoraFirebaseScript.src = './firebase-init.js';
 agoraFirebaseScript.onerror = () => console.warn('ÁGORA: No se pudo cargar el módulo Firebase. La app local sigue disponible.');
 document.head.appendChild(agoraFirebaseScript);
+
+// Herramientas de acceso de usuarios, backup y sincronización Firestore.
+const agoraCloudScript=document.createElement('script');
+agoraCloudScript.type='module';
+agoraCloudScript.src='./agora-cloud.js';
+agoraCloudScript.onerror=()=>console.warn('ÁGORA: No se pudo cargar la interfaz de nube. Sigue disponible el respaldo local.');
+document.head.appendChild(agoraCloudScript);
