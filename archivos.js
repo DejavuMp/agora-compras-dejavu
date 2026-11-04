@@ -19,7 +19,8 @@ const safeHttps=url=>{try{let u=new URL(url);return u.protocol==='https:'?u.href
 // 32 bytes de aleatoriedad; cada byte representa exactamente 6 bits en el alfabeto de 64 caracteres.
 const secret=()=>{let bytes=crypto.getRandomValues(new Uint8Array(32));return btoa(String.fromCharCode(...bytes)).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');};
 const urlFor=id=>new URL('./archivo-recibir.html',location.href).href+'#t='+id;
-const assetHtml=(arr,heading)=>arr?.length?`<div class="reference-group"><h3>${heading}</h3><div class="image-grid">${arr.map((url,i)=>`<a href="${esc(safeHttps(url))}" target="_blank" rel="noopener noreferrer"><img src="${esc(safeHttps(url))}" alt="${esc(heading)} ${i+1}" loading="lazy"></a>`).join('')}</div></div>`:'';
+function imagePreviewUrl(value){const href=safeHttps(value);if(!href)return '';try{const u=new URL(href);if(!['drive.google.com','docs.google.com'].includes(u.hostname))return href;const id=u.pathname.match(/\/file\/d\/([A-Za-z0-9_-]+)/)?.[1]||u.searchParams.get('id');return id&&/^[A-Za-z0-9_-]{8,}$/.test(id)?'https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w800':href;}catch{return href;}}
+const assetHtml=(arr,heading)=>arr?.length?`<div class="reference-group"><h3>${heading}</h3><div class="image-grid">${arr.map((url,i)=>`<a href="${esc(safeHttps(url))}" target="_blank" rel="noopener noreferrer"><img src="${esc(imagePreviewUrl(url))}" alt="${esc(heading)} ${i+1}" loading="lazy"></a>`).join('')}</div></div>`:'';
 let user=null,role=null,deliveries=[],responses=new Map(),editRecord=null,openRecord=null,subscriptions=[],readyDeliveries=false,readyResponses=false,firstResponses=true;
 let sampleSelected=[],folderSelected=[];
 function notify(msg,error=false){$('alert').textContent=msg;$('alert').className='alert'+(error?' error':'');$('alert').hidden=false;setTimeout(()=>{if($('alert').textContent===msg)$('alert').hidden=true;},8500);}
@@ -62,7 +63,7 @@ function renderDetail(r){const state=statusFor(r),res=responseFor(r.id,r.version
 function openDetail(id){const r=deliveries.find(d=>d.id===id);if(!r)return;openRecord=r.id;renderDetail(r);$('detailOverlay').hidden=false;document.body.style.overflow='hidden';}
 async function copyLink(url){try{await navigator.clipboard.writeText(url);notify('Enlace copiado. Puedes enviarlo por correo o mensaje.');}catch(e){notify('No se pudo copiar el enlace: '+e.message,true);}}
 async function copyEmailEvidence(r){
- const url=urlFor(r.id),drive=safeHttps(r.driveUrl),photos=arr=>(arr||[]).slice(0,8).map((src,i)=>safeHttps(src)?'<img src="'+esc(safeHttps(src))+'" alt="Captura '+(i+1)+'" width="125" style="width:125px;height:auto;max-height:125px;object-fit:contain;border:1px solid #e2d8c8;margin:5px">':'').join('');
+ const url=urlFor(r.id),drive=safeHttps(r.driveUrl),photos=arr=>(arr||[]).slice(0,8).map((src,i)=>safeHttps(src)?'<img src="'+esc(imagePreviewUrl(src))+'" alt="Captura '+(i+1)+'" width="125" style="width:125px;height:auto;max-height:125px;object-fit:contain;border:1px solid #e2d8c8;margin:5px">':'').join('');
  const text='Dejavú Marketing · Archivos de producción para muestras\nSolicitud: '+r.project+'\nArchivo: '+r.title+'\nAbre tu expediente y confirma de recibido: '+url+'\nDrive: '+drive;
  const html='<div style="font:14px Arial;color:#26221c;max-width:620px">'+
  '<div style="background:#111;color:#d4b377;padding:20px;font:bold 19px Arial">DÉJÀ VU MARKETING · ARCHIVOS DE PRODUCCIÓN</div>'+
