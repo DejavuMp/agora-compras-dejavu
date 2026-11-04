@@ -1,11 +1,14 @@
 import {initializeApp,getApps} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js';
 import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import {getFirestore,doc,getDoc,collection,collectionGroup,onSnapshot,serverTimestamp,Timestamp,setDoc,runTransaction} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
-import {getStorage,ref,uploadBytes,getDownloadURL} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
+import {getStorage,ref,uploadBytesResumable,getDownloadURL,setMaxUploadRetryTime,setMaxOperationRetryTime} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
 
 // Usa el proyecto Firebase existente de ÁGORA Pedidos. Estas son claves de cliente públicas.
 const config={apiKey:'AIzaSyDPh-AFdST9Ax_Eoho-wT0shlWlCHad6Zg',authDomain:'agora-dejavu-38b8c.firebaseapp.com',projectId:'agora-dejavu-38b8c',storageBucket:'agora-dejavu-38b8c.firebasestorage.app',messagingSenderId:'775680965171',appId:'1:775680965171:web:274557c8c9c25ff304c146'};
 const app=getApps()[0]||initializeApp(config),auth=getAuth(app),db=getFirestore(app),storage=getStorage(app);
+// Limita los reintentos cuando Firebase Storage no está disponible o requiere facturación.
+setMaxUploadRetryTime(storage,18000);
+setMaxOperationRetryTime(storage,15000);
 const $=id=>document.getElementById(id);
 window.__AGORA_FILES_BOOT?.mark('module-ready');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -28,7 +31,7 @@ function imagesToDisplay(files,slot){const preview=$(slot),current=files;preview
 function addFiles(input,arr,slot,max){const chosen=Array.from(input.files||[]);if(chosen.length+arr.length>max){notify(`Máximo ${max} imágenes en esta sección.`,true);input.value='';return;}for(const file of chosen){if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>12*1024*1024){notify('Las imágenes deben ser JPG, PNG o WEBP y pesar menos de 12 MB cada una.',true);continue;}arr.push({file,name:file.name,preview:URL.createObjectURL(file)});}imagesToDisplay(arr,slot);input.value='';}
 function readImageUrls(el,max){const values=String($(el).value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);if(values.length>max)throw Error(`Demasiadas URL de imágenes (${max} máximo).`);for(const url of values){if(!safeHttps(url))throw Error('Las imágenes externas deben usar una dirección https:// válida.');}return values;}
 function clearFiles(){for(const v of [...sampleSelected,...folderSelected])URL.revokeObjectURL(v.preview);sampleSelected=[];folderSelected=[];imagesToDisplay(sampleSelected,'samplePreview');imagesToDisplay(folderSelected,'folderPreview');$('sampleFiles').value='';$('folderFiles').value='';}
-function openEditor(record=null){try{authRequired();}catch(e){notify(e.message,true);return;}editRecord=record;$('deliveryForm').reset();clearFiles();$('formTitle').textContent=record?'Publicar nueva versión':'Nuevo envío de archivos';$('formSubtitle').textContent=record?`Versión ${record.version+1}. El enlace de recepción será el mismo.`:'Crea un expediente que se guarda directamente en Firebase.';$('saveButton').textContent=record?'Publicar versión '+(record.version+1):'Publicar envío';$('sampleUrls').value=record?.sampleImages?.join('\n')||'';$('folderUrls').value=record?.folderImages?.join('\n')||'';const f=$('deliveryForm');for(const key of ['project','category','title','recipientName','recipientEmail','driveUrl','notes']){if(record)f.elements[key].value=record[key]||'';}f.elements.recipientName.readOnly=!!record;f.elements.recipientEmail.readOnly=!!record;const today=new Date();const y=today.getFullYear(),m=String(today.getMonth()+1).padStart(2,'0'),d=String(today.getDate()).padStart(2,'0');f.elements.validUntil.min=`${y}-${m}-${d}`;const prev=record?.validUntil?.toDate?.();const defaultUntil=new Date(today.getTime()+14*86400000);const target=prev&&prev>today?prev:defaultUntil;f.elements.validUntil.value=`${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,'0')}-${String(target.getDate()).padStart(2,'0')}`;$('editorOverlay').hidden=false;document.body.style.overflow='hidden';}
+function openEditor(record=null){try{authRequired();}catch(e){notify(e.message,true);return;}editRecord=record;if(uploadProgress){uploadProgress.hidden=true;uploadProgress.dataset.error='0';uploadMeter.value=0;uploadMeter.hidden=false;uploadStatus.textContent='';}$('deliveryForm').reset();clearFiles();$('formTitle').textContent=record?'Publicar nueva versión':'Nuevo envío de archivos';$('formSubtitle').textContent=record?`Versión ${record.version+1}. El enlace de recepción será el mismo.`:'Crea un expediente que se guarda directamente en Firebase.';$('saveButton').textContent=record?'Publicar versión '+(record.version+1):'Publicar envío';$('sampleUrls').value=record?.sampleImages?.join('\n')||'';$('folderUrls').value=record?.folderImages?.join('\n')||'';const f=$('deliveryForm');for(const key of ['project','category','title','recipientName','recipientEmail','driveUrl','notes']){if(record)f.elements[key].value=record[key]||'';}f.elements.recipientName.readOnly=!!record;f.elements.recipientEmail.readOnly=!!record;const today=new Date();const y=today.getFullYear(),m=String(today.getMonth()+1).padStart(2,'0'),d=String(today.getDate()).padStart(2,'0');f.elements.validUntil.min=`${y}-${m}-${d}`;const prev=record?.validUntil?.toDate?.();const defaultUntil=new Date(today.getTime()+14*86400000);const target=prev&&prev>today?prev:defaultUntil;f.elements.validUntil.value=`${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,'0')}-${String(target.getDate()).padStart(2,'0')}`;$('editorOverlay').hidden=false;document.body.style.overflow='hidden';}
 function closeModals(){for(const id of ['editorOverlay','detailOverlay'])$(id).hidden=true;document.body.style.overflow='';}
 function recordLine(r){const state=statusFor(r);const recipient=r.recipientName||'—';return `<tr><td><strong>${esc(r.title)}</strong><small>${esc(r.folio||'Sin folio')} · Versión ${r.version}</small></td><td>${esc(r.project)}<br><small>${esc(r.category)}</small></td><td>${esc(recipient)}<br><small>${esc(r.recipientEmail)}</small></td><td>${fmt(r.validUntil)}</td><td><span class="status-pill ${state}">${statuses[state]}</span></td><td><button class="table-action" type="button" data-detail="${r.id}">Ver expediente</button></td></tr>`;}
 function updateCounters(){const results={};for(const r of deliveries)results[statusFor(r)]=(results[statusFor(r)]||0)+1;$('statTotal').textContent=deliveries.length;$('statPending').textContent=results.pendiente||0;$('statChanges').textContent=results.cambios||0;$('statReceived').textContent=(results.recibido||0)+(results.aprobado||0);}
@@ -47,10 +50,105 @@ async function copyLink(url){try{await navigator.clipboard.writeText(url);notify
 function prepareEmail(r){const url=urlFor(r.id);const subject=`ÁGORA · Revisión de archivos · ${r.title} · ${r.folio}`;const content=`Hola ${r.recipientName},\n\nDejavú Marketing te comparte los archivos de ${r.project}.\n\nAbre el enlace, revisa las imágenes y la carpeta de Drive y confirma en línea si recibiste los archivos o si necesitas cambios:\n\n${url}\n\nVigencia: ${fmt(r.validUntil)}\nVersión: ${r.version}\n\nGracias.\nDejavú Marketing`;const mailto=`mailto:${encodeURIComponent(r.recipientEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(content)}`;location.href=mailto;}
 function revoke(r){if(!confirm('¿Revocar este enlace? El destinatario dejará de poder abrirlo o responder. La información del expediente se conservará.'))return;authRequired();runTransaction(db,async tx=>{const refDoc=doc(db,'agora_file_deliveries',r.id),s=await tx.get(refDoc);if(!s.exists()||!s.data().active)throw Error('El envío ya fue revocado o no existe.');tx.update(refDoc,{active:false,updatedAt:serverTimestamp()});}).then(()=>{closeModals();notify('Enlace revocado. El expediente permanece en el historial.');}).catch(e=>notify(e.message,true));}
 function parseValidUntil(value){const d=new Date(value+'T23:59:59');if(Number.isNaN(+d)||d.getTime()<=Date.now())throw Error('Selecciona una vigencia futura.');return Timestamp.fromDate(d);}
-function resize(file){return new Promise((resolve,reject)=>{const src=URL.createObjectURL(file),img=new Image();img.onload=()=>{try{const scale=Math.min(1,1600/Math.max(img.width,img.height)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.width*scale));canvas.height=Math.max(1,Math.round(img.height*scale));const ctx=canvas.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);canvas.toBlob(blob=>{URL.revokeObjectURL(src);if(blob)resolve(blob);else reject(Error('No se pudo procesar la imagen.'));},'image/jpeg',.82);}catch(e){URL.revokeObjectURL(src);reject(e);}};img.onerror=()=>{URL.revokeObjectURL(src);reject(Error('Archivo de imagen no válido.'));};img.src=src;});}
-async function uploadList(items,id,version,section){const urls=[];for(let i=0;i<items.length;i++){const blob=await resize(items[i].file),path=`agora-file-previews/${id}/v${version}/${section}-${crypto.randomUUID()}.jpg`;const handle=ref(storage,path);await uploadBytes(handle,blob,{contentType:'image/jpeg',customMetadata:{section}});urls.push(await getDownloadURL(handle));}return urls;}
+// Los originales permanecen en Drive; aquí guardamos vistas optimizadas.
+function resize(file){
+  return new Promise((resolve,reject)=>{
+    const src=URL.createObjectURL(file),img=new Image();
+    img.onload=()=>{
+      try{
+        const scale=Math.min(1,1200/Math.max(img.width,img.height));
+        const canvas=document.createElement('canvas');
+        canvas.width=Math.max(1,Math.round(img.width*scale));
+        canvas.height=Math.max(1,Math.round(img.height*scale));
+        const ctx=canvas.getContext('2d');
+        if(!ctx)throw Error('El navegador no pudo procesar la imagen.');
+        ctx.fillStyle='#ffffff';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.drawImage(img,0,0,canvas.width,canvas.height);
+        canvas.toBlob(blob=>{
+          URL.revokeObjectURL(src);
+          if(blob)resolve(blob);
+          else reject(Error('No se pudo comprimir la imagen.'));
+        },'image/jpeg',0.72);
+      }catch(e){URL.revokeObjectURL(src);reject(e);}
+    };
+    img.onerror=()=>{URL.revokeObjectURL(src);reject(Error('Archivo de imagen no válido.'));};
+    img.src=src;
+  });
+}
+const uploadProgress=$('uploadProgress');
+const uploadMeter=$('uploadMeter');
+const uploadStatus=$('uploadStatus');
+function updateUploadStatus(label,progress=null,error=false){
+  if(!uploadProgress)return;
+  uploadProgress.hidden=false;
+  uploadProgress.dataset.error=error?'1':'0';
+  uploadStatus.textContent=label;
+  if(progress===null){uploadMeter.hidden=true;return;}
+  uploadMeter.hidden=false;
+  uploadMeter.value=Math.max(0,Math.min(100,Math.round(progress)));
+}
+function explainStorageError(error){
+  const code=String(error?.code||'');
+  if(['storage/quota-exceeded','storage/unauthorized','storage/bucket-not-found','storage/project-not-found'].includes(code))
+    return 'Firebase Storage rechazó las imágenes ('+code+'). Comprueba que el proyecto tenga el plan Blaze, un bucket activo y las reglas de Storage publicadas. Los enlaces de Drive siguen disponibles.';
+  if(code==='storage/unauthenticated')return 'La sesión expiró mientras subías imágenes. Vuelve a iniciar sesión y prueba de nuevo.';
+  if(code==='storage/retry-limit-exceeded')return 'Firebase Storage no respondió. Comprueba que Storage esté habilitado y que tu conexión funcione.';
+  if(code==='storage/canceled')return 'Se canceló la subida de imágenes.';
+  return 'No se pudo subir una imagen: '+String(error?.message||error);
+}
+function uploadBlob(blob,handle,section,onProgress){
+  return new Promise((resolve,reject)=>{
+    const task=uploadBytesResumable(handle,blob,{contentType:'image/jpeg',customMetadata:{section}});
+    task.on('state_changed',
+      snap=>onProgress(snap.bytesTransferred,Math.max(1,snap.totalBytes)),
+      reject,
+      resolve);
+  });
+}
+async function uploadAllImages(samples,folders,id,version){
+  const jobs=[...samples.map((item,i)=>({item,group:'samples',section:'muestra',i})),
+              ...folders.map((item,i)=>({item,group:'folders',section:'carpeta',i}))];
+  const result={samples:new Array(samples.length),folders:new Array(folders.length)};
+  if(!jobs.length)return result;
+  const uploaded=new Array(jobs.length).fill(0),total=new Array(jobs.length).fill(0);
+  let completed=0,next=0,failed=false;
+  const refresh=()=>{
+    let partial=0;
+    for(let j=0;j<jobs.length;j++)partial+=total[j]?Math.min(1,uploaded[j]/total[j]):0;
+    const percent=Math.min(99,(partial/jobs.length)*100);
+    updateUploadStatus('Subiendo imágenes: '+completed+' de '+jobs.length+' completadas · '+Math.round(percent)+'%',percent);
+    $('saveButton').textContent='Subiendo '+completed+'/'+jobs.length+'…';
+  };
+  updateUploadStatus('Preparando '+jobs.length+' imágenes optimizadas…',0);
+  async function worker(){
+    while(next<jobs.length&&!failed){
+      const index=next++,job=jobs[index];
+      try{
+        const blob=await resize(job.item.file);
+        total[index]=blob.size;
+        refresh();
+        const path='agora-file-previews/'+id+'/v'+version+'/'+job.section+'-'+crypto.randomUUID()+'.jpg';
+        const handle=ref(storage,path);
+        await uploadBlob(blob,handle,job.section,(bytes,full)=>{
+          uploaded[index]=bytes;total[index]=full;refresh();
+        });
+        const url=await getDownloadURL(handle);
+        result[job.group][job.i]=url;
+        uploaded[index]=total[index];
+        completed++;refresh();
+      }catch(error){failed=true;throw error;}
+    }
+  }
+  const settled=await Promise.allSettled(
+    Array.from({length:Math.min(3,jobs.length)},()=>worker()));
+  const error=settled.find(x=>x.status==='rejected');
+  if(error)throw Error(explainStorageError(error.reason));
+  updateUploadStatus('Imágenes listas: '+jobs.length+' de '+jobs.length+'. Guardando expediente…',100);
+  return result;
+}
 function normalizeDrive(raw){const uri=safeHttps(String(raw||'').trim());if(!uri)throw Error('Agrega un enlace válido de Drive con https://');const host=new URL(uri).hostname;if(!['drive.google.com','docs.google.com'].includes(host))throw Error('El enlace debe ser de Google Drive o Google Docs.');return uri;}
-async function saveDelivery(event){event.preventDefault();let btn=$('saveButton');if(btn.disabled)return;btn.disabled=true;btn.textContent='Guardando en Firebase…';try{authRequired();const f=$('deliveryForm'),fd=new FormData(f),read=x=>String(fd.get(x)||'').trim();const recipientEmail=read('recipientEmail').toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail))throw Error('Indica un correo válido para el destinatario.');const validUntil=parseValidUntil(read('validUntil'));const driveUrl=normalizeDrive(read('driveUrl'));const id=editRecord?.id||secret(),version=(editRecord?.version||0)+1;if(sampleSelected.length>8||folderSelected.length>6)throw Error('Hay demasiadas imágenes.');let samples=readImageUrls('sampleUrls',8),folders=readImageUrls('folderUrls',6);if(samples.length+sampleSelected.length>8||folders.length+folderSelected.length>6)throw Error('Se superó el límite entre archivos e imágenes por URL.');if(sampleSelected.length||folderSelected.length){btn.textContent='Subiendo imágenes…';samples=[...samples,...await uploadList(sampleSelected,id,version,'muestra')];folders=[...folders,...await uploadList(folderSelected,id,version,'carpeta')];}const payload={project:read('project'),category:read('category'),title:read('title'),recipientName:read('recipientName'),recipientEmail,driveUrl,validUntil,notes:read('notes'),sampleImages:samples,folderImages:folders};if(!payload.project||!payload.title||!payload.recipientName)throw Error('Completa los campos obligatorios.');const rev={version,title:payload.title,notes:payload.notes,driveUrl,sampleImages:samples,folderImages:folders,publishedAt:new Date().toISOString(),editorEmail:user.email||''};if(editRecord){await runTransaction(db,async tx=>{const path=doc(db,'agora_file_deliveries',id),snap=await tx.get(path);if(!snap.exists())throw Error('El expediente ya no existe.');const old=snap.data();if(old.version!==editRecord.version||!old.active)throw Error('El expediente fue actualizado o revocado por otro usuario. Cierra y abre de nuevo el registro.');if(old.recipientEmail!==recipientEmail)throw Error('No se puede cambiar el destinatario del mismo enlace.');tx.update(path,{...payload,version,revisions:[...old.revisions,rev],updatedAt:serverTimestamp()});});}else{const createdAt=new Date(),folio='ARC-'+createdAt.getFullYear()+'-'+createdAt.toISOString().replace(/\D/g,'').slice(4,12)+'-'+id.slice(0,4).toUpperCase();await setDoc(doc(db,'agora_file_deliveries',id),{...payload,folio,id,version,active:true,createdBy:user.uid,createdByEmail:user.email||'',createdAt:serverTimestamp(),updatedAt:serverTimestamp(),revisions:[rev]});}closeModals();notify(`Envío ${editRecord?'actualizado':'publicado'} en Firebase. El enlace ${editRecord?'continúa siendo el mismo':'ya se puede compartir'}.`);openDetail(id);}catch(e){notify(e.message||String(e),true);}finally{btn.disabled=false;btn.textContent=editRecord?'Publicar nueva versión':'Publicar envío';}}
+async function saveDelivery(event){event.preventDefault();let btn=$('saveButton');if(btn.disabled)return;btn.disabled=true;btn.textContent='Guardando en Firebase…';try{authRequired();const f=$('deliveryForm'),fd=new FormData(f),read=x=>String(fd.get(x)||'').trim();const recipientEmail=read('recipientEmail').toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail))throw Error('Indica un correo válido para el destinatario.');const validUntil=parseValidUntil(read('validUntil'));const driveUrl=normalizeDrive(read('driveUrl'));const id=editRecord?.id||secret(),version=(editRecord?.version||0)+1;if(sampleSelected.length>8||folderSelected.length>6)throw Error('Hay demasiadas imágenes.');let samples=readImageUrls('sampleUrls',8),folders=readImageUrls('folderUrls',6);if(samples.length+sampleSelected.length>8||folders.length+folderSelected.length>6)throw Error('Se superó el límite entre archivos e imágenes por URL.');if(sampleSelected.length||folderSelected.length){const prepared=await uploadAllImages(sampleSelected,folderSelected,id,version);samples=[...samples,...prepared.samples];folders=[...folders,...prepared.folders];btn.textContent='Guardando expediente…';}const payload={project:read('project'),category:read('category'),title:read('title'),recipientName:read('recipientName'),recipientEmail,driveUrl,validUntil,notes:read('notes'),sampleImages:samples,folderImages:folders};if(!payload.project||!payload.title||!payload.recipientName)throw Error('Completa los campos obligatorios.');const rev={version,title:payload.title,notes:payload.notes,driveUrl,sampleImages:samples,folderImages:folders,publishedAt:new Date().toISOString(),editorEmail:user.email||''};if(editRecord){await runTransaction(db,async tx=>{const path=doc(db,'agora_file_deliveries',id),snap=await tx.get(path);if(!snap.exists())throw Error('El expediente ya no existe.');const old=snap.data();if(old.version!==editRecord.version||!old.active)throw Error('El expediente fue actualizado o revocado por otro usuario. Cierra y abre de nuevo el registro.');if(old.recipientEmail!==recipientEmail)throw Error('No se puede cambiar el destinatario del mismo enlace.');tx.update(path,{...payload,version,revisions:[...old.revisions,rev],updatedAt:serverTimestamp()});});}else{const createdAt=new Date(),folio='ARC-'+createdAt.getFullYear()+'-'+createdAt.toISOString().replace(/\D/g,'').slice(4,12)+'-'+id.slice(0,4).toUpperCase();await setDoc(doc(db,'agora_file_deliveries',id),{...payload,folio,id,version,active:true,createdBy:user.uid,createdByEmail:user.email||'',createdAt:serverTimestamp(),updatedAt:serverTimestamp(),revisions:[rev]});}closeModals();notify(`Envío ${editRecord?'actualizado':'publicado'} en Firebase. El enlace ${editRecord?'continúa siendo el mismo':'ya se puede compartir'}.`);openDetail(id);}catch(e){const message=e.message||String(e);notify(message,true);updateUploadStatus(message,null,true);}finally{btn.disabled=false;btn.textContent=editRecord?'Publicar nueva versión':'Publicar envío';}}
 function stopListeners(){for(const u of subscriptions)u();subscriptions=[];readyDeliveries=false;readyResponses=false;deliveries=[];responses.clear();firstResponses=true;}
 /* Estado visible y recuperable: nunca mostrar "sin conexión" indefinidamente. */
 const retrySyncButton=document.createElement('button');
