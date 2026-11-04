@@ -7,6 +7,7 @@ import {getStorage,ref,uploadBytes,getDownloadURL} from 'https://www.gstatic.com
 const config={apiKey:'AIzaSyDPh-AFdST9Ax_Eoho-wT0shlWlCHad6Zg',authDomain:'agora-dejavu-38b8c.firebaseapp.com',projectId:'agora-dejavu-38b8c',storageBucket:'agora-dejavu-38b8c.firebasestorage.app',messagingSenderId:'775680965171',appId:'1:775680965171:web:274557c8c9c25ff304c146'};
 const app=getApps()[0]||initializeApp(config),auth=getAuth(app),db=getFirestore(app),storage=getStorage(app);
 const $=id=>document.getElementById(id);
+window.__AGORA_FILES_BOOT?.mark('module-ready');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=d=>d?.toDate?d.toDate().toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric',timeZone:'America/Mexico_City'}):'—';
 const fmtTime=d=>d?.toDate?d.toDate().toLocaleString('es-MX',{dateStyle:'medium',timeStyle:'short',timeZone:'America/Mexico_City'}):'—';
