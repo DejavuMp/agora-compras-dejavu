@@ -31,7 +31,7 @@ function openEditor(record=null){try{authRequired();}catch(e){notify(e.message,t
 function closeModals(){for(const id of ['editorOverlay','detailOverlay'])$(id).hidden=true;document.body.style.overflow='';}
 function recordLine(r){const state=statusFor(r);const recipient=r.recipientName||'—';return `<tr><td><strong>${esc(r.title)}</strong><small>${esc(r.folio||'Sin folio')} · Versión ${r.version}</small></td><td>${esc(r.project)}<br><small>${esc(r.category)}</small></td><td>${esc(recipient)}<br><small>${esc(r.recipientEmail)}</small></td><td>${fmt(r.validUntil)}</td><td><span class="status-pill ${state}">${statuses[state]}</span></td><td><button class="table-action" type="button" data-detail="${r.id}">Ver expediente</button></td></tr>`;}
 function updateCounters(){const results={};for(const r of deliveries)results[statusFor(r)]=(results[statusFor(r)]||0)+1;$('statTotal').textContent=deliveries.length;$('statPending').textContent=results.pendiente||0;$('statChanges').textContent=results.cambios||0;$('statReceived').textContent=(results.recibido||0)+(results.aprobado||0);}
-function renderList(){if(!readyDeliveries||!readyResponses)return;updateCounters();const q=$('search').value.toLowerCase().trim(),f=$('filter').value;const rows=deliveries.filter(r=>(f==='all'||statusFor(r)===f)&&[r.title,r.project,r.recipientName,r.recipientEmail,r.folio,r.category].join(' ').toLowerCase().includes(q));$('deliveryRows').innerHTML=rows.length?rows.map(recordLine).join(''):'<tr><td colspan="6" class="empty-cell">No se encontraron envíos con estos filtros.</td></tr>';$('syncState').textContent='● Firebase · actualizado';$('syncState').style.color='#2a7355';$('deliveryRows').querySelectorAll('[data-detail]').forEach(el=>el.addEventListener('click',()=>openDetail(el.dataset.detail)));if(openRecord&&!$('detailOverlay').hidden){const updated=deliveries.find(r=>r.id===openRecord);if(updated)renderDetail(updated);}}
+function renderList(){if(!readyDeliveries||!readyResponses)return;updateCounters();const q=$('search').value.toLowerCase().trim(),f=$('filter').value;const rows=deliveries.filter(r=>(f==='all'||statusFor(r)===f)&&[r.title,r.project,r.recipientName,r.recipientEmail,r.folio,r.category].join(' ').toLowerCase().includes(q));$('deliveryRows').innerHTML=rows.length?rows.map(recordLine).join(''):'<tr><td colspan="6" class="empty-cell">No se encontraron envíos con estos filtros.</td></tr>';$('syncState').textContent='● Firebase · actualizado';$('syncState').style.color='#2a7355';retrySyncButton.hidden=true;$('deliveryRows').querySelectorAll('[data-detail]').forEach(el=>el.addEventListener('click',()=>openDetail(el.dataset.detail)));if(openRecord&&!$('detailOverlay').hidden){const updated=deliveries.find(r=>r.id===openRecord);if(updated)renderDetail(updated);}}
 function responseTimeline(r){return selectedRevisions(r).slice().reverse().map(v=>{const resp=responseFor(r.id,v.version);return `<div class="timeline-item"><b>Versión ${v.version} · ${esc(v.title||r.title)}</b><br><small>Publicada: ${esc(v.publishedAt?new Date(v.publishedAt).toLocaleString('es-MX'):'—')}</small><p>${esc(v.notes||'Sin instrucciones adicionales')}</p>${resp?`<div class="feedback-note"><strong>${statuses[resp.status]||resp.status}</strong> · ${esc(resp.receiverName)}<br>${esc(resp.comments||'Sin comentarios')}<br><small>${fmtTime(resp.createdAt)} · ${esc(resp.receiverEmail)}</small></div>`:'<small>Sin respuesta registrada para esta versión.</small>'}</div>`;}).join('');}
 function renderDetail(r){const state=statusFor(r),res=responseFor(r.id,r.version),url=urlFor(r.id),active=r.active;const link=safeHttps(r.driveUrl);$('detailTitle').textContent=r.title;$('detailSub').textContent=`${r.folio||''} · ${r.project} · Versión ${r.version}`;$('detailContent').innerHTML=`
  <div class="head-row"><span class="status-pill ${state}">${statuses[state]}</span><small class="muted">Actualizado: ${fmtTime(r.updatedAt)}</small></div>
@@ -51,9 +51,90 @@ async function uploadList(items,id,version,section){const urls=[];for(let i=0;i<
 function normalizeDrive(raw){const uri=safeHttps(String(raw||'').trim());if(!uri)throw Error('Agrega un enlace válido de Drive con https://');const host=new URL(uri).hostname;if(!['drive.google.com','docs.google.com'].includes(host))throw Error('El enlace debe ser de Google Drive o Google Docs.');return uri;}
 async function saveDelivery(event){event.preventDefault();let btn=$('saveButton');if(btn.disabled)return;btn.disabled=true;btn.textContent='Guardando en Firebase…';try{authRequired();const f=$('deliveryForm'),fd=new FormData(f),read=x=>String(fd.get(x)||'').trim();const recipientEmail=read('recipientEmail').toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail))throw Error('Indica un correo válido para el destinatario.');const validUntil=parseValidUntil(read('validUntil'));const driveUrl=normalizeDrive(read('driveUrl'));const id=editRecord?.id||secret(),version=(editRecord?.version||0)+1;if(sampleSelected.length>8||folderSelected.length>6)throw Error('Hay demasiadas imágenes.');let samples=readImageUrls('sampleUrls',8),folders=readImageUrls('folderUrls',6);if(samples.length+sampleSelected.length>8||folders.length+folderSelected.length>6)throw Error('Se superó el límite entre archivos e imágenes por URL.');if(sampleSelected.length||folderSelected.length){btn.textContent='Subiendo imágenes…';samples=[...samples,...await uploadList(sampleSelected,id,version,'muestra')];folders=[...folders,...await uploadList(folderSelected,id,version,'carpeta')];}const payload={project:read('project'),category:read('category'),title:read('title'),recipientName:read('recipientName'),recipientEmail,driveUrl,validUntil,notes:read('notes'),sampleImages:samples,folderImages:folders};if(!payload.project||!payload.title||!payload.recipientName)throw Error('Completa los campos obligatorios.');const rev={version,title:payload.title,notes:payload.notes,driveUrl,sampleImages:samples,folderImages:folders,publishedAt:new Date().toISOString(),editorEmail:user.email||''};if(editRecord){await runTransaction(db,async tx=>{const path=doc(db,'agora_file_deliveries',id),snap=await tx.get(path);if(!snap.exists())throw Error('El expediente ya no existe.');const old=snap.data();if(old.version!==editRecord.version||!old.active)throw Error('El expediente fue actualizado o revocado por otro usuario. Cierra y abre de nuevo el registro.');if(old.recipientEmail!==recipientEmail)throw Error('No se puede cambiar el destinatario del mismo enlace.');tx.update(path,{...payload,version,revisions:[...old.revisions,rev],updatedAt:serverTimestamp()});});}else{const createdAt=new Date(),folio='ARC-'+createdAt.getFullYear()+'-'+createdAt.toISOString().replace(/\D/g,'').slice(4,12)+'-'+id.slice(0,4).toUpperCase();await setDoc(doc(db,'agora_file_deliveries',id),{...payload,folio,id,version,active:true,createdBy:user.uid,createdByEmail:user.email||'',createdAt:serverTimestamp(),updatedAt:serverTimestamp(),revisions:[rev]});}closeModals();notify(`Envío ${editRecord?'actualizado':'publicado'} en Firebase. El enlace ${editRecord?'continúa siendo el mismo':'ya se puede compartir'}.`);openDetail(id);}catch(e){notify(e.message||String(e),true);}finally{btn.disabled=false;btn.textContent=editRecord?'Publicar nueva versión':'Publicar envío';}}
 function stopListeners(){for(const u of subscriptions)u();subscriptions=[];readyDeliveries=false;readyResponses=false;deliveries=[];responses.clear();firstResponses=true;}
-function connect(){stopListeners();$('syncState').textContent='Conectando…';subscriptions.push(onSnapshot(collection(db,'agora_file_deliveries'),snap=>{deliveries=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.updatedAt?.toMillis?.()||0)-(a.updatedAt?.toMillis?.()||0));readyDeliveries=true;renderList();},e=>{notify('No se pudo obtener el historial: '+e.message,true);$('syncState').textContent='Error de conexión';}));subscriptions.push(onSnapshot(collectionGroup(db,'agora_file_reply_versions'),snap=>{const previous=new Set(responses.keys());responses=new Map(snap.docs.map(d=>{const v=d.data();return [v.deliveryId+'_v'+v.version,v];}));if(!firstResponses){const fresh=[...responses.keys()].filter(k=>!previous.has(k));if(fresh.length)notify(`Se registraron ${fresh.length} nueva(s) respuesta(s) a envíos.`);}firstResponses=false;readyResponses=true;renderList();},e=>{notify('No se pudieron consultar las respuestas: '+e.message,true);}));}
-async function checkRole(person){const token=person.uid;const snap=await getDoc(doc(db,'agora_users',token));if(auth.currentUser?.uid!==token)return;role=snap.exists()&&snap.data().active===true?snap.data().role:null;if(!['admin','coordinador','consulta'].includes(role))throw Error('Tu cuenta todavía no cuenta con permiso en ÁGORA.');$('userLabel').textContent=(person.email||'Cuenta conectada')+' · '+role;$('authButton').textContent='Cerrar sesión';$('newButton').disabled=$('menuNew').disabled=!['admin','coordinador'].includes(role);connect();}
-onAuthStateChanged(auth,async person=>{stopListeners();user=person;role=null;closeModals();$('authButton').textContent=person?'Cerrar sesión':'Iniciar sesión';$('userLabel').textContent=person?.email||'Sin sesión';$('newButton').disabled=true;$('menuNew').disabled=true;$('statTotal').textContent=$('statPending').textContent=$('statChanges').textContent=$('statReceived')='—';$('deliveryRows').innerHTML='<tr><td colspan="6" class="empty-cell">Inicia sesión con una cuenta de ÁGORA para ver tus registros.</td></tr>';if(!person){$('syncState').textContent='Sin sesión';return;}try{await checkRole(person);}catch(e){notify(e.message,true);$('syncState').textContent='Sin permiso';}});
+/* Estado visible y recuperable: nunca mostrar "sin conexión" indefinidamente. */
+const retrySyncButton=document.createElement('button');
+retrySyncButton.type='button';
+retrySyncButton.id='retrySyncButton';
+retrySyncButton.textContent='Reintentar';
+retrySyncButton.title='Revisar de nuevo la conexión y los permisos de Firebase';
+retrySyncButton.style.cssText='margin-left:10px;padding:7px 10px;border:1px solid #cbb28a;border-radius:8px;background:#fff;color:#6f512a;font:600 12px Arial;cursor:pointer';
+retrySyncButton.hidden=true;
+$('syncState').insertAdjacentElement('afterend',retrySyncButton);
+let checkingRole=false;
+let connectionSerial=0;
+function connectionError(prefix,e){
+  const details=String(e?.message||e||'Error desconocido');
+  const isPerm=e?.code==='permission-denied'||/permission|permiso|acceso denegado/i.test(details);
+  $('syncState').textContent=isPerm?'Permiso denegado':'Error de Firebase';
+  $('syncState').style.color='#a34f31';
+  retrySyncButton.hidden=false;
+  notify(prefix+': '+details,true);
+  console.error('[ÁGORA Archivos]',prefix,e);
+}
+function connect(){
+  stopListeners();
+  const stamp=++connectionSerial;
+  $('syncState').textContent='Cargando historial…';
+  $('syncState').style.color='';
+  retrySyncButton.hidden=true;
+  subscriptions.push(onSnapshot(collection(db,'agora_file_deliveries'),snap=>{
+    if(stamp!==connectionSerial)return;
+    deliveries=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.updatedAt?.toMillis?.()||0)-(a.updatedAt?.toMillis?.()||0));
+    readyDeliveries=true;renderList();
+  },e=>{if(stamp===connectionSerial)connectionError('No se pudo consultar envíos',e);}));
+  subscriptions.push(onSnapshot(collectionGroup(db,'agora_file_reply_versions'),snap=>{
+    if(stamp!==connectionSerial)return;
+    const previous=new Set(responses.keys());
+    responses=new Map(snap.docs.map(d=>{const v=d.data();return [v.deliveryId+'_v'+v.version,v];}));
+    if(!firstResponses){const fresh=[...responses.keys()].filter(k=>!previous.has(k));if(fresh.length)notify('Se registraron '+fresh.length+' nueva(s) respuesta(s) a envíos.');}
+    firstResponses=false;readyResponses=true;renderList();
+  },e=>{if(stamp===connectionSerial)connectionError('No se pudieron consultar respuestas',e);}));
+  setTimeout(()=>{
+    if(stamp===connectionSerial&&auth.currentUser&&(!readyDeliveries||!readyResponses)){
+      const pending=[!readyDeliveries?'envíos':null,!readyResponses?'respuestas':null].filter(Boolean).join(' y ');
+      connectionError('Sin respuesta de Firestore para '+pending,new Error('La consulta no terminó. Comprueba tu conexión o las reglas publicadas y pulsa Reintentar.'));
+    }
+  },16000);
+}
+async function checkRole(person){
+  if(checkingRole)return;
+  checkingRole=true;
+  retrySyncButton.hidden=true;
+  $('syncState').textContent='Verificando permisos…';
+  $('syncState').style.color='';
+  try{
+    const token=person.uid;
+    const snap=await Promise.race([
+      getDoc(doc(db,'agora_users',token)),
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error('Firestore no respondió durante 15 segundos. Comprueba que tu navegador permita conexiones a firestore.googleapis.com.')),15000))
+    ]);
+    if(auth.currentUser?.uid!==token)return;
+    role=snap.exists()&&snap.data().active===true?snap.data().role:null;
+    if(!['admin','coordinador','consulta'].includes(role))throw Error('Tu cuenta de Google no tiene un documento agora_users activo con rol admin, coordinador o consulta.');
+    $('userLabel').textContent=(person.email||'Cuenta conectada')+' · '+role;
+    $('authButton').textContent='Cerrar sesión';
+    $('newButton').disabled=$('menuNew').disabled=!['admin','coordinador'].includes(role);
+    connect();
+  }finally{checkingRole=false;}
+}
+async function retryConnection(){
+  if(!auth.currentUser){$('syncState').textContent='Inicia sesión primero';return;}
+  try{await checkRole(auth.currentUser);}catch(e){connectionError('No se pudo verificar la cuenta',e);}
+}
+retrySyncButton.addEventListener('click',retryConnection);
+window.addEventListener('online',()=>{if(auth.currentUser&&retrySyncButton.hidden===false)retryConnection();});
+onAuthStateChanged(auth,async person=>{
+  ++connectionSerial;
+  stopListeners();
+  user=person;role=null;closeModals();
+  $('authButton').textContent=person?'Cerrar sesión':'Iniciar sesión';
+  $('userLabel').textContent=person?.email||'Sin sesión';
+  $('newButton').disabled=true;$('menuNew').disabled=true;
+  $('statTotal').textContent=$('statPending').textContent=$('statChanges').textContent=$('statReceived')='—';
+  $('deliveryRows').innerHTML='<tr><td colspan="6" class="empty-cell">Verificando el acceso a Firebase…</td></tr>';
+  if(!person){$('syncState').textContent='Sin sesión';retrySyncButton.hidden=true;return;}
+  await retryConnection();
+});
 $('authButton').addEventListener('click',async()=>{try{if(user)await signOut(auth);else await signInWithPopup(auth,new GoogleAuthProvider());}catch(e){notify('Error de autenticación: '+e.message,true);}});
 $('deliveryForm').addEventListener('submit',saveDelivery);$('sampleFiles').addEventListener('change',e=>addFiles(e.target,sampleSelected,'samplePreview',8));$('folderFiles').addEventListener('change',e=>addFiles(e.target,folderSelected,'folderPreview',6));$('search').addEventListener('input',renderList);$('filter').addEventListener('change',renderList);
 $('newButton').addEventListener('click',()=>openEditor());$('menuNew').addEventListener('click',()=>openEditor());$('menuHistory').addEventListener('click',()=>{$('search').focus();$('sidebar').classList.remove('mobile-open');});
