@@ -29,3 +29,20 @@ Actualización aplicada al repositorio: 4 de noviembre de 2026.
 - Código JavaScript revisado en sintaxis y presencia de los elementos del flujo.
 - No se ha comprobado un correo real enviado desde el Gmail del usuario ni el clic de un proveedor real en Firebase.
 - La publicación final por GitHub Pages se realiza si el repositorio ya tiene Pages activo para esa rama; verificar en el enlace público.
+
+## Material de referencia incorporado (04/11/2026)
+
+Al final de **Muestras → Solicitud de muestras** encontrarás un único bloque de referencias:
+
+- **Link de Drive:** pega la URL de la carpeta o archivo de referencia y ábrela desde la propia solicitud.
+- **Indicaciones:** detalla materiales, medidas, colores, acabados o instrucciones para fabricar la muestra.
+- **Imágenes de muestra:** hasta 6 fotos (JPG, PNG o WebP) desde computadora o celular, optimizadas para el expediente.
+- **Imágenes de Drive:** hasta 12 enlaces individuales de fotos de Google Drive, con miniaturas cuando Drive autorice su visualización.
+
+La información aparecerá al final del correo con fotos, en la vista PDF y en el formulario web del proveedor. Los enlaces externos de Drive **requieren permisos de visualización para el destinatario**. La aplicación no puede importar automáticamente el contenido completo de una carpeta de Drive.
+
+**Antes de compartir:** completa las referencias y luego genera el enlace del proveedor. Si modificas las referencias de una invitación pendiente, ÁGORA pedirá confirmación para cancelar el enlace anterior y crear uno nuevo. Si el proveedor ya acusó o contestó, conserva ese expediente y genera otra solicitud de muestras.
+
+### Herramienta independiente de envío de archivos
+
+Se retiró de la navegación principal de ÁGORA. No se han borrado expedientes ni registros históricos de Firebase y los flujos de presupuestos, solicitudes de muestras y pedidos siguen activos.
