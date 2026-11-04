@@ -77,13 +77,7 @@ service cloud.firestore {
         request.resource.data.response == null;
     }
     function publicTokenIsValid(token) {
-      return token.matches('^[A-Za-z0-9_-]{43}
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-) &&
+      return token.matches('^[A-Za-z0-9_-]{43}$') &&
         resource.data.expiresAt > request.time &&
         resource.data.status in ['pendiente','recibida','cotizada'];
     }
@@ -121,13 +115,7 @@ service cloud.firestore {
     match /provider_invites/{token} {
       allow get: if activeStaff() || publicTokenIsValid(token);
       allow list: if activeStaff();
-      allow create: if token.matches('^[A-Za-z0-9_-]{43}
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-) && validInviteCreate();
+      allow create: if token.matches('^[A-Za-z0-9_-]{43}$') && validInviteCreate();
       allow update: if validSupplierReceipt(token) || validSupplierResponse(token) ||
         (canEdit() &&
           request.resource.data.diff(resource.data).affectedKeys()
@@ -136,8 +124,7 @@ service cloud.firestore {
           request.resource.data.updatedAt == request.time);
       allow delete: if isAdmin();
     }
-
-    // Ni invitaciones de proveedores ni datos privados quedan abiertos al público.
+    // Todas las demás colecciones permanecen cerradas.
     match /{document=**} {
       allow read, write: if false;
     }
