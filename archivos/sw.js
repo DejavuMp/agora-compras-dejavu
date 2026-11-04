@@ -1,5 +1,5 @@
 // ÁGORA Archivos · caché propio, independiente de Compras & Producción
-const CACHE='agora-archivos-web-v1';
+const CACHE='agora-archivos-web-v2-fix-storage';
 const ASSETS=['./','./index.html','./app.js','./style.css','./recibir.html','./recibir.js','./manifest.webmanifest'];
 self.addEventListener('install',event=>event.waitUntil(
   caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())
