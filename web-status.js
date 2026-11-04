@@ -32,3 +32,10 @@ agoraCloudScript.type='module';
 agoraCloudScript.src='./agora-cloud.js';
 agoraCloudScript.onerror=()=>console.warn('ÁGORA: No se pudo cargar la interfaz de nube. Sigue disponible el respaldo local.');
 document.head.appendChild(agoraCloudScript);
+
+// Formularios online para proveedores: enlace directo, sin adjuntos.
+const agoraInvitesScript=document.createElement('script');
+agoraInvitesScript.type='module';
+agoraInvitesScript.src='./agora-invites.js';
+agoraInvitesScript.onerror=()=>console.warn('ÁGORA: No se pudo cargar el envío online.');
+document.head.appendChild(agoraInvitesScript);
