@@ -1,173 +1,308 @@
 import * as authSdk from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
 import * as dbSdk from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
-(function cloudRuntime({authSdk,dbSdk}) {
-  const roles=["admin","coordinador","consulta"];
-  const groups=["rfqs","orders","samples","suppliers"];
-  const authCol="agora_users",recordsCol="agora_records";
-  const escape=s=>String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-  let fb=null,account=null,role=null,mode="local",busy=false,backupOk=false,panel=null,initialized=false,collapsed=false;
-  let note="El guardado local continúa funcionando. Activa la nube para sincronizar.";
-  let revisions=new Map(),baseline=new Map(),timer=0,activeSync=false,pending=false;
-  const canEdit=()=>role==="admin"||role==="coordinador";
-  const key=(type,id)=>type+"__"+encodeURIComponent(String(id));
-  const local=()=>window.AGORA_LOCAL;
-  function tell(message){note=message;render();}
-  function toMap(data){
-    if(data?.app!=="agora-compras-v1")throw Error("Formato local incompatible.");
-    const fields={...data};groups.forEach(t=>delete fields[t]);
-    const items=[{kind:"settings",recordId:"main",payload:fields}];
-    for(const type of groups)for(const value of data[type]||[]) {
-      if(!value.id)throw Error("Registro sin ID en "+type);
-      items.push({kind:type,recordId:String(value.id),payload:value});
+(()=>{
+  const ROLES=['admin','coordinador','consulta'],TYPES=['rfqs','orders','samples','suppliers'],COL='agora_records',META='AGORA_SYNC_V2';
+  let fb,account=null,role=null,appReady=false,initialized=false,panel=null;
+  let mode='starting',message='Preparando conexión con Firebase...',inFlight=false,pending=false,applying=false;
+  let baseline=new Map(),hasBase=false,epoch=0,authSerial=0,dbPromise=null,syncTimer=null;
+  const local=()=>window.AGORA_LOCAL,editable=()=>['admin','coordinador'].includes(role);
+  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const key=(kind,id)=>kind+'__'+encodeURIComponent(String(id));
+  const json=x=>x==null?null:JSON.stringify(x);
+  function status(next,text){
+    mode=next;message=text;
+    const dictionary={cloud:['Firebase · sincronizado','cloud'],saving:['Firebase · guardando','pending'],offline:['Sin internet · copia local','offline'],starting:['Conectando con Firebase','pending'],setup:['Primera conexión · revisar','pending'],conflict:['Conflicto · revisar','error'],error:['Error de nube · copia local','error'],signedout:['Sin sesión · copia local','offline'],consulta:['Firebase · consulta','cloud'],local:['Copia local · sin sincronizar','offline']};
+    const [label,state]=dictionary[next]||dictionary.local;
+    window.AGORA_CLOUD_STATUS=Object.freeze({mode:next,label,status:state,description:text});
+    window.dispatchEvent(new CustomEvent('agora:cloud-status',{detail:window.AGORA_CLOUD_STATUS}));
+    render();
+  }
+  function openDB(){
+    if(dbPromise)return dbPromise;
+    dbPromise=new Promise((res,rej)=>{
+      if(!window.indexedDB)return rej(Error('El navegador bloquea el almacenamiento local.'));
+      const req=indexedDB.open(META,1);
+      req.onupgradeneeded=()=>{
+        if(!req.result.objectStoreNames.contains('sync'))req.result.createObjectStore('sync');
+        if(!req.result.objectStoreNames.contains('safety'))req.result.createObjectStore('safety');
+      };
+      req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error||Error('No se pudo abrir IndexedDB'));
+    });
+    return dbPromise;
+  }
+  async function readStore(store,id){
+    const db=await openDB();
+    return new Promise((res,rej)=>{
+      const tx=db.transaction(store,'readonly'),rq=tx.objectStore(store).get(id);
+      rq.onsuccess=()=>res(rq.result);rq.onerror=()=>rej(rq.error||Error('Lectura local fallida'));
+    });
+  }
+  async function writeStore(store,id,value){
+    const db=await openDB();
+    return new Promise((res,rej)=>{
+      const tx=db.transaction(store,'readwrite');
+      tx.objectStore(store).put(value,id);
+      tx.oncomplete=()=>res();tx.onabort=()=>rej(tx.error||Error('Error de respaldo local'));
+      tx.onerror=()=>rej(tx.error||Error('No se pudo guardar la copia local'));
+    });
+  }
+  async function safety(uid,why){
+    await writeStore('safety',uid+'-'+Date.now(),{why,date:new Date().toISOString(),payload:local().snapshot()});
+  }
+  async function loadBase(uid){
+    const saved=await readStore('sync',uid);
+    if(!saved?.ready)return false;
+    baseline=new Map(saved.records||[]);
+    return true;
+  }
+  async function saveBase(uid){
+    await writeStore('sync',uid,{ready:true,records:[...baseline],at:Date.now()});
+  }
+  function mapLocal(data){
+    if(data?.app!=='agora-compras-v1')throw Error('Formato local desconocido.');
+    const root={...data};for(const t of TYPES)delete root[t];
+    const values=[{kind:'settings',recordId:'main',payload:root}];
+    for(const type of TYPES){
+      if(!Array.isArray(data[type]))throw Error('Falta la colección local '+type);
+      for(const row of data[type]){
+        if(!row?.id)throw Error('Un expediente '+type+' carece de ID.');
+        values.push({kind:type,recordId:String(row.id),payload:row});
+      }
     }
     const result=new Map();
-    for(const item of items){
-      const id=key(item.kind,item.recordId);
-      if(result.has(id))throw Error("ID duplicado: "+id);
-      if(new Blob([JSON.stringify(item.payload)]).size>850000)throw Error("Expediente "+id+" demasiado grande para Firestore (imágenes incluidas). No se sincronizó; el original permanece local.");
-      result.set(id,item);
+    for(const value of values){
+      const id=key(value.kind,value.recordId);
+      if(result.has(id))throw Error('Registro duplicado '+id);
+      if(new Blob([JSON.stringify(value.payload)]).size>850000)throw Error('El registro '+value.recordId+' tiene imágenes o datos de más de 850 KB. Está protegido localmente, pero no puede subirse a Firestore sin reducir adjuntos.');
+      result.set(id,value);
     }
     return result;
   }
-  function fromDocs(records){
-    const settings=records.find(x=>x.kind==="settings"&&x.recordId==="main");
-    if(!settings)throw Error("No hay configuración completa en la nube.");
-    const data={...settings.payload};
-    for(const type of groups)data[type]=records.filter(x=>x.kind===type).map(x=>x.payload);
-    if(data.app!=="agora-compras-v1")throw Error("Versión de nube incompatible.");
+  function mapRemote(snapshot){
+    return new Map(snapshot.docs.map(doc=>{
+      const row=doc.data();
+      return [doc.id,{revision:Number(row.revision||0),value:{kind:row.kind,recordId:row.recordId,payload:row.payload}}];
+    }));
+  }
+  function hydrate(remote){
+    const items=[...remote.values()].map(row=>row.value);
+    const main=items.find(x=>x.kind==='settings'&&x.recordId==='main');
+    if(!main||main.payload?.app!=='agora-compras-v1')throw Error('La nube no contiene una configuración de ÁGORA válida.');
+    const data={...main.payload};
+    for(const type of TYPES)data[type]=items.filter(x=>x.kind===type).map(x=>x.payload);
     return data;
   }
-  function backup(){
-    const data=local()?.snapshot();
-    if(!data)throw Error("Ágora todavía no está lista.");
-    const href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
-    const a=document.createElement("a");a.href=href;a.download="AGORA_RESPALDO_"+new Date().toISOString().slice(0,10)+".json";
+  function download(){
+    const snapshot=local()?.snapshot();
+    if(!snapshot)throw Error('ÁGORA aún está cargando.');
+    const href=URL.createObjectURL(new Blob([JSON.stringify(snapshot,null,2)],{type:'application/json'}));
+    const a=document.createElement('a');a.href=href;a.download='AGORA_RESPALDO_'+new Date().toISOString().slice(0,10)+'.json';
     document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(href),1000);
-    backupOk=true;tell("Respaldo descargado. Guárdalo fuera del navegador.");
   }
-  async function writeRecord(id,item){
-    const ref=dbSdk.doc(fb.firestore,recordsCol,id),expected=revisions.get(id)||0;
+  function closeAfterSuccess(){if(panel)panel.hidden=true;}
+  function applyRemote(remote){
+    applying=true;
+    try{local().applyCloud(hydrate(remote));}
+    finally{applying=false;}
+    window.dispatchEvent(new CustomEvent('agora:cloud-applied'));
+  }
+  async function writeRevision(uid,id,value,expected){
+    const ref=dbSdk.doc(fb.firestore,COL,id);
     await dbSdk.runTransaction(fb.firestore,async tx=>{
       const got=await tx.get(ref);
-      const rev=got.exists()?Number(got.data().revision||0):0;
-      if(rev!==expected)throw Error("Conflicto de versión en "+id+"; no se sobrescribió.");
-      if(item)tx.set(ref,{...item,revision:rev+1,updatedBy:account.uid,updatedAt:dbSdk.serverTimestamp()});
+      const actual=got.exists()?Number(got.data().revision||0):0;
+      if(actual!==expected)throw Error('Otro equipo actualizó '+id+'. No se sobrescribió. Revisa antes de reintentar.');
+      if(value)tx.set(ref,{...value,revision:actual+1,updatedBy:uid,updatedAt:dbSdk.serverTimestamp()});
       else if(got.exists())tx.delete(ref);
     });
-    if(item){revisions.set(id,expected+1);baseline.set(id,JSON.stringify(item));}
-    else{revisions.delete(id);baseline.delete(id);}
+    if(value)baseline.set(id,{revision:expected+1,text:json(value)});
+    else baseline.delete(id);
+    await saveBase(uid);
   }
-  async function pushChanges(){
-    if(mode!=="cloud"||!canEdit())return;
-    if(activeSync){pending=true;return;}
-    activeSync=true;
+  function schedule(fast=false){
+    if(!account||!role||applying)return;
+    pending=true;clearTimeout(syncTimer);
+    syncTimer=setTimeout(()=>sync(false),fast?100:1200);
+  }
+  async function sync(adopt=false){
+    if(inFlight){pending=true;return;}
+    if(!account||!role||!appReady)return;
+    if(!navigator.onLine){status('offline','No hay internet. Los cambios se guardan en este navegador y se enviarán automáticamente al reconectar.');return;}
+    const uid=account.uid,stamp=authSerial,startEpoch=epoch;
+    inFlight=true;pending=false;status('saving','Verificando los expedientes de Firebase...');
     try{
-      do{
-        pending=false;
-        const next=toMap(local().snapshot());
-        const ids=new Set([...next.keys(),...baseline.keys()]);
-        let changed=0;
-        for(const id of ids){
-          const item=next.get(id)||null;
-          if((item?JSON.stringify(item):null)===(baseline.get(id)||null))continue;
-          await writeRecord(id,item);changed++;
+      let remote=mapRemote(await dbSdk.getDocsFromServer(dbSdk.collection(fb.firestore,COL)));
+      if(stamp!==authSerial)return;
+      if(!hasBase){
+        const found=await loadBase(uid);hasBase=true;
+        if(!found){
+          const current=local().snapshot();
+          const localRecords=TYPES.some(t=>current[t]?.length);
+          if(remote.size){
+            if(localRecords&&!adopt){
+              status('setup','Firebase contiene información y este navegador tiene expedientes locales. Debes elegir una sola vez cómo continuar para evitar pérdidas.');
+              return;
+            }
+            // Nunca subir automáticamente la copia local sobre los documentos existentes.
+            await safety(uid,'Antes de adoptar Firebase');
+            baseline=new Map([...remote].map(([id,row])=>[id,{revision:row.revision,text:json(row.value)}]));
+            await saveBase(uid);
+            if(stamp!==authSerial)return;
+            if(epoch!==startEpoch){pending=true;return;}
+            applyRemote(remote);
+            status(editable()?'cloud':'consulta','Firebase es la fuente principal. Se guardó una copia local de seguridad.');
+            closeAfterSuccess();
+            return;
+          }
+          // La nube está vacía: conservar copia local y subir expedientes existentes.
+          await safety(uid,'Primera carga en Firebase');
+          baseline=new Map();await saveBase(uid);
         }
-        if(changed)tell("Guardado en Firestore: "+changed+" cambios.");
-      }while(pending&&mode==="cloud");
-    }catch(e){mode="error";tell("Sincronización detenida: "+e.message+". Haz respaldo antes de volver a cargar.");}
-    finally{activeSync=false;render();}
-  }
-  async function connect(){
-    if(busy||!role||!account)return;
-    if(!backupOk)return tell("Primero descarga un respaldo local.");
-    busy=true;render();
-    try{
-      const results=await dbSdk.getDocs(dbSdk.collection(fb.firestore,recordsCol));
-      const records=results.docs.map(d=>({key:d.id,...d.data()}));
-      if(!records.length){
-        if(!canEdit())throw Error("No tienes permiso para crear registros.");
-        if(!confirm("La nube está vacía. ¿Copiar ahora los registros locales a Firestore?"))return;
-        const next=toMap(local().snapshot());
-        revisions.clear();baseline.clear();
-        for(const [id,item] of next)await writeRecord(id,item);
-        mode="cloud";tell("Nube activada. Los cambios posteriores se guardan automáticamente.");
-      }else{
-        if(!confirm("Se abrirán los datos de Firebase en este navegador. ¿Confirmas que ya guardaste tu respaldo?"))return;
-        const next=fromDocs(records);
-        revisions=new Map(records.map(x=>[x.key,Number(x.revision||0)]));
-        baseline=new Map(records.map(x=>[x.key,JSON.stringify({kind:x.kind,recordId:x.recordId,payload:x.payload})]));
-        mode="local";local().applyCloud(next);
-        mode=canEdit()?"cloud":"consulta";
-        tell(mode==="cloud"?"Datos de Firebase cargados. Guardado automático activo.":"Datos abiertos en modo consulta.");
       }
-    }catch(e){mode="error";tell("Error al conectar: "+e.message);}
-    finally{busy=false;render();}
+      const current=mapLocal(local().snapshot());
+      const ids=new Set([...current.keys(),...baseline.keys()]);
+      const dirty=[...ids].filter(id=>json(current.get(id)||null)!==(baseline.get(id)?.text||null));
+      const conflicts=dirty.filter(id=>{
+        const mine=current.get(id)||null,there=remote.get(id)||null;
+        return (baseline.get(id)?.revision||0)!==(there?.revision||0) && json(mine)!==json(there?.value||null);
+      });
+      if(conflicts.length){
+        status('conflict','Se detectaron modificaciones simultáneas en '+conflicts.length+' expediente(s). Ningún dato fue sobrescrito. Conservamos ambas copias.');
+        return;
+      }
+      if(dirty.length&&!editable()){
+        status('consulta','Tu cuenta es de consulta. Los cambios locales se conservaron sin subirlos.');
+        return;
+      }
+      for(const id of dirty){
+        if(stamp!==authSerial)return;
+        const value=current.get(id)||null,there=remote.get(id)||null;
+        if(json(value)===json(there?.value||null)){
+          if(value)baseline.set(id,{revision:there.revision,text:json(value)});
+          else baseline.delete(id);
+          await saveBase(uid);continue;
+        }
+        await writeRevision(uid,id,value,baseline.get(id)?.revision||0);
+      }
+      remote=mapRemote(await dbSdk.getDocsFromServer(dbSdk.collection(fb.firestore,COL)));
+      if(stamp!==authSerial)return;
+      if(epoch!==startEpoch){pending=true;return;}
+      const snapshot=local().snapshot(),newData=hydrate(remote);
+      if(json(snapshot)!==json(newData)){
+        await safety(uid,'Actualización automática desde Firebase');
+        if(epoch!==startEpoch){pending=true;return;}
+        applyRemote(remote);
+      }
+      baseline=new Map([...remote].map(([id,row])=>[id,{revision:row.revision,text:json(row.value)}]));
+      await saveBase(uid);
+      status(editable()?'cloud':'consulta',editable()?'Firebase sincronizado. Los cambios posteriores se guardarán automáticamente en la nube y en este navegador.':'Datos recibidos de Firebase. Cuenta de consulta.');
+      closeAfterSuccess();
+    }catch(error){
+      const problem=String(error?.message||error);
+      if(!navigator.onLine||/offline|network|unavailable|failed to fetch/i.test(problem)){
+        status('offline','Sin conexión con Firebase. Los cambios siguen a salvo localmente y se reintentarán al recuperar internet.');
+      }else{
+        status('error','No se pudo sincronizar: '+problem+' Se conservaron los cambios locales.');
+        console.warn('ÁGORA nube',error);
+      }
+    }finally{
+      inFlight=false;
+      if(pending&&account&&role&&navigator.onLine&&!['setup','conflict'].includes(mode))schedule(true);
+    }
   }
-  async function authorizeUser(){
-    if(role!=="admin")return;
-    const uid=prompt("UID de Authentication del colaborador:");if(!uid)return;
-    if(!/^[A-Za-z0-9_-]{8,128}$/.test(uid))return tell("UID inválido.");
-    const email=prompt("Correo Google del colaborador:");if(!email||!email.includes("@"))return;
-    const assigned=prompt("Rol (admin / coordinador / consulta):","consulta");
-    if(!roles.includes(assigned))return tell("El rol indicado no es válido.");
-    await dbSdk.setDoc(dbSdk.doc(fb.firestore,authCol,uid),{email:email.trim().toLowerCase(),role:assigned,active:true,updatedAt:dbSdk.serverTimestamp()},{merge:true});
-    tell("Usuario autorizado por UID. Se aplicaron los permisos.");
+  async function allowUser(){
+    if(role!=='admin')return;
+    const uid=prompt('UID del colaborador:');
+    if(!uid||!/^[A-Za-z0-9_-]{8,128}$/.test(uid))return;
+    const email=prompt('Correo del colaborador:');if(!email?.includes('@'))return;
+    const assigned=prompt('Rol: admin / coordinador / consulta','consulta');
+    if(!ROLES.includes(assigned))return;
+    await dbSdk.setDoc(dbSdk.doc(fb.firestore,'agora_users',uid),{email:email.toLowerCase().trim(),role:assigned,active:true,updatedAt:dbSdk.serverTimestamp()},{merge:true});
+    status(mode,'Colaborador autorizado.');
   }
   function render(){
     if(!panel)return;
-    panel.innerHTML=`
-      <div style="display:flex;justify-content:space-between;gap:8px"><strong style="color:#eac58b">☁ ÁGORA · Nube</strong><button data-cloud="toggle" style="margin-left:auto;background:transparent;border:1px solid #9e7843;border-radius:5px;color:#eac58b;padding:3px 6px;cursor:pointer">Ocultar</button><span>${escape(mode)}</span></div>
-      <div style="margin:8px 0">${escape(note)}</div>
-      <div style="opacity:.8">${account?escape(account.email)+" · "+escape(role||"Sin autorización"):"Sin sesión"}</div>
-      ${account&&!role?`<div style="margin:8px 0">Para autorizar tu cuenta, crea en Firestore la colección <b>agora_users</b> con un documento cuyo ID sea tu UID, y los campos <b>role = admin</b> (texto) y <b>active = true</b> (booleano).<p style="overflow-wrap:anywhere">UID: <code>${escape(account.uid)}</code></p></div>`:""}
-      <div class="agora-cloud-actions">
-      ${account?'<button data-cloud="logout">Salir</button><button data-cloud="copy">Copiar UID</button>':'<button data-cloud="login">Iniciar con Google</button>'}
-      ${role?'<button data-cloud="backup">Descargar respaldo</button><button data-cloud="connect">Activar / cargar nube</button>':""}
-      ${role==="admin"?'<button data-cloud="users">Autorizar usuario</button>':""}
-      </div>
-      <small style="opacity:.7">El acuse y la cotización externa de proveedores todavía utilizan JSON. El acceso de proveedores se conectará por un servicio seguro independiente.</small>`;
+    const state=mode==='cloud'?'🟢 Conectado':mode==='offline'?'🟡 Sin internet':mode==='saving'?'◌ Sincronizando':mode==='setup'?'⚠ Primera conexión':mode==='conflict'?'⚠ Conflicto':mode==='consulta'?'🔵 Consulta':'◌ Copia local';
+    panel.innerHTML='<div class="agora-cloud-head"><strong>☁ ÁGORA · Nube</strong><button data-cloud="close">✕ Cerrar</button></div>'+
+      '<p><b>'+esc(state)+'</b></p><p>'+esc(message)+'</p>'+
+      '<p class="agora-cloud-user">'+(account?esc(account.email)+' · '+esc(role||'Sin autorización'):'Sin sesión')+'</p>'+
+      (account&&!role?'<p>Verifica tu UID y permisos en Firestore: '+esc(account.uid)+'</p>':'')+
+      '<div class="agora-cloud-buttons">'+(account?'<button data-cloud="logout">Salir</button>':'<button data-cloud="login">Entrar con Google</button>')+
+      (account?'<button data-cloud="uid">Copiar UID</button>':'')+
+      (role?'<button data-cloud="backup">Descargar respaldo</button>':'')+
+      (role&&mode!=='cloud'&&mode!=='consulta'?'<button data-cloud="sync">'+(mode==='setup'?'Revisar primera conexión':'Reintentar sincronización')+'</button>':'')+
+      (role==='admin'?'<button data-cloud="users">Autorizar usuario</button>':'')+'</div>'+
+      '<small>Los expedientes se respaldan automáticamente en este dispositivo. Firebase es el guardado principal al estar conectado.</small>';
   }
   function mount(){
-    const style=document.createElement("style");
-    style.textContent="#agora-cloud-panel[hidden]{display:none!important}#agora-cloud-panel{position:fixed;left:12px;bottom:12px;width:min(355px,calc(100vw - 24px));max-height:45vh;overflow:auto;background:#171613;color:#f1e8d5;border:1px solid #a1804b;border-radius:11px;padding:12px;box-shadow:0 8px 26px #0008;z-index:10000;font:12px/1.4 Arial,sans-serif}.agora-cloud-actions{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}.agora-cloud-actions button{background:#9e7843;color:#fff;border:0;padding:7px 10px;border-radius:5px;cursor:pointer;font:inherit}@media(max-width:650px){#agora-cloud-panel{bottom:140px;max-height:38vh}}";
-    document.head.appendChild(style);panel=document.createElement("aside");panel.id="agora-cloud-panel";panel.hidden=true;document.body.append(panel);
-    panel.addEventListener("click",async e=>{
-      const action=e.target.closest("[data-cloud]")?.dataset.cloud;if(!action)return;
+    if(panel)return;
+    const style=document.createElement('style');style.textContent='#agora-cloud-panel[hidden]{display:none!important}#agora-cloud-panel{position:fixed;top:84px;right:20px;width:min(380px,calc(100vw - 30px));max-height:calc(100dvh - 105px);overflow:auto;z-index:10000;background:#191713;color:#f1e9db;border:1px solid #ab8550;border-radius:12px;box-shadow:0 9px 25px #0008;padding:15px;font:12px/1.5 Arial,sans-serif}.agora-cloud-head{display:flex;justify-content:space-between;gap:9px;align-items:center}.agora-cloud-head strong{color:#ebc789;font-size:14px}.agora-cloud-head button,.agora-cloud-buttons button{background:#987542;color:#fff;border:1px solid #b68a4c;border-radius:7px;padding:8px 10px;cursor:pointer;font:inherit}.agora-cloud-buttons{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}.agora-cloud-user{color:#d8c9af;overflow-wrap:anywhere}#agora-cloud-panel small{color:#d2c3a8}';
+    document.head.append(style);panel=document.createElement('aside');panel.id='agora-cloud-panel';panel.hidden=true;document.body.append(panel);
+    panel.addEventListener('click',async e=>{
+      const action=e.target.closest('[data-cloud]')?.dataset.cloud;if(!action)return;
       try{
-        if(action==="toggle"){panel.hidden=true;return;}
-        if(action==="login")await authSdk.signInWithPopup(fb.auth,new authSdk.GoogleAuthProvider());
-        if(action==="logout"){mode="local";await authSdk.signOut(fb.auth);}
-        if(action==="copy"&&account){await navigator.clipboard.writeText(account.uid);tell("UID copiado.");}
-        if(action==="backup")backup();
-        if(action==="connect")await connect();
-        if(action==="users")await authorizeUser();
-      }catch(error){tell("Error: "+error.message);}
+        if(action==='close'){panel.hidden=true;return;}
+        if(action==='login')await authSdk.signInWithPopup(fb.auth,new authSdk.GoogleAuthProvider());
+        if(action==='logout'){await authSdk.signOut(fb.auth);panel.hidden=true;}
+        if(action==='uid'&&account)await navigator.clipboard.writeText(account.uid);
+        if(action==='backup')download();
+        if(action==='users')await allowUser();
+        if(action==='sync'){
+          if(mode==='setup'){
+            if(!confirm('Firebase ya tiene expedientes y este equipo guarda información local. ¿Cargar la versión de Firebase? Se conservará una copia local automática antes de cambiarla.'))return;
+            hasBase=false;await sync(true);
+          }else await sync();
+        }
+      }catch(error){status('error',String(error?.message||error));}
     });
-    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&panel&&!panel.hidden)panel.hidden=true;});
-    render();
+    document.addEventListener('keydown',e=>{if(e.key==='Escape')panel.hidden=true;});render();
   }
-  window.AGORA_CLOUD=Object.freeze({open:()=>{initialize();if(panel){collapsed=false;panel.hidden=false;render();}}});
-  function initialize(){
+  async function checkUser(){
+    if(!account)return false;
+    const uid=account.uid;
+    const ref=await dbSdk.getDoc(dbSdk.doc(fb.firestore,'agora_users',uid));
+    if(!account||account.uid!==uid)return false;
+    const item=ref.exists()?ref.data():null;
+    role=item?.active===true&&ROLES.includes(item.role)?item.role:null;
+    window.AGORA_STAFF_SESSION=role?Object.freeze({uid,role}):null;
+    window.dispatchEvent(new CustomEvent(role?'agora:staff-ready':'agora:staff-offline',{detail:role?{uid,role}:{}}));
+    return !!role;
+  }
+  async function afterAuth(user,stamp){
+    if(!user){role=null;hasBase=false;baseline.clear();status('signedout','Inicia sesión para activar la nube. La copia local sigue disponible.');return;}
+    if(!navigator.onLine){status('offline','Sin internet. Utiliza la copia local y sincronizaremos al reconectar.');return;}
+    try{
+      const ok=await checkUser();if(stamp!==authSerial)return;
+      if(!ok){status('local','La cuenta todavía no tiene permisos en Firebase. La copia local permanece disponible.');return;}
+      if(appReady)sync();
+    }catch(error){status('offline','No pudimos comprobar tus permisos. Los datos permanecen guardados localmente.');}
+  }
+  function boot(){
     if(initialized||!window.AGORA_FIREBASE?.initialized)return;
     fb=window.AGORA_FIREBASE;initialized=true;mount();
-    authSdk.onAuthStateChanged(fb.auth,async next=>{
-      account=next;role=null;mode="local";revisions.clear();baseline.clear();backupOk=false;
-      if(next){
-        try{
-          const info=await dbSdk.getDoc(dbSdk.doc(fb.firestore,authCol,next.uid));
-          role=info.exists()&&info.data().active===true&&roles.includes(info.data().role)?info.data().role:null;
-          tell(role?"Cuenta autorizada. Descarga respaldo para activar la nube.":"Cuenta sin permiso aún. Copia tu UID para autorizarla en Firestore.");
-        }catch(e){tell("No se pudo consultar tu permiso: "+e.message);}
-      }else tell("Inicia sesión para acceder a la nube.");
-      window.AGORA_STAFF_SESSION=role?Object.freeze({uid:next.uid,role}):null;
-      window.dispatchEvent(new CustomEvent(role?'agora:staff-ready':'agora:staff-offline',{detail:role?{uid:next.uid,role}:{}}));
+    authSdk.onAuthStateChanged(fb.auth,user=>{
+      account=user;const stamp=++authSerial;
+      role=null;baseline.clear();hasBase=false;
+      afterAuth(user,stamp);
     });
   }
-  window.addEventListener("agora:firebase-ready",initialize);
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",initialize);
-  else initialize();
-  window.addEventListener("agora:local-saved",()=>{
-    if(mode!=="cloud"||!canEdit())return;
-    pending=true;clearTimeout(timer);timer=setTimeout(pushChanges,1100);
+  window.AGORA_CLOUD=Object.freeze({open:()=>{boot();if(panel){panel.hidden=false;render();}},sync:()=>sync()});
+  window.addEventListener('agora:firebase-ready',boot);
+  window.addEventListener('agora:local-ready',()=>{appReady=true;if(role)sync();});
+  window.addEventListener('agora:local-saved',()=>{
+    if(applying)return;
+    epoch++;
+    if(account&&role){
+      if(!navigator.onLine){status('offline','Sin internet. Los cambios se guardaron aquí y están pendientes de sincronización.');return;}
+      schedule();
+    }
   });
-})({authSdk,dbSdk});
+  window.addEventListener('online',async()=>{
+    if(!account)return;
+    try{if(!role)await checkUser();if(role)schedule(true);}
+    catch{status('offline','Reconectando con Firebase; datos locales conservados.');}
+  });
+  window.addEventListener('offline',()=>{if(account&&role)status('offline','Sin internet. Tus cambios se guardan localmente y se enviarán al reconectar.');});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&role&&account)schedule(true);});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+})();
