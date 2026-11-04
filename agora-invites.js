@@ -110,7 +110,15 @@ import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestor
     const old=cached.find(v=>v.request?.id===provider.id && v.request?.kind===provider.kind &&
       String(v.request?.supplier?.email||'').toLowerCase()===provider.supplier.email.toLowerCase() &&
       v.status!=='revocada' && (!v.expiresAt?.toDate || v.expiresAt.toDate()>new Date()));
-    if(old){useExisting(old);show();msg('Ya existía un enlace para esta solicitud. Se recuperó el mismo enlace sin generar otro.');return;}
+    if(old){
+      const {result:latest}=cleanData(provider);
+      if(JSON.stringify(old.request)===JSON.stringify(latest)){
+        useExisting(old);show();msg('Ya existía un enlace para esta solicitud. Se recuperó el mismo enlace.');return;
+      }
+      if(old.status!=='pendiente')throw Error('Este enlace ya tiene acuse o respuesta. Para cambiar las referencias, genera una nueva solicitud de muestras sin alterar la que ya respondió el proveedor.');
+      if(!confirm('Cambiaste fotos, Drive o indicaciones después de crear el enlace. ¿Cancelar el enlace anterior y crear uno nuevo? Si ya enviaste el correo, el enlace anterior dejará de funcionar.'))return;
+      await db.updateDoc(db.doc(fb.firestore,'provider_invites',old.token),{status:'revocada',updatedAt:db.serverTimestamp()});
+    }
 
     const {result,omitted}=cleanData(provider);
     const inviteId=token(),expiry=new Date(Date.now()+14*864e5);
