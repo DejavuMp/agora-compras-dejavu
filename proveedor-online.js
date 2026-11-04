@@ -57,9 +57,12 @@ import * as fire from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firest
         field("minWholesale","Cantidad mínima de mayoreo","","number"),
         field("wholesaleCost","Precio unitario mayoreo","","number"),
         field("sampleCost","Costo de muestra","","number")
-      ].join(""):sample?field("sampleCost","Costo unitario de muestra",x.unitCost||"","number"):"";
+      ].join(""):sample?[
+        field("confirmedQty","Cantidad de muestras que prepararás",x.qty||1,"number"),
+        field("sampleCost","Costo unitario confirmado (MXN)",x.unitCost||0,"number")
+      ].join(""):"";
       return '<div class="item" data-product="'+esc(x.id)+'"><strong>'+(i+1)+'. '+itemLabel(x)+'</strong>'+
-        '<p class="muted">'+esc(x.description||"")+'</p><div class="grid">'+fields+
+        '<div class="itemhead">'+imageMarkup(x.image)+'<p class="muted">'+esc(x.description||"")+'</p></div>'+(sample?'<p><b>Cantidad solicitada:</b> '+esc(x.qty||1)+' · <b>Costo previamente cotizado:</b> $'+esc(x.unitCost||0)+' MXN</p>':'')+'<div class="grid">'+fields+
         '<div class="field"><label>Disponibilidad / plazo</label><input name="availability" placeholder="Disponible / 5 días / A consultar"></div></div>'+
         '<div class="field"><label>Comentarios del producto</label><textarea name="comment" placeholder="Notas del proveedor"></textarea></div></div>';
     }).join("");
@@ -68,8 +71,12 @@ import * as fire from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firest
       '<div class="grid">'+field("company","Empresa / razón social",p.supplier?.name||"")+
       field("email","Correo de contacto",p.supplier?.email||"","email")+'</div>'+
       '<h2>Productos y condiciones</h2>'+items+
-      '<div class="grid">'+field("deliveryDays","Plazo general de entrega")+
-      field("paymentTerms","Condiciones de pago")+'</div>'+
+      '<div class="grid">'+field("deliveryDays",sample?"Días de entrega":"Plazo general de entrega")+
+      (sample?field("productionDays","Días de preparación"):field("paymentTerms","Condiciones de pago"))+'</div>'+
+      (sample?'<div class="grid">'+field("deliveryDate","Fecha estimada de entrega","","date")+
+        field("deliveryMethod","Entrega (sucursal / domicilio / paquetería)")+
+        field("deliveryPlace","Lugar o sucursal de entrega")+
+        field("tracking","Paquetería y número de guía (si aplica)")+'</div>':'')+
       '<div class="field"><label>Comentarios generales</label><textarea name="notes"></textarea></div>'+
       '<div class="actions"><button type="submit" class="primary">Enviar respuesta a ÁGORA</button></div></form>';
   }
@@ -172,9 +179,11 @@ import * as fire from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firest
       return obj;
     });
     if(items.length>60)return setBusy("La solicitud tiene demasiados productos.");
-    const general={deliveryDays:form.querySelector('[name="deliveryDays"]').value.trim().slice(0,200),
-      paymentTerms:form.querySelector('[name="paymentTerms"]').value.trim().slice(0,200),
-      notes:form.querySelector('[name="notes"]').value.trim().slice(0,2000)};
+    const val=name=>form.querySelector('[name="'+name+'"]')?.value.trim().slice(0,200)||'';
+    const general={deliveryDays:val('deliveryDays'),paymentTerms:val('paymentTerms'),
+      productionDays:val('productionDays'),deliveryDate:val('deliveryDate'),
+      deliveryMethod:val('deliveryMethod'),deliveryPlace:val('deliveryPlace'),
+      tracking:val('tracking'),notes:form.querySelector('[name="notes"]').value.trim().slice(0,2000)};
     const response={company:company.slice(0,160),email:email.slice(0,240),general,items};
     const size=new Blob([JSON.stringify(response)]).size;
     if(size>180000)return setBusy("Tu respuesta es demasiado extensa. Acorta los comentarios.");
