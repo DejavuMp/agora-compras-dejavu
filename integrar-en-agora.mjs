@@ -10,7 +10,7 @@ if(!rules.includes('match /agora_file_deliveries/{token}')){
   const ending='    // Todas las demás colecciones permanecen cerradas.';
   if(!rules.includes(ending))throw Error('No encontré la posición segura de inserción en firestore.rules. No se modificó.');
   fs.copyFileSync(src,src+'.backup');
-  rules=rules.replace(ending,fragment.replaceAll('\n','\n    ')+ '\n'+ending);
+  rules=rules.replace(ending,() => fragment.replaceAll('\n','\n    ') + '\n' + ending);
   fs.writeFileSync(src,rules);
   console.log('Reglas de archivos integradas; respaldo firestore.rules.backup creado.');
 }else console.log('Las reglas de archivos ya estaban integradas.');
