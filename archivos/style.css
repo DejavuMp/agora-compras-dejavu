@@ -20,3 +20,58 @@
 .upload-progress progress::-webkit-progress-value{background:#b58d51;border-radius:8px}
 .upload-progress progress::-moz-progress-bar{background:#b58d51;border-radius:8px}
 .upload-progress progress[hidden]{display:none}
+
+/* ÁGORA × DEJAVÚ · identidad oficial: obsidiana/ónix, mármol claro y oro metálico */
+:root{--ink:#151515;--gold:#c8a45a;--gold2:#dbc187;--cream:#f6f4f0}
+.sidebar{
+ background:
+  radial-gradient(ellipse at 78% 12%,rgba(198,159,82,.13),transparent 42%),
+  repeating-linear-gradient(122deg,transparent 0 29px,rgba(210,195,151,.025) 29px 30px,transparent 30px 74px),
+  linear-gradient(160deg,#111111 0%,#211f1b 48%,#0c0c0d 100%);
+}
+.sidebar::before{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(142deg,transparent 0 38%,rgba(197,183,153,.07) 38.05%,transparent 38.2%,transparent 72%,rgba(232,214,173,.035) 72.1%,transparent 72.3%);z-index:0}
+.sidebar > *{position:relative;z-index:1}
+.side-brand{padding-bottom:22px}
+.brand-glyph.dejavu-brandmark{width:57px;height:70px;flex:none;background:transparent;border:none;border-radius:0;box-shadow:none;padding:0}
+.brand-glyph.dejavu-brandmark .dejavu-logo{display:block;width:53px;height:68px;max-width:100%;object-fit:contain}
+.side-brand strong,.public-brand strong{color:#e0c18a;letter-spacing:2.1px}
+.public-header{
+ background:
+  radial-gradient(ellipse at 75% 8%,rgba(194,158,86,.15),transparent 42%),
+  linear-gradient(152deg,#111111,#24221d 53%,#141414);
+ border-bottom:1px solid rgba(205,170,105,.36);
+}
+.public-brand .brand-glyph.dejavu-brandmark{width:49px;height:58px}
+.public-brand .brand-glyph.dejavu-brandmark .dejavu-logo{width:45px;height:57px}
+.page-heading h1,.public-hero h1{letter-spacing:-.7px;color:#201d19}
+.eyebrow{color:#9a7131}
+.btn-gold{background:linear-gradient(130deg,#ae8747,#c8a45a);border-color:#a6854d;color:#fff}
+.btn-dark{background:#1a1916}
+.panel,.stat{box-shadow:0 8px 24px rgba(29,26,20,.045)}
+/* Imágenes enlazadas: miniaturas reales, apertura del original y diagnóstico visible */
+.agora-linked-gallery{margin-top:18px}
+.agora-image-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin:13px 0}
+.agora-image-tile{min-width:0;border:1px solid #ded6c7;background:#fff;border-radius:11px;overflow:hidden;box-shadow:0 4px 14px rgba(36,26,14,.055)}
+.agora-image-visual{height:134px;display:flex;align-items:center;justify-content:center;background:linear-gradient(140deg,#f4f0e9,#eae3d6);overflow:hidden}
+.agora-image-visual img{display:block;width:100%;height:100%;object-fit:contain;background:#fff}
+.agora-image-unavailable{padding:10px;display:flex;flex-direction:column;gap:7px;align-items:center;justify-content:center;text-align:center;color:#746653;font:11px/1.4 Arial,sans-serif;min-height:108px}
+.agora-image-unavailable[hidden]{display:none!important}
+.agora-preview-symbol{font-size:26px;color:#c2a166}
+.agora-image-meta{display:flex;align-items:center;justify-content:space-between;gap:7px;padding:10px 9px 4px;font:11px Arial,sans-serif;color:#5e5547}
+.agora-image-meta span{overflow-wrap:anywhere}
+.agora-image-meta a{color:#88612a;font-weight:700;text-decoration:underline;text-underline-offset:2px;white-space:nowrap}
+.agora-image-hint{font:10px Arial,sans-serif!important;color:#8e8068!important;padding:0 9px 9px!important;margin:0!important}
+.agora-image-error{border-color:#d1bda0}
+.agora-link-previews{border:1px dashed #d6c6aa;border-radius:9px;background:#f7f3ec;margin:8px 0 17px;padding:10px}
+.agora-link-previews .reference-group{border:0;margin:0;padding:0}
+.agora-link-previews h3{margin:2px 0 8px;font-size:12px}
+.agora-link-previews .agora-image-grid{grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:9px;margin:5px 0}
+.agora-preview-empty{color:#8d806d;font-size:11px;line-height:1.5;margin:0}
+@media(max-width:760px){
+ .brand-glyph.dejavu-brandmark{width:48px;height:59px}
+ .brand-glyph.dejavu-brandmark .dejavu-logo{width:45px;height:58px}
+ .agora-image-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ .agora-image-visual{height:118px}
+ .agora-image-meta{flex-wrap:wrap}
+}
+@media print{.agora-image-tile{break-inside:avoid}.agora-image-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.agora-link-previews{display:none}}
