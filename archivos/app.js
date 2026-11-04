@@ -2,6 +2,7 @@ import {initializeApp,getApps} from 'https://www.gstatic.com/firebasejs/13.1.0/f
 import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import {getFirestore,doc,getDoc,collection,collectionGroup,onSnapshot,serverTimestamp,Timestamp,setDoc,runTransaction} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import {getStorage,ref,uploadBytesResumable,getDownloadURL} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
+import {galleryHtml,imageLinkInfo,preferredImageUrl} from './image-preview.js';
 
 // Usa el proyecto Firebase existente de ÁGORA Pedidos. Estas son claves de cliente públicas.
 const config={apiKey:'AIzaSyDPh-AFdST9Ax_Eoho-wT0shlWlCHad6Zg',authDomain:'agora-dejavu-38b8c.firebaseapp.com',projectId:'agora-dejavu-38b8c',storageBucket:'agora-dejavu-38b8c.firebasestorage.app',messagingSenderId:'775680965171',appId:'1:775680965171:web:274557c8c9c25ff304c146'};
@@ -19,8 +20,7 @@ const safeHttps=url=>{try{let u=new URL(url);return u.protocol==='https:'?u.href
 // 32 bytes de aleatoriedad; cada byte representa exactamente 6 bits en el alfabeto de 64 caracteres.
 const secret=()=>{let bytes=crypto.getRandomValues(new Uint8Array(32));return btoa(String.fromCharCode(...bytes)).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');};
 const urlFor=id=>new URL('./recibir.html',location.href).href+'#t='+id;
-function imagePreviewUrl(value){const href=safeHttps(value);if(!href)return '';try{const u=new URL(href);if(!['drive.google.com','docs.google.com'].includes(u.hostname))return href;const id=u.pathname.match(/\/file\/d\/([A-Za-z0-9_-]+)/)?.[1]||u.searchParams.get('id');return id&&/^[A-Za-z0-9_-]{8,}$/.test(id)?'https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w800':href;}catch{return href;}}
-const assetHtml=(arr,heading)=>arr?.length?`<div class="reference-group"><h3>${heading}</h3><div class="image-grid">${arr.map((url,i)=>`<a href="${esc(safeHttps(url))}" target="_blank" rel="noopener noreferrer"><img src="${esc(imagePreviewUrl(url))}" alt="${esc(heading)} ${i+1}" loading="lazy"></a>`).join('')}</div></div>`:'';
+const assetHtml=(arr,heading)=>galleryHtml(arr,heading);
 let user=null,role=null,deliveries=[],responses=new Map(),editRecord=null,openRecord=null,subscriptions=[],readyDeliveries=false,readyResponses=false,firstResponses=true;
 let sampleSelected=[],folderSelected=[];
 function notify(msg,error=false){$('alert').textContent=msg;$('alert').className='alert'+(error?' error':'');$('alert').hidden=false;setTimeout(()=>{if($('alert').textContent===msg)$('alert').hidden=true;},8500);}
@@ -30,7 +30,25 @@ function statusFor(r){if(!r.active)return 'revocado';const response=responseFor(
 function selectedRevisions(r){return Array.isArray(r.revisions)?r.revisions:[];}
 function imagesToDisplay(files,slot){const preview=$(slot),current=files;preview.innerHTML=current.map((file,i)=>`<div class="preview-item"><img alt="${esc(file.name)}" src="${esc(file.preview)}"><button type="button" data-remove="${i}" aria-label="Quitar imagen">×</button></div>`).join('');preview.querySelectorAll('[data-remove]').forEach(btn=>btn.addEventListener('click',()=>{const k=Number(btn.dataset.remove);URL.revokeObjectURL(files[k].preview);files.splice(k,1);imagesToDisplay(files,slot);}));}
 function addFiles(input,arr,slot,max){const chosen=Array.from(input.files||[]);if(chosen.length+arr.length>max){notify(`Máximo ${max} imágenes en esta sección.`,true);input.value='';return;}for(const file of chosen){if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>12*1024*1024){notify('Las imágenes deben ser JPG, PNG o WEBP y pesar menos de 12 MB cada una.',true);continue;}arr.push({file,name:file.name,preview:URL.createObjectURL(file)});}imagesToDisplay(arr,slot);input.value='';}
-function readImageUrls(el,max){const values=String($(el).value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);if(values.length>max)throw Error(`Demasiadas URL de imágenes (${max} máximo).`);for(const url of values){if(!safeHttps(url))throw Error('Las imágenes externas deben usar una dirección https:// válida.');}return values;}
+function readImageUrls(el,max){const values=String($(el).value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);if(values.length>max)throw Error(`Demasiadas URL de imágenes (${max} máximo).`);for(const raw of values){const info=imageLinkInfo(raw);if(!info.original)throw Error('Una imagen tiene un enlace no válido. Usa https://');if(['folder','document','unknown-drive'].includes(info.type))throw Error('Pega el enlace individual de la foto, no el de una carpeta o documento de Drive.');}return values;}
+
+function updateLinkPreviews(){
+ for(const [id,title] of [['sampleUrls','Vistas de artes enlazados'],['folderUrls','Imágenes de archivos en Drive']]){
+  const input=$(id),holder=$(id+'LinkPreview');
+  if(!input||!holder)continue;
+  const values=String(input.value||'').split(/\r?\n/).map(v=>v.trim()).filter(Boolean);
+  holder.innerHTML=values.length?galleryHtml(values,title):'<p class="agora-preview-empty">Pega el enlace individual de una imagen y aparecerá aquí su vista previa.</p>';
+ }
+}
+function setupLinkPreviews(){
+ for(const id of ['sampleUrls','folderUrls']){
+  const field=$(id);if(!field||$(id+'LinkPreview'))continue;
+  const wrap=document.createElement('div');wrap.id=id+'LinkPreview';wrap.className='agora-link-previews';
+  field.insertAdjacentElement('afterend',wrap);
+  field.addEventListener('input',updateLinkPreviews);
+ }
+ updateLinkPreviews();
+}
 function clearFiles(){for(const v of [...sampleSelected,...folderSelected])URL.revokeObjectURL(v.preview);sampleSelected=[];folderSelected=[];imagesToDisplay(sampleSelected,'samplePreview');imagesToDisplay(folderSelected,'folderPreview');$('sampleFiles').value='';$('folderFiles').value='';}
 function openEditor(record=null){try{authRequired();}catch(e){notify(e.message,true);return;}editRecord=record;if(uploadProgress){uploadProgress.hidden=true;uploadProgress.dataset.error='0';uploadMeter.value=0;uploadMeter.hidden=false;uploadStatus.textContent='';}$('deliveryForm').reset();clearFiles();$('formTitle').textContent=record?'Publicar nueva versión de archivos':'Enviar archivos para fabricar muestras';$('formSubtitle').textContent=record?`Versión ${record.version+1}. El enlace de recepción será el mismo.`:'Crea un expediente que se guarda directamente en Firebase.';$('saveButton').textContent=record?'Publicar versión '+(record.version+1):'Publicar envío';$('sampleUrls').value=record?.sampleImages?.join('\n')||'';$('folderUrls').value=record?.folderImages?.join('\n')||'';const f=$('deliveryForm');for(const key of ['project','category','title','recipientName','recipientEmail','driveUrl','notes']){if(record)f.elements[key].value=record[key]||'';}f.elements.recipientName.readOnly=!!record;f.elements.recipientEmail.readOnly=!!record;const today=new Date();const y=today.getFullYear(),m=String(today.getMonth()+1).padStart(2,'0'),d=String(today.getDate()).padStart(2,'0');f.elements.validUntil.min=`${y}-${m}-${d}`;const prev=record?.validUntil?.toDate?.();const defaultUntil=new Date(today.getTime()+14*86400000);const target=prev&&prev>today?prev:defaultUntil;f.elements.validUntil.value=`${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,'0')}-${String(target.getDate()).padStart(2,'0')}`;
  if(!record){
@@ -46,7 +64,7 @@ function openEditor(record=null){try{authRequired();}catch(e){notify(e.message,t
      if(Array.isArray(handoff.driveImageUrls))$('sampleUrls').value=handoff.driveImageUrls.filter(u=>/^https:\/\//.test(u)).slice(0,8).join('\n');
      sessionStorage.removeItem('agora_sample_file_context');
    }
- }$('editorOverlay').hidden=false;document.body.style.overflow='hidden';}
+ }updateLinkPreviews();$('editorOverlay').hidden=false;document.body.style.overflow='hidden';}
 function closeModals(){for(const id of ['editorOverlay','detailOverlay'])$(id).hidden=true;document.body.style.overflow='';}
 function recordLine(r){const state=statusFor(r);const recipient=r.recipientName||'—';return `<tr><td><strong>${esc(r.title)}</strong><small>${esc(r.folio||'Sin folio')} · Versión ${r.version}</small></td><td>${esc(r.project)}<br><small>${esc(r.category)}</small></td><td>${esc(recipient)}<br><small>${esc(r.recipientEmail)}</small></td><td>${fmt(r.validUntil)}</td><td><span class="status-pill ${state}">${statuses[state]}</span></td><td><button class="table-action" type="button" data-detail="${r.id}">Ver expediente</button></td></tr>`;}
 function updateCounters(){const results={};for(const r of deliveries)results[statusFor(r)]=(results[statusFor(r)]||0)+1;$('statTotal').textContent=deliveries.length;$('statPending').textContent=results.pendiente||0;$('statChanges').textContent=results.cambios||0;$('statReceived').textContent=(results.recibido||0)+(results.aprobado||0);}
@@ -63,7 +81,7 @@ function renderDetail(r){const state=statusFor(r),res=responseFor(r.id,r.version
 function openDetail(id){const r=deliveries.find(d=>d.id===id);if(!r)return;openRecord=r.id;renderDetail(r);$('detailOverlay').hidden=false;document.body.style.overflow='hidden';}
 async function copyLink(url){try{await navigator.clipboard.writeText(url);notify('Enlace copiado. Puedes enviarlo por correo o mensaje.');}catch(e){notify('No se pudo copiar el enlace: '+e.message,true);}}
 async function copyEmailEvidence(r){
- const url=urlFor(r.id),drive=safeHttps(r.driveUrl),photos=arr=>(arr||[]).slice(0,8).map((src,i)=>safeHttps(src)?'<img src="'+esc(imagePreviewUrl(src))+'" alt="Captura '+(i+1)+'" width="125" style="width:125px;height:auto;max-height:125px;object-fit:contain;border:1px solid #e2d8c8;margin:5px">':'').join('');
+ const url=urlFor(r.id),drive=safeHttps(r.driveUrl),photos=arr=>(arr||[]).slice(0,8).map((src,i)=>safeHttps(src)?'<img src="'+esc(preferredImageUrl(src)||src)+'" alt="Captura '+(i+1)+'" width="125" style="width:125px;height:auto;max-height:125px;object-fit:contain;border:1px solid #e2d8c8;margin:5px">':'').join('');
  const text='Dejavú Marketing · Archivos de producción para muestras\nSolicitud: '+r.project+'\nArchivo: '+r.title+'\nAbre tu expediente y confirma de recibido: '+url+'\nDrive: '+drive;
  const html='<div style="font:14px Arial;color:#26221c;max-width:620px">'+
  '<div style="background:#111;color:#d4b377;padding:20px;font:bold 19px Arial">DÉJÀ VU MARKETING · ARCHIVOS DE PRODUCCIÓN</div>'+
@@ -277,3 +295,4 @@ $('newButton').addEventListener('click',()=>openEditor());$('menuNew').addEventL
 for(const el of document.querySelectorAll('[data-close]'))el.addEventListener('click',closeModals);
 for(const name of ['editorOverlay','detailOverlay'])$(name).addEventListener('click',e=>{if(e.target===$(name))closeModals();});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModals();});
 $('toggleSide').addEventListener('click',()=>{const side=$('sidebar');if(window.innerWidth<=760)side.classList.toggle('mobile-open');else side.classList.toggle('collapsed');});document.addEventListener('click',e=>{if(window.innerWidth<=760&&!e.target.closest('.sidebar,#toggleSide'))$('sidebar').classList.remove('mobile-open');});
+setupLinkPreviews();
