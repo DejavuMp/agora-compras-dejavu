@@ -30,3 +30,10 @@ En Firebase Authentication > Settings > Authorized domains confirma que exista `
 - La versión antigua guarda los expedientes en IndexedDB del navegador. El respaldo sigue siendo necesario y la sincronización general es optativa.
 - No se envía el correo desde la aplicación sin intervención: **Abrir correo en Gmail** prepara un borrador; el operador debe pulsar Enviar.
 - Antes de enviar a proveedores reales, realizar una prueba con un correo propio. No se ha verificado aquí un despliegue live ni publicado las reglas en la consola de Firebase.
+
+## Correcciones y avisos · 03/11/2026
+- Panel de envío: ahora puede cerrarse con el botón **✕ Cerrar** arriba, **Cerrar panel** abajo, tecla Esc o clic fuera. Se eliminó un estilo `display:block` que impedía respetar el estado cerrado.
+- Campana **Notificaciones** dentro de Ágora: avisa de acuse y cotización recibida mientras haya sesión de personal autorizada y la página esté abierta. En la campana se puede activar permiso para notificaciones nativas del navegador (no funcionan con la página cerrada).
+- El proveedor verá una **constancia digital** tras confirmar el acuse o registrar su cotización. Puede usar **Preparar copia por correo**, que abre un mensaje en Gmail dirigido al correo de contacto, listo para revisar y enviar, o **Copiar constancia**.
+- **La copia por correo todavía NO se envía automáticamente.** Envío automático al proveedor y alertas por email a la agencia necesitan un servidor o servicio de correo autorizado, por ejemplo una Cloud Function y SMTP con credenciales guardadas de forma privada. No poner SMTP ni claves privadas en GitHub.
+- Para ver los cambios, en GitHub Pages actualizar con `Ctrl + Shift + R`; si el service worker está actualizando, volver a cargar una vez más. No borrar datos locales ni almacenamiento del sitio.
