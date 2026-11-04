@@ -158,6 +158,8 @@ import * as dbSdk from "https://www.gstatic.com/firebasejs/13.1.0/firebase-fires
           tell(role?"Cuenta autorizada. Descarga respaldo para activar la nube.":"Cuenta sin permiso aún. Copia tu UID para autorizarla en Firestore.");
         }catch(e){tell("No se pudo consultar tu permiso: "+e.message);}
       }else tell("Inicia sesión para acceder a la nube.");
+      window.AGORA_STAFF_SESSION=role?Object.freeze({uid:next.uid,role}):null;
+      window.dispatchEvent(new CustomEvent(role?'agora:staff-ready':'agora:staff-offline',{detail:role?{uid:next.uid,role}:{}}));
     });
   }
   window.addEventListener("agora:firebase-ready",initialize);
