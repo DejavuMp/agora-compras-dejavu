@@ -1,6 +1,6 @@
 import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 (function invitesRuntime(db){
-  let fb=null,session=null,unsubscribe=null,panel=null,last=null,lastSeen=new Map(),cached=[];
+  let fb=null,session=null,unsubscribe=null,panel=null,last=null,lastSeen=new Map(),cached=[],selectedToken='',historyLoaded=false;
   const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const msg=s=>{const e=document.getElementById("agora-invite-msg");if(e)e.textContent=s};
   function getUrls(token){
@@ -24,6 +24,44 @@ import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestor
     if(bytes(result)>770000)throw Error("La solicitud es demasiado pesada. Reduce las imágenes de los productos.");
     return {result,omitted};
   }
+
+  const dateText=ts=>ts?.toDate?.().toLocaleString('es-MX')||'—';
+  const statusName=r=>r.status==='cotizada'?'Cotización recibida':r.status==='recibida'?'Acuse recibido':r.status==='pendiente'?'Pendiente de acuse':r.status==='revocada'?'Cancelado':r.status||'—';
+  function useExisting(record){
+    if(!record?.token)throw Error('No se encontró el enlace original.');
+    const p=record.request||{},supplier=p.supplier||{};
+    last={folio:p.folio||p.id,email:supplier.email||'',supplierName:supplier.name||'',contact:supplier.contact||'',
+      expiry:record.expiresAt?.toDate?.().toLocaleDateString('es-MX')||'—',urls:getUrls(record.token)};
+    selectedToken=record.token;
+  }
+  function historyHtml(){
+    const sorted=[...cached].sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+    const selected=cached.find(v=>v.token===selectedToken);
+    let detail='';
+    if(selected){
+      const info=selected.response||{},general=info.general||{};
+      const responses=(info.items||[]).slice(0,60).map(item=>{
+        const origin=(selected.request?.items||[]).find(x=>String(x.id)===String(item.id))||{};
+        const pairs=[['minRetail','Mínimo menudeo'],['retailCost','Precio menudeo'],['minWholesale','Mínimo mayoreo'],['wholesaleCost','Precio mayoreo'],['sampleCost','Costo de muestra'],['availability','Disponibilidad'],['comment','Comentarios']].filter(([key])=>item[key]!==undefined&&item[key]!==null&&String(item[key]).trim()).map(([key,label])=>'<span><b>'+esc(label)+':</b> '+esc(item[key])+'</span>').join(' · ');
+        return '<div class="agora-history-product"><b>'+esc(origin.name||origin.product||item.id||'Concepto')+'</b><p>'+pairs+'</p></div>';
+      }).join('');
+      detail='<div class="agora-history-detail"><h4>Detalle del enlace seleccionado</h4>'+
+        '<p><b>Solicitud:</b> '+esc(selected.request?.folio||'—')+' · <b>Estado:</b> '+esc(statusName(selected))+'</p>'+
+        '<p><b>Registrado:</b> '+esc(dateText(selected.createdAt))+'<br><b>Acuse:</b> '+esc(dateText(selected.receivedAt))+
+        '<br><b>Recibido por:</b> '+esc(selected.receiver||'—')+'<br><b>Cotización:</b> '+esc(dateText(selected.submittedAt))+'</p>'+
+        (selected.status==='cotizada'?'<p><b>Empresa:</b> '+esc(info.company||'—')+' · <b>Contacto:</b> '+esc(info.email||'—')+'</p>'+responses+
+          '<p><b>Plazo:</b> '+esc(general.deliveryDays||'—')+' · <b>Pago:</b> '+esc(general.paymentTerms||'—')+'</p>'+
+          '<p><b>Comentarios:</b> '+esc(general.notes||'Sin comentarios')+'</p>':'<p>La respuesta completa aparecerá aquí cuando el proveedor termine de enviarla.</p>')+
+        '<div class="agora-invite-actions"><button data-invite="reuse" data-token="'+esc(selected.token)+'">Usar este mismo enlace</button></div></div>';
+    }
+    return '<section class="agora-history"><div class="agora-history-head"><h3>Historial de formularios enviados</h3><span>'+sorted.length+' enlace(s)</span></div>'+
+      '<p class="agora-muted">Consultas de Firebase en tiempo real. Un enlace generado no confirma que el correo haya sido enviado.</p>'+
+      (!historyLoaded?'<p>Consultando Firebase…</p>':sorted.length?'<div class="agora-history-list">'+sorted.slice(0,60).map(r=>
+        '<div class="agora-history-row"><div><b>'+esc(r.request?.folio||r.request?.id||'Solicitud')+'</b><span>'+esc(r.request?.supplier?.name||'Proveedor')+'</span></div>'+
+        '<div><strong>'+esc(statusName(r))+'</strong><small>'+esc(dateText(r.submittedAt||r.receivedAt||r.createdAt))+'</small></div>'+
+        '<button data-invite="details" data-token="'+esc(r.token)+'">Ver respuesta</button></div>'
+      ).join('')+'</div>':'<p>Sin enlaces registrados todavía.</p>')+detail+'</section>';
+  }
   function paint(){
     if(!panel)return;
     if(!session){panel.hidden=true;return;}
@@ -32,6 +70,7 @@ import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestor
       '<div class="agora-invite-actions"><button data-invite="create">Generar enlace de la solicitud abierta</button></div>'+
       (last?'<div class="agora-invite-created"><strong>Enlace creado · '+esc(last.folio)+'</strong><p>Válido hasta '+esc(last.expiry)+'. Cualquiera que tenga el enlace podrá responder.</p>'+
       '<div class="agora-invite-actions"><button data-invite="gmail">Abrir correo en Gmail</button><button data-invite="copyrich">Copiar correo con botones</button><button data-invite="copyurl">Copiar enlace</button><button data-invite="preview">Ver formulario</button></div></div>':"")+
+      historyHtml()+
       '<p id="agora-invite-msg" role="status" aria-live="polite"></p><div class="agora-invite-actions"><button data-invite="close">Cerrar panel</button></div>';
   }
   function show(){
@@ -71,6 +110,12 @@ import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestor
     const provider=window.AGORA_LOCAL?.currentSupplierRequest?.();
     if(!provider)throw Error("Primero abre un presupuesto, solicitud de muestras o pedido.");
     if(!provider.supplier?.email)throw Error("Primero registra el correo del proveedor.");
+    if(!historyLoaded)throw Error('Estamos revisando los enlaces existentes. Intenta nuevamente cuando cargue el historial.');
+    const old=cached.find(v=>v.request?.id===provider.id && v.request?.kind===provider.kind &&
+      String(v.request?.supplier?.email||'').toLowerCase()===provider.supplier.email.toLowerCase() &&
+      v.status!=='revocada' && (!v.expiresAt?.toDate || v.expiresAt.toDate()>new Date()));
+    if(old){useExisting(old);show();msg('Ya existía un enlace para esta solicitud. Se recuperó el mismo enlace sin generar otro.');return;}
+
     const {result,omitted}=cleanData(provider);
     const inviteId=token(),expiry=new Date(Date.now()+14*864e5);
     await db.setDoc(db.doc(fb.firestore,"provider_invites",inviteId),{
@@ -99,16 +144,18 @@ import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestor
     if(unsubscribe){unsubscribe();unsubscribe=null;}
     if(!session)return;
     unsubscribe=db.onSnapshot(db.collection(fb.firestore,"provider_invites"),snapshot=>{
-      cached=snapshot.docs.map(x=>({token:x.id,...x.data()}));
+      cached=snapshot.docs.map(x=>({token:x.id,...x.data()}));historyLoaded=true;
       applyInvites();
       window.AGORA_PROVIDER_EVENTS=cached;
       window.dispatchEvent(new CustomEvent("agora:provider-events",{detail:cached}));
+      if(panel&&!panel.hidden)paint();
     },err=>msg("No se pudieron revisar respuestas: "+err.message));
   }
   function initPanel(){
     if(panel)return;
     const css=document.createElement("style");
-    css.textContent="#agora-invite-open{position:fixed;right:14px;bottom:18px;z-index:10020;background:#ac8648;color:white;border:0;padding:10px 14px;border-radius:9px;cursor:pointer;font:600 12px Arial}#agora-invite-panel{position:fixed;right:14px;bottom:64px;z-index:10021;background:#171512;color:#eee5d9;border:1px solid #a78042;border-radius:12px;padding:15px;width:min(430px,calc(100vw - 28px));max-height:70vh;overflow:auto;box-shadow:0 10px 30px #0009;font:13px/1.5 Arial}#agora-invite-panel[hidden]{display:none}.agora-invite-title{font-weight:700;display:flex;justify-content:space-between;align-items:center;color:#e6bc79}.agora-invite-title{gap:10px;flex-wrap:wrap}.agora-invite-title button{background:#3a2e20;color:#f4d6a0;border:1px solid #a78042;border-radius:6px;padding:6px 9px;font:600 12px Arial;cursor:pointer}.agora-invite-actions{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.agora-invite-actions button{background:#a77e42;color:#fff;border:0;border-radius:6px;padding:9px;cursor:pointer;font:12px Arial}.agora-invite-created{border-top:1px solid #755c38;padding-top:8px}#agora-invite-msg{color:#e5c991;font-size:12px}";
+    css.textContent="#agora-invite-open{display:none!important;position:fixed;right:14px;bottom:18px;z-index:10020;background:#ac8648;color:white;border:0;padding:10px 14px;border-radius:9px;cursor:pointer;font:600 12px Arial}#agora-invite-panel{position:fixed;right:20px;top:83px;bottom:auto;z-index:10021;background:#171512;color:#eee5d9;border:1px solid #a78042;border-radius:12px;padding:15px;width:min(570px,calc(100vw - 28px));max-height:calc(100dvh - 105px);overflow:auto;box-shadow:0 10px 30px #0009;font:13px/1.5 Arial}#agora-invite-panel[hidden]{display:none}.agora-invite-title{font-weight:700;display:flex;justify-content:space-between;align-items:center;color:#e6bc79}.agora-invite-title{gap:10px;flex-wrap:wrap}.agora-invite-title button{background:#3a2e20;color:#f4d6a0;border:1px solid #a78042;border-radius:6px;padding:6px 9px;font:600 12px Arial;cursor:pointer}.agora-invite-actions{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.agora-invite-actions button{background:#a77e42;color:#fff;border:0;border-radius:6px;padding:9px;cursor:pointer;font:12px Arial}.agora-invite-created{border-top:1px solid #755c38;padding-top:8px}#agora-invite-msg{color:#e5c991;font-size:12px}";
+    css.textContent+='#agora-history-panel{background:#191612}.agora-history{border-top:1px solid #806437;margin-top:15px;padding-top:11px}.agora-history-head{display:flex;justify-content:space-between;align-items:center;gap:10px}.agora-history-head h3{font-size:14px;margin:0;color:#e3c389}.agora-history-head span,.agora-muted{color:#c0b39c;font-size:11px}.agora-history-list{display:grid;gap:7px;max-height:260px;overflow:auto;margin-top:10px}.agora-history-row{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) auto;align-items:center;gap:7px;background:#28231c;border:1px solid #493927;border-radius:8px;padding:9px}.agora-history-row span,.agora-history-row small{display:block;color:#c5b8a3;font-size:10px}.agora-history-row strong{color:#e6c58f;font-size:11px}.agora-history-row button{padding:7px;background:#47341d;border:1px solid #9e7843;border-radius:5px;color:#efd9b6;cursor:pointer}.agora-history-detail{border:1px solid #947244;border-radius:9px;padding:11px;margin-top:13px;background:#252019}.agora-history-detail h4{font-size:13px;margin:0 0 10px;color:#e5be7b}.agora-history-product{border-top:1px solid #604c30;padding:8px 0}.agora-history-product p{color:#e6ddc9;line-height:1.6;overflow-wrap:anywhere}@media(max-width:650px){#agora-invite-panel{top:66px;right:8px;max-height:calc(100dvh - 80px)}.agora-history-row{grid-template-columns:1fr 1fr}.agora-history-row button{grid-column:span 2}}';
     document.head.appendChild(css);
     const open=document.createElement("button");open.id="agora-invite-open";open.textContent="✉ Enviar formulario online";open.hidden=true;document.body.appendChild(open);
     panel=document.createElement("section");panel.id="agora-invite-panel";panel.hidden=true;document.body.appendChild(panel);
@@ -120,6 +167,8 @@ import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestor
       try{
         if(action==="close"){panel.hidden=true;return;}
         if(action==="create")await create();
+        if(action==="details"){selectedToken=e.target.closest('[data-token]')?.dataset.token||'';paint();return;}
+        if(action==="reuse"){const selected=cached.find(x=>x.token===e.target.closest('[data-token]')?.dataset.token);useExisting(selected);paint();msg('Se recuperó el enlace original. No se generó uno nuevo.');return;}
         if(action==="gmail")openGmail();
         if(action==="copyrich")await copyRich();
         if(action==="copyurl"){await navigator.clipboard.writeText(last.urls.cotizar);msg("Enlace copiado.");}
@@ -131,7 +180,7 @@ import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestor
     session=event.detail||null;
     const open=document.getElementById("agora-invite-open");
     if(open)open.hidden=!session||!["admin","coordinador"].includes(session.role);
-    if(!session){last=null;cached=[];lastSeen.clear();if(panel)panel.hidden=true;}
+    if(!session){last=null;cached=[];selectedToken='';historyLoaded=false;lastSeen.clear();if(panel)panel.hidden=true;}
     begin();
   }
   window.AGORA_INVITES=Object.freeze({open:()=>{init();if(!session){alert('Para enviar formularios online, primero entra con Google y autoriza tu cuenta como admin o coordinador.');return;}show();}});
