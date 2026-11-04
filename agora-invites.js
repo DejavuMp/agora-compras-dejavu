@@ -194,5 +194,6 @@ import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestor
   window.addEventListener("agora:staff-ready",onSession);
   window.addEventListener("agora:staff-offline",()=>onSession({detail:null}));
   window.addEventListener("agora:local-ready",applyInvites);
+  window.addEventListener('agora:cloud-applied',applyInvites);
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();
 })(db);
