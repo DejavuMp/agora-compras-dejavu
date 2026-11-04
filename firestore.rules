@@ -46,6 +46,97 @@ service cloud.firestore {
         request.resource.data.updatedBy == request.auth.uid;
       allow delete: if canEdit();
     }
+    // Un vínculo secreto de 256 bits concede acceso sólo a esta invitación.
+    // El token no es enumerable y expira; nunca contiene credenciales de Firebase.
+    function validInviteCreate() {
+      return canEdit() &&
+        request.resource.data.keys().hasOnly([
+          'version','createdBy','createdAt','updatedAt','expiresAt','request',
+          'status','receivedAt','receiver','submittedAt','response'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'version','createdBy','createdAt','updatedAt','expiresAt','request',
+          'status','receivedAt','receiver','submittedAt','response'
+        ]) &&
+        request.resource.data.version == 1 &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.expiresAt is timestamp &&
+        request.resource.data.expiresAt > request.time &&
+        request.resource.data.expiresAt <= request.time + duration.value(30, 'd') &&
+        request.resource.data.request is map &&
+        request.resource.data.request.items is list &&
+        request.resource.data.request.items.size() <= 60 &&
+        request.resource.data.request.id is string &&
+        request.resource.data.request.kind in ['quote','sample','order'] &&
+        request.resource.data.status == 'pendiente' &&
+        request.resource.data.receivedAt == null &&
+        request.resource.data.receiver == '' &&
+        request.resource.data.submittedAt == null &&
+        request.resource.data.response == null;
+    }
+    function publicTokenIsValid(token) {
+      return token.matches('^[A-Za-z0-9_-]{43}
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+) &&
+        resource.data.expiresAt > request.time &&
+        resource.data.status in ['pendiente','recibida','cotizada'];
+    }
+    function validSupplierReceipt(token) {
+      return publicTokenIsValid(token) &&
+        resource.data.status == 'pendiente' &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['receivedAt','receiver','status','updatedAt']) &&
+        request.resource.data.status == 'recibida' &&
+        request.resource.data.receivedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.receiver is string &&
+        request.resource.data.receiver.size() > 1 &&
+        request.resource.data.receiver.size() <= 120;
+    }
+    function validSupplierResponse(token) {
+      return publicTokenIsValid(token) &&
+        resource.data.status == 'recibida' &&
+        resource.data.receivedAt is timestamp &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['response','submittedAt','status','updatedAt']) &&
+        request.resource.data.status == 'cotizada' &&
+        request.resource.data.submittedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.response is map &&
+        request.resource.data.response.keys().hasOnly(['company','email','general','items']) &&
+        request.resource.data.response.company is string &&
+        request.resource.data.response.company.size() <= 160 &&
+        request.resource.data.response.email is string &&
+        request.resource.data.response.email.size() <= 240 &&
+        request.resource.data.response.general is map &&
+        request.resource.data.response.items is list &&
+        request.resource.data.response.items.size() <= 60;
+    }
+    match /provider_invites/{token} {
+      allow get: if activeStaff() || publicTokenIsValid(token);
+      allow list: if activeStaff();
+      allow create: if token.matches('^[A-Za-z0-9_-]{43}
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+) && validInviteCreate();
+      allow update: if validSupplierReceipt(token) || validSupplierResponse(token) ||
+        (canEdit() &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status','updatedAt']) &&
+          request.resource.data.status == 'revocada' &&
+          request.resource.data.updatedAt == request.time);
+      allow delete: if isAdmin();
+    }
+
     // Ni invitaciones de proveedores ni datos privados quedan abiertos al público.
     match /{document=**} {
       allow read, write: if false;
