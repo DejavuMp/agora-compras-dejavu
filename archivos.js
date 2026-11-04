@@ -131,7 +131,7 @@ onAuthStateChanged(auth,async person=>{
   $('authButton').textContent=person?'Cerrar sesión':'Iniciar sesión';
   $('userLabel').textContent=person?.email||'Sin sesión';
   $('newButton').disabled=true;$('menuNew').disabled=true;
-  $('statTotal').textContent=$('statPending').textContent=$('statChanges').textContent=$('statReceived')='—';
+  for(const id of ['statTotal','statPending','statChanges','statReceived']) $(id).textContent='—';
   $('deliveryRows').innerHTML='<tr><td colspan="6" class="empty-cell">Verificando el acceso a Firebase…</td></tr>';
   if(!person){$('syncState').textContent='Sin sesión';retrySyncButton.hidden=true;return;}
   await retryConnection();
