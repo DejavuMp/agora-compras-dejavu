@@ -1,14 +1,14 @@
 import {initializeApp,getApps} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js';
 import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import {getFirestore,doc,getDoc,collection,collectionGroup,onSnapshot,serverTimestamp,Timestamp,setDoc,runTransaction} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
-import {getStorage,ref,uploadBytesResumable,getDownloadURL,setMaxUploadRetryTime,setMaxOperationRetryTime} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
+import {getStorage,ref,uploadBytesResumable,getDownloadURL} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
 
 // Usa el proyecto Firebase existente de ÁGORA Pedidos. Estas son claves de cliente públicas.
 const config={apiKey:'AIzaSyDPh-AFdST9Ax_Eoho-wT0shlWlCHad6Zg',authDomain:'agora-dejavu-38b8c.firebaseapp.com',projectId:'agora-dejavu-38b8c',storageBucket:'agora-dejavu-38b8c.firebasestorage.app',messagingSenderId:'775680965171',appId:'1:775680965171:web:274557c8c9c25ff304c146'};
 const app=getApps()[0]||initializeApp(config),auth=getAuth(app),db=getFirestore(app),storage=getStorage(app);
 // Limita los reintentos cuando Firebase Storage no está disponible o requiere facturación.
-setMaxUploadRetryTime(storage,18000);
-setMaxOperationRetryTime(storage,15000);
+storage.maxUploadRetryTime=18000;
+storage.maxOperationRetryTime=15000;
 const $=id=>document.getElementById(id);
 window.__AGORA_FILES_BOOT?.mark('module-ready');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
