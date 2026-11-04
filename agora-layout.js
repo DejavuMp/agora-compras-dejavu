@@ -25,4 +25,6 @@
   });
 })();
 
-/* Envío de archivos retirado de la navegación. Los expedientes históricos permanecen conservados. */
+/* Acceso integrado al apartado Archivos de producción. */
+(()=>{if(document.querySelector('script[data-agora-files]'))return;const script=document.createElement('script');script.defer=true;script.src='./agora-archivos-bridge.js';script.dataset.agoraFiles='1';document.head.appendChild(script)})();
+
