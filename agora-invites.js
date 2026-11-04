@@ -101,6 +101,7 @@ import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestor
     unsubscribe=db.onSnapshot(db.collection(fb.firestore,"provider_invites"),snapshot=>{
       cached=snapshot.docs.map(x=>({token:x.id,...x.data()}));
       applyInvites();
+      window.dispatchEvent(new CustomEvent("agora:provider-events",{detail:cached}));
     },err=>msg("No se pudieron revisar respuestas: "+err.message));
   }
   function initPanel(){
