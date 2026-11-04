@@ -131,6 +131,7 @@ import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestor
     if(!session){last=null;cached=[];lastSeen.clear();if(panel)panel.hidden=true;}
     begin();
   }
+  window.AGORA_INVITES=Object.freeze({open:()=>{init();show();}});
   function init(){
     if(fb||!window.AGORA_FIREBASE?.initialized)return;
     fb=window.AGORA_FIREBASE;
