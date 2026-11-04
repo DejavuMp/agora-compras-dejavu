@@ -115,7 +115,6 @@ import * as dbSdk from "https://www.gstatic.com/firebasejs/13.1.0/firebase-fires
   }
   function render(){
     if(!panel)return;
-    if(collapsed){panel.innerHTML='<button data-cloud="toggle" style="background:#9e7843;color:white;border:0;border-radius:7px;padding:7px 10px;cursor:pointer">☁ ÁGORA · Abrir nube</button>';return;}
     panel.innerHTML=`
       <div style="display:flex;justify-content:space-between;gap:8px"><strong style="color:#eac58b">☁ ÁGORA · Nube</strong><button data-cloud="toggle" style="margin-left:auto;background:transparent;border:1px solid #9e7843;border-radius:5px;color:#eac58b;padding:3px 6px;cursor:pointer">Ocultar</button><span>${escape(mode)}</span></div>
       <div style="margin:8px 0">${escape(note)}</div>
@@ -130,12 +129,12 @@ import * as dbSdk from "https://www.gstatic.com/firebasejs/13.1.0/firebase-fires
   }
   function mount(){
     const style=document.createElement("style");
-    style.textContent="#agora-cloud-panel{position:fixed;left:12px;bottom:12px;width:min(355px,calc(100vw - 24px));max-height:45vh;overflow:auto;background:#171613;color:#f1e8d5;border:1px solid #a1804b;border-radius:11px;padding:12px;box-shadow:0 8px 26px #0008;z-index:10000;font:12px/1.4 Arial,sans-serif}.agora-cloud-actions{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}.agora-cloud-actions button{background:#9e7843;color:#fff;border:0;padding:7px 10px;border-radius:5px;cursor:pointer;font:inherit}@media(max-width:650px){#agora-cloud-panel{bottom:140px;max-height:38vh}}";
-    document.head.appendChild(style);panel=document.createElement("aside");panel.id="agora-cloud-panel";document.body.append(panel);
+    style.textContent="#agora-cloud-panel[hidden]{display:none!important}#agora-cloud-panel{position:fixed;left:12px;bottom:12px;width:min(355px,calc(100vw - 24px));max-height:45vh;overflow:auto;background:#171613;color:#f1e8d5;border:1px solid #a1804b;border-radius:11px;padding:12px;box-shadow:0 8px 26px #0008;z-index:10000;font:12px/1.4 Arial,sans-serif}.agora-cloud-actions{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}.agora-cloud-actions button{background:#9e7843;color:#fff;border:0;padding:7px 10px;border-radius:5px;cursor:pointer;font:inherit}@media(max-width:650px){#agora-cloud-panel{bottom:140px;max-height:38vh}}";
+    document.head.appendChild(style);panel=document.createElement("aside");panel.id="agora-cloud-panel";panel.hidden=true;document.body.append(panel);
     panel.addEventListener("click",async e=>{
       const action=e.target.closest("[data-cloud]")?.dataset.cloud;if(!action)return;
       try{
-        if(action==="toggle"){collapsed=!collapsed;render();return;}
+        if(action==="toggle"){panel.hidden=true;return;}
         if(action==="login")await authSdk.signInWithPopup(fb.auth,new authSdk.GoogleAuthProvider());
         if(action==="logout"){mode="local";await authSdk.signOut(fb.auth);}
         if(action==="copy"&&account){await navigator.clipboard.writeText(account.uid);tell("UID copiado.");}
@@ -144,8 +143,10 @@ import * as dbSdk from "https://www.gstatic.com/firebasejs/13.1.0/firebase-fires
         if(action==="users")await authorizeUser();
       }catch(error){tell("Error: "+error.message);}
     });
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&panel&&!panel.hidden)panel.hidden=true;});
     render();
   }
+  window.AGORA_CLOUD=Object.freeze({open:()=>{initialize();if(panel){collapsed=false;panel.hidden=false;render();}}});
   function initialize(){
     if(initialized||!window.AGORA_FIREBASE?.initialized)return;
     fb=window.AGORA_FIREBASE;initialized=true;mount();
