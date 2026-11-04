@@ -1,0 +1,108 @@
+// INCORPORAR estos dos match DENTRO de match /databases/{database}/documents,
+// ANTES del match /{document=**} de cierre. Reutiliza las funciones
+// activeStaff(), canEdit(), isAdmin() del firestore.rules actual.
+// Importante: este archivo es un fragmento, NO sustituir las reglas existentes.
+
+function deliveryPath(id) {
+  return /databases/$(database)/documents/agora_file_deliveries/$(id);
+}
+function isActiveDelivery(id) {
+  return id.matches('^[A-Za-z0-9_-]{43}$') &&
+    exists(deliveryPath(id)) &&
+    get(deliveryPath(id)).data.active == true &&
+    get(deliveryPath(id)).data.validUntil > request.time;
+}
+function isDeliveryReadAllowed(token) {
+  return token.matches('^[A-Za-z0-9_-]{43}$') &&
+    resource.data.active == true &&
+    resource.data.validUntil > request.time;
+}
+function validDeliveryData() {
+  return request.resource.data.keys().hasOnly([
+    'id','folio','createdBy','createdByEmail','createdAt','updatedAt','active',
+    'version','revisions','project','category','title','recipientName',
+    'recipientEmail','driveUrl','validUntil','notes','sampleImages','folderImages'
+  ]) &&
+  request.resource.data.keys().hasAll([
+    'id','folio','createdBy','createdByEmail','createdAt','updatedAt','active',
+    'version','revisions','project','category','title','recipientName',
+    'recipientEmail','driveUrl','validUntil','notes','sampleImages','folderImages'
+  ]) &&
+  request.resource.data.id is string &&
+  request.resource.data.title is string && request.resource.data.title.size() <= 160 &&
+  request.resource.data.project is string && request.resource.data.project.size() <= 120 &&
+  request.resource.data.recipientName is string && request.resource.data.recipientName.size() <= 120 &&
+  request.resource.data.recipientEmail is string && request.resource.data.recipientEmail.size() <= 240 &&
+  request.resource.data.driveUrl is string && request.resource.data.driveUrl.size() <= 2048 &&
+  request.resource.data.notes is string && request.resource.data.notes.size() <= 3000 &&
+  request.resource.data.sampleImages is list && request.resource.data.sampleImages.size() <= 8 &&
+  request.resource.data.folderImages is list && request.resource.data.folderImages.size() <= 6 &&
+  request.resource.data.revisions is list && request.resource.data.revisions.size() <= 30 &&
+  request.resource.data.validUntil is timestamp &&
+  request.resource.data.version is int && request.resource.data.version >= 1 && request.resource.data.version <= 30 &&
+  request.resource.data.active is bool;
+}
+match /agora_file_deliveries/{token} {
+  allow get: if activeStaff() || isDeliveryReadAllowed(token);
+  allow list: if activeStaff();
+  allow create: if canEdit() && token.matches('^[A-Za-z0-9_-]{43}$') &&
+    validDeliveryData() && request.resource.data.id == token &&
+    request.resource.data.createdBy == request.auth.uid &&
+    request.resource.data.createdByEmail == request.auth.token.email &&
+    request.resource.data.createdAt == request.time &&
+    request.resource.data.updatedAt == request.time &&
+    request.resource.data.active == true &&
+    request.resource.data.version == 1 &&
+    request.resource.data.revisions.size() == 1 &&
+    request.resource.data.validUntil > request.time;
+  allow update: if canEdit() && validDeliveryData() &&
+    request.resource.data.id == resource.data.id &&
+    request.resource.data.createdBy == resource.data.createdBy &&
+    request.resource.data.createdByEmail == resource.data.createdByEmail &&
+    request.resource.data.recipientName == resource.data.recipientName &&
+    request.resource.data.createdAt == resource.data.createdAt &&
+    request.resource.data.recipientEmail == resource.data.recipientEmail &&
+    request.resource.data.updatedAt == request.time &&
+    (
+      // Una nueva revisión conserva el enlace y registra versión posterior.
+      (resource.data.active == true && request.resource.data.active == true &&
+       request.resource.data.version == resource.data.version + 1 &&
+       request.resource.data.revisions.size() == resource.data.revisions.size() + 1 &&
+       request.resource.data.validUntil > request.time)
+      ||
+      // Revocación sin borrar el expediente.
+      (resource.data.active == true && request.resource.data.active == false &&
+       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active','updatedAt']))
+    );
+  allow delete: if false;
+}
+// El token está en el segmento de ruta: permite verificar incluso si NO existe
+// aún la respuesta. La colección de respuestas es de solo agregado.
+match /agora_file_responses/{token}/agora_file_reply_versions/{versionId} {
+  allow get: if activeStaff() || isActiveDelivery(token);
+  allow list: if activeStaff();
+  allow create: if
+    isActiveDelivery(token) &&
+    request.resource.data.keys().hasOnly([
+      'deliveryId','version','status','receiverName','receiverEmail','comments','createdAt'
+    ]) &&
+    request.resource.data.keys().hasAll([
+      'deliveryId','version','status','receiverName','receiverEmail','comments','createdAt'
+    ]) &&
+    request.resource.data.deliveryId == token &&
+    request.resource.data.version is int &&
+    versionId == string(request.resource.data.version) &&
+    request.resource.data.version == get(deliveryPath(token)).data.version &&
+    request.resource.data.status in ['recibido','no_recibido','cambios','aprobado'] &&
+    request.resource.data.receiverName is string &&
+    request.resource.data.receiverName.size() >= 2 && request.resource.data.receiverName.size() <= 120 &&
+    request.resource.data.receiverEmail is string && request.resource.data.receiverEmail.size() <= 240 &&
+    request.resource.data.comments is string && request.resource.data.comments.size() <= 3000 &&
+    (request.resource.data.status in ['recibido','aprobado'] || request.resource.data.comments.size() >= 5) &&
+    request.resource.data.createdAt == request.time;
+  allow update, delete: if false;
+}
+// Consulta global del historial para los usuarios internos, nunca para visitantes.
+match /{path=**}/agora_file_reply_versions/{versionId} {
+  allow list: if activeStaff();
+}

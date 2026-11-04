@@ -24,3 +24,6 @@
     }
   });
 })();
+
+/* Acceso integrado a la herramienta de archivos de ÁGORA. */
+(()=>{if(document.querySelector('script[data-agora-files]'))return;const script=document.createElement('script');script.defer=true;script.src='./agora-archivos-bridge.js';script.setAttribute('data-agora-files','1');document.head.appendChild(script);})();

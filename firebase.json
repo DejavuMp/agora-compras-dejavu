@@ -8,7 +8,12 @@
       "FIREBASE_ACTIVACION.md",
       "firestore.rules",
       "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "functions/**",
+      "firestore.archivos.rules.fragment",
+      "integrar-en-agora.mjs",
+      "README_ARCHIVOS.md",
+      "*.backup"
     ],
     "headers": [
       {
@@ -33,5 +38,11 @@
   },
   "firestore": {
     "rules": "firestore.rules"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "functions": {
+    "source": "functions"
   }
 }
