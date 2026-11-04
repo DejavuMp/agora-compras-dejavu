@@ -175,6 +175,11 @@ import * as dbSdk from "https://www.gstatic.com/firebasejs/13.1.0/firebase-fires
       const current=mapLocal(local().snapshot());
       const ids=new Set([...current.keys(),...baseline.keys()]);
       const dirty=[...ids].filter(id=>json(current.get(id)||null)!==(baseline.get(id)?.text||null));
+      const deleted=dirty.filter(id=>!current.has(id)&&baseline.has(id));
+      if(deleted.length>1 || (deleted.length>0&&baseline.size>1&&deleted.length>=baseline.size/2)){
+        status('conflict','La copia local parece haber perdido varios expedientes. Se detuvo la sincronización para evitar borrarlos de Firebase. No borres los datos del navegador.');
+        return;
+      }
       const conflicts=dirty.filter(id=>{
         const mine=current.get(id)||null,there=remote.get(id)||null;
         return (baseline.get(id)?.revision||0)!==(there?.revision||0) && json(mine)!==json(there?.value||null);
