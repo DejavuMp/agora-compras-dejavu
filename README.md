@@ -1,3 +1,16 @@
+# ÁGORA · Aplicaciones independientes
+
+La interfaz se dividió en dos aplicaciones publicadas en GitHub Pages:
+
+- **Compras & Producción:** https://dejavump.github.io/agora-compras-dejavu/ (presupuestos, muestras, pedidos, proveedores y entregas).
+- **Envío y Recepción de Archivos:** https://dejavump.github.io/agora-compras-dejavu/archivos/ (Drive, vistas de artes, evidencias, respuestas y comprobantes).
+
+Se publican en subrutas del **mismo repositorio**, pero mantienen pantallas, código y flujos diferenciados. Comparten el proyecto Firebase, utilizando colecciones separadas. Se conservaron los enlaces históricos de recepción mediante redirección.
+
+Véase [README_ARCHIVOS.md](./README_ARCHIVOS.md) para la aplicación de Archivos.
+
+---
+
 # ÁGORA · Compras y Producción — Sitio web
 
 Proyecto Firebase: **agora-dejavu-38b8c**.
