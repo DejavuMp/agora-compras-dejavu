@@ -124,34 +124,17 @@ service cloud.firestore {
           request.resource.data.updatedAt == request.time);
       allow delete: if isAdmin();
     }
-// INCORPORAR estos dos match DENTRO de match /databases/{database}/documents,
-    // ANTES del match /{document=**} de cierre. Reutiliza las funciones
-    // activeStaff(), canEdit(), isAdmin() del firestore.rules actual.
-    // Importante: este archivo es un fragmento, NO sustituir las reglas existentes.
-    
     function deliveryPath(id) {
       return /databases/$(database)/documents/agora_file_deliveries/$(id);
     }
     function isActiveDelivery(id) {
-      return id.matches('^[A-Za-z0-9_-]{43}
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-) &&
+      return id.matches('^[A-Za-z0-9_-]{43}$') &&
         exists(deliveryPath(id)) &&
         get(deliveryPath(id)).data.active == true &&
         get(deliveryPath(id)).data.validUntil > request.time;
     }
     function isDeliveryReadAllowed(token) {
-      return token.matches('^[A-Za-z0-9_-]{43}
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-) &&
+      return token.matches('^[A-Za-z0-9_-]{43}$') &&
         resource.data.active == true &&
         resource.data.validUntil > request.time;
     }
@@ -183,13 +166,7 @@ service cloud.firestore {
     match /agora_file_deliveries/{token} {
       allow get: if activeStaff() || isDeliveryReadAllowed(token);
       allow list: if activeStaff();
-      allow create: if canEdit() && token.matches('^[A-Za-z0-9_-]{43}
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-) &&
+      allow create: if canEdit() && token.matches('^[A-Za-z0-9_-]{43}$') &&
         validDeliveryData() && request.resource.data.id == token &&
         request.resource.data.createdBy == request.auth.uid &&
         request.resource.data.createdByEmail == request.auth.token.email &&
@@ -250,7 +227,7 @@ service cloud.firestore {
     match /{path=**}/agora_file_reply_versions/{versionId} {
       allow list: if activeStaff();
     }
-    
+
     // Todas las demás colecciones permanecen cerradas.
     match /{document=**} {
       allow read, write: if false;
