@@ -46,3 +46,10 @@ agoraAlertsScript.defer=true;
 agoraAlertsScript.src='./agora-notificaciones.js';
 agoraAlertsScript.onerror=()=>console.warn('ÁGORA: No se pudo cargar el centro de notificaciones.');
 document.head.appendChild(agoraAlertsScript);
+
+// Diseño responsivo: herramientas en barra superior y navegación plegable.
+const agoraLayoutScript=document.createElement('script');
+agoraLayoutScript.defer=true;
+agoraLayoutScript.src='./agora-layout.js';
+agoraLayoutScript.onerror=()=>console.warn('ÁGORA: No se pudieron cargar los ajustes visuales.');
+document.head.appendChild(agoraLayoutScript);
