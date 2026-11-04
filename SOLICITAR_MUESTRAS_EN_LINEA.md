@@ -5,14 +5,14 @@ Actualización aplicada al repositorio: 4 de noviembre de 2026.
 ## Flujo operativo
 
 1. Entra a ÁGORA desde https://dejavump.github.io/agora-compras-dejavu/ usando **el mismo navegador y cuenta** donde trabajaste la cotización. Si la app conserva una versión anterior, recarga con Ctrl + Shift + R.
-2. Abre **Presupuestos** y el folio **PRE-...** al que el proveedor ya respondió. Comprueba que los costos de muestras estén capturados y el estado sea **Cotizada**. Si no ves los precios, abre **Envíos** y revisa la respuesta en Firebase; se incorpora al expediente con la sesión autorizada.
+2. Abre **Presupuestos** y el folio **PRE-...** al que el proveedor ya respondió. Comprueba que los costos de muestras estén capturados y el estado sea **Cotizada**. Si no ves los precios, abre **Respuestas** y revisa la respuesta en Firebase; se incorpora al expediente con la sesión autorizada.
 3. Pulsa **Solicitar muestras**. Se genera **MUE-...** vinculado a la cotización y se copian las fotografías, descripción y costo de muestra de cada artículo.
 4. En **Muestras**, conserva solamente los productos que deseas solicitar; ajusta las cantidades, fecha y lugar de entrega.
-5. Pulsa **Correo con fotos y botones**. En **Envíos**, selecciona **Generar enlace de la solicitud abierta** (o recupera el enlace existente para el mismo folio).
+5. Pulsa **Correo con fotos y botones**. En **Respuestas**, selecciona **Generar enlace de la solicitud abierta** (o recupera el enlace existente para el mismo folio).
 6. Pulsa **Crear borrador Gmail con fotos y botones**. Gmail guardará un borrador con la marca Dejavú, imágenes incrustadas, cantidades, costos cotizados y dos botones: **Firmar de recibido** y **Responder solicitud de muestras**.
 7. En **Gmail → Borradores**, revisa que todas las fotos se vean y que ambos enlaces apunten a `proveedor-online.html`; **envía el correo manualmente**.
 8. El proveedor confirma recepción, responde disponibilidad, cantidades a preparar, costo definitivo, días de producción, fecha y método de entrega, lugar, guía y observaciones. Firestore almacena el acuse y la respuesta.
-9. En ÁGORA, la respuesta del proveedor aparece en **Envíos** y se incorpora al mismo folio de muestras al tener sesión y conexión. El acuse **no** cambia el estado de recepción física. Tras la entrega real, la agencia registra la recepción y aprueba o rechaza la muestra.
+9. En ÁGORA, la respuesta del proveedor aparece en **Respuestas** y se incorpora al mismo folio de muestras al tener sesión y conexión. El acuse **no** cambia el estado de recepción física. Tras la entrega real, la agencia registra la recepción y aprueba o rechaza la muestra.
 
 ## Requisitos
 
