@@ -301,8 +301,57 @@ function delegateInput(e){let t=e.target;if(t.matches('[data-filter="query"]')){
 async function filesChanged(e){const t=e.target;if(t.matches('[data-image-id]')){let f=t.files?.[0];if(!f)return;try{let url=await imageFile(f),r=getRFQ(),x=r?.items.find(x=>x.id===t.dataset.imageId);if(x){x.image=url;scheduleSave();render();notification('Imagen cargada y optimizada para almacenamiento local.')}}catch(err){notification(err.message)}return}if(t.id==='restoreFile'||t.id==='responseFile'){const f=t.files?.[0];if(f){if(t.id==='responseFile')closeModal();await readJSON(f)}return}}
 function delegateClick(e){const b=e.target.closest('[data-action],[data-nav],[data-open],[data-tab]');if(!b)return;if(b.dataset.nav){routeTo(b.dataset.nav);return}if(b.dataset.open){let type=b.dataset.open;routeTo(type==='rfq'?'solicitudes':type==='sample'?'muestras':'pedidos',b.dataset.id,type==='rfq'?'informacion':'detalle');return}if(b.dataset.tab){tab=b.dataset.tab;render();return}if(b.dataset.action){e.preventDefault();doAction(b.dataset.action,b)}}
 document.addEventListener('click',delegateClick);document.addEventListener('input',delegateInput);document.addEventListener('change',e=>{delegateInput(e);filesChanged(e)});
+function receiveOnlineInvitation(invite){
+  const p=invite?.request||{},kind=p.kind;
+  const list=kind==='quote'?data.rfqs:kind==='order'?data.orders:kind==='sample'?data.samples:null;
+  const record=list?.find(x=>x.id===p.id);if(!record)return false;
+  const received=invite.receivedAt?.toDate?.().toISOString?.()||null;
+  const submitted=invite.submittedAt?.toDate?.().toISOString?.()||null;
+  const marker=[invite.token,received,submitted,invite.status].join('|');
+  if(record._onlineInviteSync===marker)return false;
+  if(!received)return false;
+  const reply=invite.response||{},company=reply.company||p.supplier?.name||'Proveedor';
+  record.receivedAt=received;
+  if(kind==='quote'){
+    record.supplierResponse=record.supplierResponse||{};
+    Object.assign(record.supplierResponse,{receivedAt:received,receiver:invite.receiver||'Proveedor',company,email:reply.email||p.supplier?.email||''});
+    if(submitted){
+      record.supplierResponse.general=reply.general||{};
+      for(const x of reply.items||[]){
+        const item=record.items.find(v=>v.id===x.id);if(!item)continue;
+        for(const name of ['retailCost','wholesaleCost','minRetail','minWholesale','sampleCost','availability','comment']){
+          if(x[name]!==undefined)item[name]=x[name];
+        }
+      }
+      record.status='cotizada';
+    }else if(record.status==='enviada'||record.status==='borrador')record.status='recibida';
+  }else if(kind==='order'){
+    record.acceptedAt=received;
+    record.supplierResponse={schema:'agora-provider-response-v1',kind,id:record.id,receivedAt:received,receiver:invite.receiver||'Proveedor',company,email:reply.email||p.supplier?.email||'',items:reply.items||[],general:reply.general||{},sentAt:submitted};
+    if(submitted)record.status='aceptado';else if(record.status==='borrador')record.status='emitido';
+  }else if(kind==='sample'){
+    record.receivedAt=received;
+    record.supplierResponse={schema:'agora-provider-response-v1',kind,id:record.id,receivedAt:received,receiver:invite.receiver||'Proveedor',company,items:reply.items||[],general:reply.general||{},sentAt:submitted};
+    if(submitted){
+      record.confirmedAt=submitted;record.status='confirmada';
+      for(const x of reply.items||[]){const item=record.items.find(v=>v.id===x.id);if(item&&x.sampleCost!==undefined&&x.sampleCost!=='')item.confirmedCost=x.sampleCost}
+    }
+  }
+  record._onlineInviteSync=marker;
+  record.modified=now();
+  log(kind,record.id,(submitted?'Respuesta digital':'Acuse digital')+' recibido de '+company);
+  render();
+  return true;
+}
 window.AGORA_LOCAL = Object.freeze({
   snapshot:()=>structuredClone(data),
+  currentSupplierRequest:()=>{
+    const item=getDoc();
+    if(!item.record)return null;
+    if(!supplier(item.record.supplierId))throw Error('Primero asigna un proveedor a la solicitud.');
+    return structuredClone(supplierPayload(item.kind,item.record));
+  },
+  applyProviderInvitation:receiveOnlineInvitation,
   applyCloud:(next)=>{
     if(!next || next.app!=='agora-compras-v1' || !['rfqs','orders','samples','suppliers'].every(k=>Array.isArray(next[k]))) throw new Error('Formato de nube incompatible');
     data=structuredClone(next);save();render();
