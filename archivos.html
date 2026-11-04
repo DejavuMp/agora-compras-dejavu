@@ -13,7 +13,7 @@
   <a class="menu-link" href="./index.html"><span>▦</span><span>Compras y pedidos</span></a>
   <a class="menu-link selected" href="./archivos.html"><span>▤</span><span>Envío de archivos</span></a>
   <div class="menu-label" style="margin-top:34px">HERRAMIENTAS</div>
-  <button class="menu-link" type="button" id="menuNew"><span>＋</span><span>Nuevo envío</span></button>
+  <button class="menu-link" type="button" id="menuNew" disabled><span>＋</span><span>Nuevo envío</span></button>
   <button class="menu-link" type="button" id="menuHistory"><span>◷</span><span>Historial de envíos</span></button>
   <div class="side-bottom"><span class="live-dot"></span> Firebase · Conexión por verificar</div>
  </aside>
@@ -24,11 +24,11 @@
    <div class="top-actions"><span id="userLabel" class="muted desktop-only">Sin sesión</span><button id="authButton" class="btn btn-outline btn-small">Iniciar sesión</button></div>
   </header>
   <main class="workspace">
-   <div class="page-heading"><div><div class="eyebrow">CENTRO DE CONTROL DOCUMENTAL</div><h1>Envío y recepción de archivos</h1><p>Comparte diseños, artes y documentos. Recibe acuses, comentarios y solicitudes de cambios en un solo lugar.</p></div><button class="btn btn-gold" id="newButton">＋ Nuevo envío</button></div>
+   <div class="page-heading"><div><div class="eyebrow">CENTRO DE CONTROL DOCUMENTAL</div><h1>Envío y recepción de archivos</h1><p>Comparte diseños, artes y documentos. Recibe acuses, comentarios y solicitudes de cambios en un solo lugar.</p></div><button class="btn btn-gold" id="newButton" disabled>＋ Nuevo envío</button></div>
    <div id="alert" class="alert" role="status" aria-live="polite" hidden></div>
    <section class="stats" id="stats"><div class="stat"><span>Total de envíos</span><strong id="statTotal">—</strong><small>Historial disponible</small></div><div class="stat"><span>Por confirmar</span><strong id="statPending">—</strong><small>Esperando al destinatario</small></div><div class="stat"><span>Solicitudes de cambio</span><strong id="statChanges">—</strong><small>Requieren seguimiento</small></div><div class="stat"><span>Confirmados</span><strong id="statReceived">—</strong><small>Recibidos / aprobados</small></div></section>
    <section class="panel list-panel">
-    <div class="panel-heading"><div><h2>Registro de envíos</h2><p>Consulta el estado en tiempo real y recupera cualquier enlace.</p></div><span id="syncState" class="sync-label">Sin conexión</span></div>
+    <div class="panel-heading"><div><h2>Registro de envíos</h2><p>Consulta el estado en tiempo real y recupera cualquier enlace.</p></div><span id="syncState" class="sync-label" aria-live="polite">Preparando Firebase…</span></div>
     <div class="filters"><label class="search-field"><span>⌕</span><input id="search" type="search" placeholder="Buscar por folio, proyecto, destinatario o archivo"></label><select id="filter" aria-label="Filtrar por estado"><option value="all">Todos los estados</option><option value="pendiente">Pendientes</option><option value="recibido">Recibidos</option><option value="aprobado">Aprobados</option><option value="cambios">Con cambios</option><option value="no_recibido">No recibidos</option><option value="vencido">Vencidos</option><option value="revocado">Revocados</option></select></div>
     <div class="list-scroll"><table class="data-table"><thead><tr><th>ENVÍO / VERSIÓN</th><th>PROYECTO</th><th>DESTINATARIO</th><th>VIGENCIA</th><th>ESTADO</th><th></th></tr></thead><tbody id="deliveryRows"><tr><td colspan="6" class="empty-cell">Inicia sesión con una cuenta autorizada de ÁGORA para consultar los envíos.</td></tr></tbody></table></div>
    </section>
@@ -53,5 +53,35 @@
  </section>
 </div>
 <div class="modal-backdrop" id="detailOverlay" hidden><section class="dialog detail-dialog" role="dialog" aria-modal="true" aria-labelledby="detailTitle"><div class="dialog-header"><div><div class="eyebrow">EXPEDIENTE EN LÍNEA</div><h2 id="detailTitle">Detalle del envío</h2><p id="detailSub">Historial, comentarios y versiones</p></div><button class="icon-button" data-close="detail" aria-label="Cerrar">✕</button></div><div class="dialog-content" id="detailContent"></div></section></div>
-<script type="module" src="./archivos.js?v=20261104-2"></script>
+<script>
+(function(){
+  const state=document.getElementById('syncState');
+  let moduleLoaded=false;
+  window.__AGORA_FILES_BOOT={
+    mark(stage){
+      if(stage==='module-ready'){moduleLoaded=true; console.info('ÁGORA Archivos: JS de Firebase cargado.');}
+    }
+  };
+  const script=document.createElement('script');
+  script.type='module';
+  script.src='./archivos.js?revision=20261104-3-931c6b5';
+  script.addEventListener('error',()=>{
+    state.textContent='No se pudo cargar el módulo';
+    state.style.color='#9f3c2c';
+    const alert=document.getElementById('alert');
+    alert.hidden=false;alert.className='alert error';
+    alert.textContent='No se pudo iniciar el módulo. Comprueba la conexión o bloqueadores de scripts y vuelve a cargar la página.';
+  });
+  document.body.appendChild(script);
+  setTimeout(()=>{
+    if(!moduleLoaded){
+      state.textContent='Módulo sin cargar';
+      state.style.color='#9f3c2c';
+      const alert=document.getElementById('alert');
+      alert.hidden=false;alert.className='alert error';
+      alert.textContent='El módulo de Firebase no terminó de cargar. Revisa en el navegador F12 > Consola para encontrar el error y compártelo con soporte.';
+    }
+  },12000);
+})();
+</script>
 </body></html>
