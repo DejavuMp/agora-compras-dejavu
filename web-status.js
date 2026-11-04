@@ -8,10 +8,10 @@ const css=document.createElement('style');css.textContent=`
 #agora-web-bar button.agora-primary{background:#a78042;color:#fff;border-color:#a78042}
 #agora-web-bar button.agora-close{border:0;padding:2px 5px;margin-left:auto}
 @media(max-width:650px){#agora-web-bar{bottom:7px;left:8px;right:8px;max-width:none}}
-`;document.head.append(css);
+#agora-web-bar[hidden]{display:none!important}\n`;document.head.append(css);
 const el=document.createElement('aside');el.id='agora-web-bar';el.setAttribute('aria-label','Estado del guardado local');
 el.innerHTML=`<div class="agora-row"><strong>✓ ÁGORA web · copia en este navegador</strong><button class="agora-close" aria-label="Ocultar aviso" title="Ocultar">×</button></div><div class="agora-desc">Los datos se conservan localmente; si activas Firebase en el panel de nube, comprueba que aparezca guardado en línea. Conserva respaldos.</div><div class="agora-row" style="margin-top:8px"><button class="agora-primary" id="agora-backup-shortcut">Descargar respaldo</button><button id="agora-protect">Proteger datos</button><span id="agora-net-status"></span></div>`;
-document.body.append(el);
+el.hidden=true;document.body.append(el);
 const net=el.querySelector('#agora-net-status');function refresh(){net.textContent=navigator.onLine?'En línea':'Sin conexión';net.style.color=navigator.onLine?'#c8e5b1':'#f1d08b'}refresh();addEventListener('online',refresh);addEventListener('offline',refresh);
 el.querySelector('.agora-close').onclick=()=>{el.remove();};
 el.querySelector('#agora-backup-shortcut').onclick=()=>{ const b=document.querySelector('[data-action="backup"]'); if(b){b.click()}else{ const nav=document.querySelector('[data-nav="respaldo"]');if(nav)nav.click();setTimeout(()=>document.querySelector('[data-action="backup"]')?.click(),250);} };
