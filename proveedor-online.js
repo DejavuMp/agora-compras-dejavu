@@ -26,6 +26,8 @@ import * as fire from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firest
     $("subtitle").textContent=(labels[p.kind]||"Solicitud")+
       " · Proveedor: "+(p.supplier?.name||"")+" · Válido hasta "+data.expiresAt.toDate().toLocaleDateString("es-MX");
   }
+  function referenceInfo(ref){if(!ref)return '';const drive=String(ref.driveUrl||'');let main='';try{const u=new URL(drive);if(u.protocol==='https:'&&['drive.google.com','docs.google.com'].includes(u.hostname))main=u.href}catch{}const notes=String(ref.instructions||'');const images=Array.isArray(ref.sampleImages)?ref.sampleImages:[],links=Array.isArray(ref.driveImages)?ref.driveImages:[];if(!main&&!notes&&!images.length&&!links.length)return '';const gallery=images.slice(0,6).map(img=>imageMarkup(img.data)).join('');const driveImgs=links.slice(0,12).map((url,i)=>{let href='',src='';try{const u=new URL(url);if(u.protocol!=='https:'||!['drive.google.com','docs.google.com'].includes(u.hostname))return '';href=u.href;const id=u.pathname.match(/\/file\/d\/([\w-]+)/)?.[1]||u.searchParams.get('id');if(id&&/^[\w-]{8,}$/.test(id))src='https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w320'}catch{return ''}return '<div class="item"><div class="itemhead">'+(src?'<img loading="lazy" src="'+esc(src)+'" alt="Imagen de Drive">':'')+'<a href="'+esc(href)+'" target="_blank" rel="noopener noreferrer">Ver imagen de Drive '+(i+1)+'</a></div></div>'}).join('');return '<div class="card"><h2>Material de referencia para las muestras</h2>'+(main?'<p><b>Carpeta o archivo de Drive:</b> <a href="'+esc(main)+'" target="_blank" rel="noopener noreferrer">Abrir en Google Drive</a></p>':'')+(notes?'<p><b>Indicaciones:</b></p><p style="white-space:pre-line">'+esc(notes)+'</p>':'')+(gallery?'<h3>Fotografías de muestra</h3><div class="itemhead">'+gallery+'</div>':'')+(driveImgs?'<h3>Imágenes del Drive</h3>'+driveImgs:'')+'<p class="muted">Para visualizar imágenes alojadas en Drive debes contar con permiso de acceso a esos archivos.</p></div>'}
+
   function requestInfo(){
     const p=data.request;
     return '<div class="card"><h2>Información de la solicitud</h2><div class="grid">'+
@@ -36,7 +38,7 @@ import * as fire from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firest
       p.items.map((x,i)=>'<div class="item"><div class="itemhead">'+imageMarkup(x.image)+
         '<div><strong>'+(i+1)+'. '+itemLabel(x)+'</strong><p class="muted">'+esc(x.description||"")+'</p>'+
         (x.qty?'<p>Cantidad: '+esc(x.qty)+'</p>':"")+'</div></div></div>').join("")+
-      '</div>';
+      '</div>'+referenceInfo(p.kind==='sample'?p.references:null);
   }
   function ackSection(){
     if(data.status!=="pendiente")return "";
