@@ -48,6 +48,19 @@ import * as dbSdk from "https://www.gstatic.com/firebasejs/13.1.0/firebase-fires
   }
   async function safety(uid,why){
     await writeStore('safety',uid+'-'+Date.now(),{why,date:new Date().toISOString(),payload:local().snapshot()});
+    // Conservar hasta cinco respaldos automáticos recientes por cuenta, sin borrar expedientes activos.
+    try{
+      const database=await openDB();
+      await new Promise((resolve,reject)=>{
+        const tx=database.transaction('safety','readwrite'),store=tx.objectStore('safety');
+        const rq=store.getAllKeys();
+        rq.onsuccess=()=>{
+          const keys=rq.result.filter(k=>typeof k==='string'&&k.startsWith(uid+'-')).sort().reverse();
+          for(const k of keys.slice(5))store.delete(k);
+        };
+        tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);
+      });
+    }catch(e){console.warn('ÁGORA: no se pudieron depurar copias antiguas',e);}
   }
   async function loadBase(uid){
     const saved=await readStore('sync',uid);
@@ -207,7 +220,7 @@ import * as dbSdk from "https://www.gstatic.com/firebasejs/13.1.0/firebase-fires
       }
     }finally{
       inFlight=false;
-      if(pending&&account&&role&&navigator.onLine&&!['setup','conflict'].includes(mode))schedule(true);
+      if(pending&&account&&role&&navigator.onLine&&!['setup','conflict','error'].includes(mode))schedule(true);
     }
   }
   async function allowUser(){
@@ -279,7 +292,7 @@ import * as dbSdk from "https://www.gstatic.com/firebasejs/13.1.0/firebase-fires
   }
   function boot(){
     if(initialized||!window.AGORA_FIREBASE?.initialized)return;
-    fb=window.AGORA_FIREBASE;initialized=true;mount();
+    fb=window.AGORA_FIREBASE;initialized=true;appReady=window.AGORA_LOCAL_READY===true;mount();
     authSdk.onAuthStateChanged(fb.auth,user=>{
       account=user;const stamp=++authSerial;
       role=null;baseline.clear();hasBase=false;
