@@ -54,7 +54,7 @@ import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestor
           '<p><b>Comentarios:</b> '+esc(general.notes||'Sin comentarios')+'</p>':'<p>La respuesta completa aparecerá aquí cuando el proveedor termine de enviarla.</p>')+
         '<div class="agora-invite-actions"><button data-invite="reuse" data-token="'+esc(selected.token)+'">Usar este mismo enlace</button></div></div>';
     }
-    return '<section class="agora-history"><div class="agora-history-head"><h3>Historial de formularios enviados</h3><span>'+sorted.length+' enlace(s)</span></div>'+
+    return '<section class="agora-history"><div class="agora-history-head"><h3>Historial de enlaces y respuestas</h3><span>'+sorted.length+' enlace(s)</span></div>'+
       '<p class="agora-muted">Consultas de Firebase en tiempo real. Un enlace generado no confirma que el correo haya sido enviado.</p>'+
       (!historyLoaded?'<p>Consultando Firebase…</p>':sorted.length?'<div class="agora-history-list">'+sorted.slice(0,60).map(r=>
         '<div class="agora-history-row"><div><b>'+esc(r.request?.folio||r.request?.id||'Solicitud')+'</b><span>'+esc(r.request?.supplier?.name||'Proveedor')+'</span></div>'+
