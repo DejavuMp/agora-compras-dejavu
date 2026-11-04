@@ -11,3 +11,5 @@ La aplicación original continúa funcionando y guardando en IndexedDB. Se agreg
 - El repositorio es público. **Jamás subir expedientes, datos de proveedores, llaves privadas, tokens ni respaldos.**
 
 **Guía paso a paso:** [PUESTA_EN_MARCHA_FIREBASE.md](./PUESTA_EN_MARCHA_FIREBASE.md).
+
+**Uso automático de Firebase y modo sin conexión:** [SINCRONIZACION_AUTOMATICA.md](./SINCRONIZACION_AUTOMATICA.md).
