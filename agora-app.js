@@ -265,6 +265,30 @@ async function createGmailDraft(){
  }catch(e){console.error('ÁGORA Gmail draft',e);gmailStatus(e.message||'Error de conexión con Gmail.');notification('No se creó el borrador: '+(e.message||'Error desconocido'));}
  finally{gmailBusy=false}
 }
+async function createOnlineInviteGmailDraft(urls,folio){
+ const d=getDoc(),r=d.record;
+ if(!r||!folio||r.folio!==folio)throw new Error('Abre el expediente '+String(folio||'correspondiente')+' antes de generar el correo.');
+ for(const value of [urls?.acuse,urls?.cotizar]){
+  const link=new URL(String(value||''),location.href);
+  if(link.origin!==location.origin||!link.pathname.endsWith('/proveedor-online.html')||!link.hash.includes('t='))throw new Error('El enlace no corresponde a la solicitud publicada en ÁGORA.');
+ }
+ const clientId=String(data.agency.gmailClientId||'').trim();
+ if(!clientId.endsWith('.apps.googleusercontent.com'))throw new Error('Configura tu ID OAuth de Gmail en Respaldo y ajustes.');
+ if(location.protocol!=='https:'&&location.hostname!=='localhost')throw new Error('Gmail requiere HTTPS o localhost.');
+ const mime=buildRichEmailMime(d.kind,r,urls);
+ if(mime.length>23*1024*1024)throw new Error('Reduce el tamaño de las fotografías: el correo supera el límite.');
+ const oauth=await ensureGmailGIS(),access=await getGmailAccessToken(oauth,clientId);
+ const raw=btoa(mime).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+ const res=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/drafts',{method:'POST',headers:{Authorization:'Bearer '+access,'Content-Type':'application/json'},body:JSON.stringify({message:{raw}})});
+ if(!res.ok){let info={};try{info=await res.json()}catch{};throw new Error('Gmail ('+res.status+'): '+(info?.error?.message||res.statusText))}
+ const result=await res.json();if(!result.id)throw new Error('Gmail no confirmó la creación del borrador.');
+ const expectedImages=1+(r.items||[]).filter(x=>!!emailImageData(x.image)).length;
+ const audit=await checkGmailDraftImages(result.id,access,expectedImages);
+ gmailDraftResult={id:result.id,folio:r.folio,at:now(),imageAudit:audit,online:true};
+ r.gmailDraftId=result.id;r.gmailDraftAt=gmailDraftResult.at;
+ log(d.kind,r.id,'Borrador Gmail con fotografías y dos botones creado: '+result.id);
+ return {draftId:result.id,expectedImages,foundImages:audit.found,imageState:audit.state};
+}
 function openEmailBasic(){const d=getDoc(),r=d.record,s=supplier(r?.supplierId);if(!r||!s)return;const msg=emailText(d.kind,r)+'\n\nIMPORTANTE: adjuntar manualmente AGORA_FORMULARIO_'+r.folio+'.html. Este método no incrusta las fotografías en el cuerpo.';window.location.href='mailto:'+encodeURIComponent(s.email||'')+'?subject='+encodeURIComponent(emailSubject(d.kind,r))+'&body='+encodeURIComponent(msg)}
 
 function supplierPayload(kind,r){let rfq=kind==='quote'?r:data.rfqs.find(x=>x.id===r.rfqId);const s=supplier(r.supplierId);let items=r.items.map(x=>kind==='quote'?{id:x.id,name:x.product,description:x.description,image:x.image,}:kind==='sample'?{id:x.id,name:x.name,description:x.description,image:x.image,qty:x.qty,unitCost:x.unitCost}:{id:x.id,name:x.name,description:x.description,image:x.image,qty:x.qty,unitCost:orderUnit(x)});return{schema:'agora-supplier-request-v1',kind,id:r.id,requestId:rfq?.id||r.id,folio:r.folio,title:r.title,project:r.project,projectId:r.projectId||rfq?.projectId||'',quoteFolio:kind==='sample'?(r.quoteFolio||rfq?.folio||''):'',instructions:r.instructions||r.notes||'Por favor, confirma los conceptos y condiciones de esta solicitud.',dueDate:r.dueDate||'',supplier:s?{name:s.name,email:s.email,phone:s.phone,contact:s.contact}:{},replyTo:data.agency.email||'',items}}
@@ -376,6 +400,7 @@ window.AGORA_LOCAL = Object.freeze({
     return structuredClone(supplierPayload(item.kind,item.record));
   },
   applyProviderInvitation:receiveOnlineInvitation,
+  createOnlineInviteGmailDraft:(urls,folio)=>createOnlineInviteGmailDraft(urls,folio),
   applyCloud:(next)=>{
     if(!next || next.app!=='agora-compras-v1' || !['rfqs','orders','samples','suppliers'].every(k=>Array.isArray(next[k]))) throw new Error('Formato de nube incompatible');
     data=structuredClone(next);save();render();
