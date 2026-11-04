@@ -73,10 +73,58 @@ import * as fire from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firest
       '<div class="field"><label>Comentarios generales</label><textarea name="notes"></textarea></div>'+
       '<div class="actions"><button type="submit" class="primary">Enviar respuesta a ÁGORA</button></div></form>';
   }
+  function receiptText(){
+    const p=data.request||{},response=data.response||{};
+    const lines=[
+      'CONSTANCIA DIGITAL · ÁGORA / DEJAVÚ MARKETING',
+      'Solicitud: '+(p.folio||''),
+      'Proveedor: '+(response.company||p.supplier?.name||''),
+      'Recibido por: '+(data.receiver||'Proveedor'),
+      'Fecha de recepción: '+(data.receivedAt?.toDate?.().toLocaleString('es-MX')||''),
+      'Estado: '+(data.status==='cotizada'?'Respuesta registrada en ÁGORA':'Acuse de recibido confirmado')
+    ];
+    if(data.status==='cotizada'){
+      lines.push('Fecha de respuesta: '+(data.submittedAt?.toDate?.().toLocaleString('es-MX')||''));
+      for(const item of response.items||[]){
+        const found=p.items.find(x=>String(x.id)===String(item.id))||{};
+        lines.push('',(found.name||found.product||'Producto')+':');
+        for(const [name,label] of [['retailCost','Precio menudeo'],['minRetail','Mínimo menudeo'],['wholesaleCost','Precio mayoreo'],['minWholesale','Mínimo mayoreo'],['sampleCost','Costo muestra'],['availability','Disponibilidad'],['comment','Comentarios']]){
+          if(item[name]!==undefined&&String(item[name]).trim())lines.push('  '+label+': '+String(item[name]));
+        }
+      }
+      const general=response.general||{};
+      if(general.deliveryDays)lines.push('Plazo: '+general.deliveryDays);
+      if(general.paymentTerms)lines.push('Condiciones de pago: '+general.paymentTerms);
+      if(general.notes)lines.push('Comentarios generales: '+general.notes);
+    }
+    lines.push('','Esta constancia corresponde a la solicitud registrada en ÁGORA de Dejavú Marketing.');
+    return lines.join('\n');
+  }
+  function receiptCard(){
+    if(!['recibida','cotizada'].includes(data.status))return '';
+    const heading=data.status==='cotizada'?'Copia de tu cotización':'Copia del acuse de recibido';
+    return '<div class="card"><h2>✓ '+heading+'</h2>'+
+      '<p>Tu información ya quedó registrada. Puedes consultar esta constancia aquí y preparar una copia para tu correo.</p>'+
+      '<div class="actions"><button type="button" id="receiptEmail">Preparar copia por correo</button><button type="button" id="receiptCopy">Copiar constancia</button></div>'+
+      '<p class="muted" style="font-size:12px">El correo se abrirá listo para enviar. Revisa y presiona Enviar: todavía no se manda automáticamente.</p></div>';
+  }
+  function openReceiptEmail(){
+    const p=data.request||{},recipient=data.response?.email||p.supplier?.email||'';
+    const subject='ÁGORA · '+(data.status==='cotizada'?'Copia de cotización':'Acuse de recibido')+' · '+(p.folio||'');
+    const link='https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(recipient)+
+      '&su='+encodeURIComponent(subject)+'&body='+encodeURIComponent(receiptText());
+    window.open(link,'_blank','noopener,noreferrer');
+    setBusy('Se abrió Gmail con la copia preparada. Recuerda pulsar Enviar para que llegue al correo.');
+  }
+  async function copyReceipt(){
+    try{await navigator.clipboard.writeText(receiptText());setBusy('Constancia copiada para pegarla donde necesites.');}
+    catch(error){setBusy('No se pudo copiar: '+error.message);}
+  }
   function render(){
     if(!data)return;
     header();
     let html=requestInfo();
+    html+=receiptCard();
     if(data.status==="pendiente")html+=ackSection();
     else if(data.status==="recibida"){
       html+='<div class="card notice"><b>✓ Recepción confirmada</b> por '+esc(data.receiver)+'. Ahora completa tu respuesta.</div>';
@@ -86,6 +134,8 @@ import * as fire from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firest
     $("content").innerHTML=html;
     $("ackButton")?.addEventListener("click",acknowledge);
     $("quoteform")?.addEventListener("submit",submit);
+    $("receiptEmail")?.addEventListener("click",openReceiptEmail);
+    $("receiptCopy")?.addEventListener("click",copyReceipt);
     setBusy("");
     if(view==="cotizar"&&data.status==="pendiente")$("ackform")?.scrollIntoView({behavior:"smooth",block:"start"});
   }
