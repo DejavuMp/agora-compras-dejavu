@@ -17,20 +17,16 @@ import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestor
   function cleanData(input){
     const result=structuredClone(input);
     const bytes=obj=>new Blob([JSON.stringify(obj)]).size;
-    let omitted=false;
-    if(bytes(result)>770000){
-      for(const item of result.items||[])if(item.image){item.image="";omitted=true;}
-    }
-    if(bytes(result)>770000)throw Error("La solicitud es demasiado pesada. Reduce las imágenes de los productos.");
-    return {result,omitted};
+    if(bytes(result)>770000)throw Error("Las fotografías exceden el tamaño máximo de Firebase. Reduce su peso; ÁGORA no enviará solicitudes sin sus imágenes.");
+    return {result,omitted:false};
   }
 
   const dateText=ts=>ts?.toDate?.().toLocaleString('es-MX')||'—';
-  const statusName=r=>r.status==='cotizada'?'Cotización recibida':r.status==='recibida'?'Acuse recibido':r.status==='pendiente'?'Pendiente de acuse':r.status==='revocada'?'Cancelado':r.status||'—';
+  const statusName=r=>r.status==='cotizada'?(r.request?.kind==='sample'?'Muestras confirmadas':'Cotización recibida'):r.status==='recibida'?'Acuse recibido':r.status==='pendiente'?'Pendiente de acuse':r.status==='revocada'?'Cancelado':r.status||'—';
   function useExisting(record){
     if(!record?.token)throw Error('No se encontró el enlace original.');
     const p=record.request||{},supplier=p.supplier||{};
-    last={folio:p.folio||p.id,email:supplier.email||'',supplierName:supplier.name||'',contact:supplier.contact||'',
+    last={folio:p.folio||p.id,kind:p.kind||'quote',email:supplier.email||'',supplierName:supplier.name||'',contact:supplier.contact||'',
       expiry:record.expiresAt?.toDate?.().toLocaleDateString('es-MX')||'—',urls:getUrls(record.token)};
     selectedToken=record.token;
   }
@@ -66,10 +62,10 @@ import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestor
     if(!panel)return;
     if(!session){panel.hidden=true;return;}
     panel.innerHTML='<div class="agora-invite-title"><button data-invite="close" class="agora-invite-close" aria-label="Cerrar el panel">✕ Cerrar</button><strong>✉ Formulario directo para proveedor</strong></div>'+
-      '<p>Envía dos enlaces por correo. El proveedor confirma y cotiza sin descargar archivos.</p>'+
+      '<p>El proveedor recibe las fotos, confirma de recibido y responde en línea. Las muestras reutilizan los costos de la cotización original.</p>'+
       '<div class="agora-invite-actions"><button data-invite="create">Generar enlace de la solicitud abierta</button></div>'+
       (last?'<div class="agora-invite-created"><strong>Enlace creado · '+esc(last.folio)+'</strong><p>Válido hasta '+esc(last.expiry)+'. Cualquiera que tenga el enlace podrá responder.</p>'+
-      '<div class="agora-invite-actions"><button data-invite="gmail">Abrir correo en Gmail</button><button data-invite="copyrich">Copiar correo con botones</button><button data-invite="copyurl">Copiar enlace</button><button data-invite="preview">Ver formulario</button></div></div>':"")+
+      '<div class="agora-invite-actions"><button data-invite="gmailphotos">Crear borrador Gmail con fotos y botones</button><button data-invite="gmail">Abrir Gmail (solo texto)</button><button data-invite="copyrich">Copiar correo con botones</button><button data-invite="copyurl">Copiar enlace</button><button data-invite="preview">Ver formulario</button></div></div>':"")+
       historyHtml()+
       '<p id="agora-invite-msg" role="status" aria-live="polite"></p><div class="agora-invite-actions"><button data-invite="close">Cerrar panel</button></div>';
   }
@@ -79,10 +75,10 @@ import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestor
   }
   function openGmail(){
     if(!last)return;
-    const subject="ÁGORA · Solicitud "+last.folio+" · Dejavú Marketing";
+    const subject="ÁGORA · "+(last.kind==='sample'?'Solicitud de muestras ':'Solicitud ')+last.folio+" · Dejavú Marketing";
     const body="Buen día, "+(last.contact||last.supplierName||"")+
       "\n\nDejavú Marketing te envía la solicitud "+last.folio+
-      ". Puedes confirmar su recepción y capturar tu cotización directamente en línea; no necesitas descargar ni reenviar archivos.\n\n"+
+      ". Puedes confirmar su recepción y "+(last.kind==='sample'?'responder la solicitud de muestras':'llenar tu cotización')+" directamente en línea.\n\n"+
       "1. CONFIRMAR DE RECIBIDO:\n"+last.urls.acuse+
       "\n\n2. LLENAR COTIZACIÓN / RESPONDER:\n"+last.urls.cotizar+
       "\n\nEstos enlaces son personales para esta solicitud. No los compartas. Saludos, Dejavú Marketing.";
@@ -93,12 +89,12 @@ import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestor
   }
   async function copyRich(){
     if(!last)return;
-    const text="Solicitud "+last.folio+"\nConfirmar recibido: "+last.urls.acuse+"\nLlenar cotización: "+last.urls.cotizar;
+    const text="Solicitud "+last.folio+"\nConfirmar recibido: "+last.urls.acuse+"\n"+(last.kind==='sample'?'Responder solicitud de muestras: ':'Llenar cotización: ')+last.urls.cotizar;
     const html=`<div style="font:14px Arial,sans-serif;color:#23211c;max-width:620px">
       <h2 style="background:#171411;color:#d9b06f;padding:18px">ÁGORA · DEJAVÚ MARKETING</h2>
       <p>Buen día, ${esc(last.contact||last.supplierName)}.</p><p>Te compartimos la solicitud <strong>${esc(last.folio)}</strong>. Confirma la recepción y registra tu respuesta directamente en nuestra página.</p>
       <p><a href="${esc(last.urls.acuse)}" style="display:inline-block;background:#24211c;color:white;text-decoration:none;padding:12px 18px;border-radius:6px">Confirmar de recibido</a></p>
-      <p><a href="${esc(last.urls.cotizar)}" style="display:inline-block;background:#b68d49;color:white;text-decoration:none;padding:12px 18px;border-radius:6px">Llenar cotización</a></p>
+      <p><a href="${esc(last.urls.cotizar)}" style="display:inline-block;background:#b68d49;color:white;text-decoration:none;padding:12px 18px;border-radius:6px">${last.kind==='sample'?'Responder solicitud de muestras':'Llenar cotización'}</a></p>
       <p>Los enlaces son exclusivos de esta solicitud. No necesitas adjuntar archivos.</p><p>Dejavú Marketing</p></div>`;
     if(navigator.clipboard?.write && typeof ClipboardItem!=="undefined"){
       await navigator.clipboard.write([new ClipboardItem({"text/html":new Blob([html],{type:"text/html"}),"text/plain":new Blob([text],{type:"text/plain"})})]);
@@ -124,7 +120,7 @@ import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestor
       receivedAt:null,receiver:"",submittedAt:null,response:null
     });
     last={
-      folio:provider.folio,email:provider.supplier.email,supplierName:provider.supplier.name||"",
+      folio:provider.folio,kind:provider.kind,email:provider.supplier.email,supplierName:provider.supplier.name||"",
       contact:provider.supplier.contact||"",expiry:expiry.toLocaleDateString("es-MX"),urls:getUrls(inviteId)
     };
     show();
@@ -169,6 +165,14 @@ import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestor
         if(action==="create")await create();
         if(action==="details"){selectedToken=e.target.closest('[data-token]')?.dataset.token||'';paint();return;}
         if(action==="reuse"){const selected=cached.find(x=>x.token===e.target.closest('[data-token]')?.dataset.token);useExisting(selected);paint();msg('Se recuperó el enlace original. No se generó uno nuevo.');return;}
+        if(action==="gmailphotos"){
+          if(!last)throw Error('Primero genera o recupera el enlace.');
+          msg('Preparando borrador Gmail con las fotografías...');
+          const result=await window.AGORA_LOCAL?.createOnlineInviteGmailDraft?.(last.urls,last.folio);
+          if(!result)throw Error('Actualiza ÁGORA para habilitar el correo con fotos.');
+          msg(result.imageState==='missing'?'El borrador se creó, pero faltan imágenes. No lo envíes.':'Borrador creado. Imágenes verificadas: '+result.foundImages+'/'+result.expectedImages+'. Revisa y envía desde Gmail.');
+          window.open('https://mail.google.com/mail/u/0/#drafts','_blank','noopener,noreferrer');
+        }
         if(action==="gmail")openGmail();
         if(action==="copyrich")await copyRich();
         if(action==="copyurl"){await navigator.clipboard.writeText(last.urls.cotizar);msg("Enlace copiado.");}
