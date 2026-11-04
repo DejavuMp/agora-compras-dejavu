@@ -368,5 +368,5 @@ window.AGORA_LOCAL = Object.freeze({
     data=structuredClone(next);save();render();
   }
 });
-(async()=>{await load();render();window.dispatchEvent(new CustomEvent('agora:local-ready'));if('serviceWorker'in navigator&&location.protocol.startsWith('http')){navigator.serviceWorker.register('./sw.js').catch(()=>{})}})();
+(async()=>{await load();render();window.AGORA_LOCAL_READY=true;window.dispatchEvent(new CustomEvent('agora:local-ready'));if('serviceWorker'in navigator&&location.protocol.startsWith('http')){navigator.serviceWorker.register('./sw.js').catch(()=>{})}})();
 })();
