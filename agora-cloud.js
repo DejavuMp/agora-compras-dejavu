@@ -322,5 +322,7 @@ import * as dbSdk from "https://www.gstatic.com/firebasejs/13.1.0/firebase-fires
   });
   window.addEventListener('offline',()=>{if(account&&role)status('offline','Sin internet. Tus cambios se guardan localmente y se enviarán al reconectar.');});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&role&&account)schedule(true);});
+  // También revisa periódicamente nuevos datos de otros equipos mientras la app esté visible.
+  setInterval(()=>{if(account&&role&&navigator.onLine&&document.visibilityState==='visible'&&['cloud','offline','consulta'].includes(mode))schedule(true);},90000);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
