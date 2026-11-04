@@ -39,3 +39,10 @@ agoraInvitesScript.type='module';
 agoraInvitesScript.src='./agora-invites.js';
 agoraInvitesScript.onerror=()=>console.warn('ÁGORA: No se pudo cargar el envío online.');
 document.head.appendChild(agoraInvitesScript);
+
+// Avisos visibles de acuses y cotizaciones (con permiso opcional para notificaciones del navegador).
+const agoraAlertsScript=document.createElement('script');
+agoraAlertsScript.defer=true;
+agoraAlertsScript.src='./agora-notificaciones.js';
+agoraAlertsScript.onerror=()=>console.warn('ÁGORA: No se pudo cargar el centro de notificaciones.');
+document.head.appendChild(agoraAlertsScript);
