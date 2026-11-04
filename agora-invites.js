@@ -26,18 +26,17 @@ import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestor
   }
   function paint(){
     if(!panel)return;
-    if(!session){panel.style.display="none";return;}
-    panel.style.display="block";
-    panel.innerHTML='<div class="agora-invite-title">✉ Formulario directo para proveedor <button data-invite="close" aria-label="Cerrar">×</button></div>'+
+    if(!session){panel.hidden=true;return;}
+    panel.innerHTML='<div class="agora-invite-title"><button data-invite="close" class="agora-invite-close" aria-label="Cerrar el panel">✕ Cerrar</button><strong>✉ Formulario directo para proveedor</strong></div>'+
       '<p>Envía dos enlaces por correo. El proveedor confirma y cotiza sin descargar archivos.</p>'+
       '<div class="agora-invite-actions"><button data-invite="create">Generar enlace de la solicitud abierta</button></div>'+
       (last?'<div class="agora-invite-created"><strong>Enlace creado · '+esc(last.folio)+'</strong><p>Válido hasta '+esc(last.expiry)+'. Cualquiera que tenga el enlace podrá responder.</p>'+
       '<div class="agora-invite-actions"><button data-invite="gmail">Abrir correo en Gmail</button><button data-invite="copyrich">Copiar correo con botones</button><button data-invite="copyurl">Copiar enlace</button><button data-invite="preview">Ver formulario</button></div></div>':"")+
-      '<p id="agora-invite-msg" role="status" aria-live="polite"></p>';
+      '<p id="agora-invite-msg" role="status" aria-live="polite"></p><div class="agora-invite-actions"><button data-invite="close">Cerrar panel</button></div>';
   }
   function show(){
     if(!panel)return;
-    paint();panel.hidden=false;
+    panel.hidden=false;paint();
   }
   function openGmail(){
     if(!last)return;
@@ -107,11 +106,13 @@ import * as db from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestor
   function initPanel(){
     if(panel)return;
     const css=document.createElement("style");
-    css.textContent="#agora-invite-open{position:fixed;right:14px;bottom:18px;z-index:10020;background:#ac8648;color:white;border:0;padding:10px 14px;border-radius:9px;cursor:pointer;font:600 12px Arial}#agora-invite-panel{position:fixed;right:14px;bottom:64px;z-index:10021;background:#171512;color:#eee5d9;border:1px solid #a78042;border-radius:12px;padding:15px;width:min(430px,calc(100vw - 28px));max-height:70vh;overflow:auto;box-shadow:0 10px 30px #0009;font:13px/1.5 Arial}#agora-invite-panel[hidden]{display:none}.agora-invite-title{font-weight:700;display:flex;justify-content:space-between;align-items:center;color:#e6bc79}.agora-invite-title button{background:transparent;color:#e6bc79;border:0;font-size:19px;cursor:pointer}.agora-invite-actions{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.agora-invite-actions button{background:#a77e42;color:#fff;border:0;border-radius:6px;padding:9px;cursor:pointer;font:12px Arial}.agora-invite-created{border-top:1px solid #755c38;padding-top:8px}#agora-invite-msg{color:#e5c991;font-size:12px}";
+    css.textContent="#agora-invite-open{position:fixed;right:14px;bottom:18px;z-index:10020;background:#ac8648;color:white;border:0;padding:10px 14px;border-radius:9px;cursor:pointer;font:600 12px Arial}#agora-invite-panel{position:fixed;right:14px;bottom:64px;z-index:10021;background:#171512;color:#eee5d9;border:1px solid #a78042;border-radius:12px;padding:15px;width:min(430px,calc(100vw - 28px));max-height:70vh;overflow:auto;box-shadow:0 10px 30px #0009;font:13px/1.5 Arial}#agora-invite-panel[hidden]{display:none}.agora-invite-title{font-weight:700;display:flex;justify-content:space-between;align-items:center;color:#e6bc79}.agora-invite-title{gap:10px;flex-wrap:wrap}.agora-invite-title button{background:#3a2e20;color:#f4d6a0;border:1px solid #a78042;border-radius:6px;padding:6px 9px;font:600 12px Arial;cursor:pointer}.agora-invite-actions{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.agora-invite-actions button{background:#a77e42;color:#fff;border:0;border-radius:6px;padding:9px;cursor:pointer;font:12px Arial}.agora-invite-created{border-top:1px solid #755c38;padding-top:8px}#agora-invite-msg{color:#e5c991;font-size:12px}";
     document.head.appendChild(css);
     const open=document.createElement("button");open.id="agora-invite-open";open.textContent="✉ Enviar formulario online";open.hidden=true;document.body.appendChild(open);
     panel=document.createElement("section");panel.id="agora-invite-panel";panel.hidden=true;document.body.appendChild(panel);
     open.addEventListener("click",show);
+    document.addEventListener("keydown",ev=>{if(ev.key==="Escape"&&panel&&!panel.hidden)panel.hidden=true;});
+    document.addEventListener("pointerdown",ev=>{if(panel&&!panel.hidden&&!panel.contains(ev.target)&&ev.target!==open)panel.hidden=true;});
     panel.addEventListener("click",async e=>{
       const action=e.target.closest("button[data-invite]")?.dataset.invite;if(!action)return;
       try{
