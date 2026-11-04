@@ -1,90 +1,17 @@
 <!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#141310"><title>ÁGORA · Archivos de producción</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%231b1814'/%3E%3Cpath d='M32 12L52 32 32 52 12 32Z' fill='%23d5b57e'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="./archivos.css?v=20261104-5">
-</head>
-<body data-view="admin">
-<div class="app-shell">
- <aside class="sidebar" id="sidebar">
-  <div class="side-brand"><div class="brand-glyph">◆</div><div><strong>ÁGORA</strong><small>DEJAVÚ MARKETING</small></div></div>
-  <div class="menu-label">ESPACIO DE TRABAJO</div>
-  <a class="menu-link" href="./index.html"><span>▦</span><span>Compras y pedidos</span></a>
-  <a class="menu-link selected" href="./archivos.html"><span>▤</span><span>Archivos</span></a>
-  <div class="menu-label" style="margin-top:34px">HERRAMIENTAS</div>
-  <button class="menu-link" type="button" id="menuNew" disabled><span>＋</span><span>Nuevo envío</span></button>
-  <button class="menu-link" type="button" id="menuHistory"><span>◷</span><span>Historial de envíos</span></button>
-  <div class="side-bottom"><span class="live-dot"></span> Firebase · Conexión por verificar</div>
- </aside>
- <div class="main-area">
-  <header class="topbar">
-   <button class="icon-button" id="toggleSide" aria-label="Mostrar u ocultar menú">☰</button>
-   <div class="breadcrumbs">ÁGORA <span>/</span> OPERACIONES <span>/</span> <b>Archivos</b></div>
-   <div class="top-actions"><span id="userLabel" class="muted desktop-only">Sin sesión</span><button id="authButton" class="btn btn-outline btn-small">Iniciar sesión</button></div>
-  </header>
-  <main class="workspace">
-   <div class="page-heading"><div><div class="eyebrow">ÁGORA · ARCHIVOS Y ACUSES</div><h1>Archivos de producción</h1><p>Comparte los artes finales y archivos que se aplicarán en las muestras. Recibe el acuse digital de los archivos, comentarios y evidencia del envío desde el mismo expediente.</p></div><button class="btn btn-gold" id="newButton" disabled>＋ Nuevo envío</button></div>
-   <div id="alert" class="alert" role="status" aria-live="polite" hidden></div>
-   <section class="stats" id="stats"><div class="stat"><span>Archivos compartidos</span><strong id="statTotal">—</strong><small>Historial disponible</small></div><div class="stat"><span>Por confirmar</span><strong id="statPending">—</strong><small>Esperando al destinatario</small></div><div class="stat"><span>Solicitudes de cambio</span><strong id="statChanges">—</strong><small>Requieren seguimiento</small></div><div class="stat"><span>Confirmados</span><strong id="statReceived">—</strong><small>Recibidos / aprobados</small></div></section>
-   <section class="panel list-panel">
-    <div class="panel-heading"><div><h2>Historial de archivos compartidos</h2><p>Consulta el estado en tiempo real y recupera cualquier enlace.</p></div><span id="syncState" class="sync-label" aria-live="polite">Preparando Firebase…</span></div>
-    <div class="filters"><label class="search-field"><span>⌕</span><input id="search" type="search" placeholder="Buscar por folio, proyecto, destinatario o archivo"></label><select id="filter" aria-label="Filtrar por estado"><option value="all">Todos los estados</option><option value="pendiente">Pendientes</option><option value="recibido">Recibidos</option><option value="aprobado">Aprobados</option><option value="cambios">Con cambios</option><option value="no_recibido">No recibidos</option><option value="vencido">Vencidos</option><option value="revocado">Revocados</option></select></div>
-    <div class="list-scroll"><table class="data-table"><thead><tr><th>ENVÍO / VERSIÓN</th><th>PROYECTO</th><th>DESTINATARIO</th><th>VIGENCIA</th><th>ESTADO</th><th></th></tr></thead><tbody id="deliveryRows"><tr><td colspan="6" class="empty-cell">Inicia sesión con una cuenta autorizada de ÁGORA para consultar los envíos.</td></tr></tbody></table></div>
-   </section>
-   <p class="foot-note">Dejavú Marketing · Los acuses son confirmaciones electrónicas asociadas al enlace de envío; no constituyen una firma digital certificada.</p>
-  </main>
- </div>
-</div>
-<div class="modal-backdrop" id="editorOverlay" hidden>
- <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="formTitle"><div class="dialog-header"><div><div class="eyebrow">ÁGORA · DOCUMENTOS</div><h2 id="formTitle">Nuevo envío de artes de producción</h2><p id="formSubtitle">Crea el expediente y comparte un único enlace seguro.</p></div><button class="icon-button" data-close="editor" aria-label="Cerrar">✕</button></div>
-  <form id="deliveryForm" class="dialog-content">
-   <div class="form-section-title">01 · Archivos que se enviarán al proveedor</div>
-   <div class="form-grid"><label>Proyecto / folio de muestras <input name="project" maxlength="120" placeholder="Ej. MUE-2026-0001 · KFC Merch" required></label><label>Tipo de archivo <select name="category"><option>Artes para muestras</option><option>Artes y diseño</option><option>Archivos de impresión</option><option>Render y visualización</option><option>Fotografía</option><option>Documentación</option><option>Presentación</option><option>Otro</option></select></label></div>
-   <label>Nombre del arte o archivo <input name="title" maxlength="160" placeholder="Ej. Arte final de aplicación para hoodie roja" required></label>
-   <div class="form-grid"><label>Destinatario <input name="recipientName" maxlength="120" placeholder="Nombre del cliente o proveedor" required></label><label>Correo del destinatario <input name="recipientEmail" type="email" maxlength="240" placeholder="correo@empresa.com" required></label></div>
-   <div class="form-grid"><label>Fecha de vigencia <input name="validUntil" type="date" required></label><label>Enlace a carpeta / archivo de Drive <input name="driveUrl" type="url" placeholder="https://drive.google.com/drive/folders/..." required></label></div>
-   <label>Indicaciones para aplicar los artes en las muestras <textarea name="notes" rows="3" maxlength="3000" placeholder="Tamaño, ubicación, impresión, colores, diseño, instrucciones de fabricación y comentarios."></textarea></label>
-   <div class="form-section-title">02 · Evidencia de los archivos compartidos</div>
-   <div class="form-grid"><div class="upload"><b>Vistas de artes / archivos de aplicación</b><small>Hasta 8 imágenes JPG, PNG o WEBP. Arte, mockup, plano o posición del diseño a imprimir.</small><input type="file" id="sampleFiles" accept="image/png,image/jpeg,image/webp" multiple><div id="samplePreview" class="preview-grid"></div><label class="mini-label">O pega URLs de imágenes, una por línea<textarea id="sampleUrls" rows="2" placeholder="https://..."></textarea></label></div><div class="upload"><b>Evidencia del envío de archivos</b><small>Hasta 6 capturas de la carpeta compartida, listado de archivos o pantalla del material enviado por Drive.</small><input type="file" id="folderFiles" accept="image/png,image/jpeg,image/webp" multiple><div id="folderPreview" class="preview-grid"></div><label class="mini-label">O pega URLs de imágenes, una por línea<textarea id="folderUrls" rows="2" placeholder="https://..."></textarea></label></div></div>
-   <div class="notice"><b>Evidencia documental:</b> la herramienta reduce las capturas antes de subirlas. Para subir archivos directamente, Firebase Storage debe estar habilitado y el proyecto en plan Blaze. Si utilizas Spark, puedes añadir enlaces HTTPS de imágenes o compartir el material desde Drive.</div>
-   <div class="notice"><b>El comprobante de recepción se genera cuando el destinatario confirma que tuvo acceso a los archivos.</b> Publicar el enlace no demuestra por sí solo que el correo fue enviado. <b>La publicación genera un enlace que no cambia.</b> Si se solicita una corrección, usa «Publicar nueva versión»: el destinatario verá la versión actual y se conservará el historial.</div>
-   <div id="uploadProgress" class="upload-progress" role="status" aria-live="polite" hidden><div class="upload-progress-head"><b>Estado de carga</b><span id="uploadStatus">Preparando imágenes…</span></div><progress id="uploadMeter" max="100" value="0" aria-label="Porcentaje total de imágenes subidas"></progress></div>
-   <div class="dialog-actions"><button class="btn btn-outline" type="button" data-close="editor">Cancelar</button><button class="btn btn-gold" type="submit" id="saveButton">Publicar envío</button></div>
-  </form>
- </section>
-</div>
-<div class="modal-backdrop" id="detailOverlay" hidden><section class="dialog detail-dialog" role="dialog" aria-modal="true" aria-labelledby="detailTitle"><div class="dialog-header"><div><div class="eyebrow">EXPEDIENTE EN LÍNEA</div><h2 id="detailTitle">Detalle del envío</h2><p id="detailSub">Historial, comentarios y versiones</p></div><button class="icon-button" data-close="detail" aria-label="Cerrar">✕</button></div><div class="dialog-content" id="detailContent"></div></section></div>
-<script>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ÁGORA Archivos · Nueva dirección</title>
+<meta name="robots" content="noindex">
+<style>body{font:16px Arial,sans-serif;background:#faf8f4;color:#26231e;margin:0;min-height:100vh;display:grid;place-items:center}main{max-width:510px;padding:36px;border:1px solid #e1d6c4;border-radius:12px;background:#fff;text-align:center}h1{font-size:22px}a{color:#815d25}</style>
+</head><body><main>
+<h1>ÁGORA Archivos</h1>
+<p>Esta herramienta tiene ahora un espacio independiente. Tu enlace de recepción se conservará.</p>
+<p><a id="continue" href="./archivos/index.html">Continuar a ÁGORA Archivos</a></p>
+</main><script>
 (function(){
-  const state=document.getElementById('syncState');
-  let moduleLoaded=false;
-  window.__AGORA_FILES_BOOT={
-    mark(stage){
-      if(stage==='module-ready'){moduleLoaded=true; console.info('ÁGORA Archivos: JS de Firebase cargado.');}
-    }
-  };
-  const script=document.createElement('script');
-  script.type='module';
-  script.src='./archivos.js?revision=20261104-artes-produccion-1';
-  script.addEventListener('error',()=>{
-    state.textContent='No se pudo cargar el módulo';
-    state.style.color='#9f3c2c';
-    const alert=document.getElementById('alert');
-    alert.hidden=false;alert.className='alert error';
-    alert.textContent='No se pudo iniciar el módulo. Comprueba la conexión o bloqueadores de scripts y vuelve a cargar la página.';
-  });
-  document.body.appendChild(script);
-  setTimeout(()=>{
-    if(!moduleLoaded){
-      state.textContent='Módulo sin cargar';
-      state.style.color='#9f3c2c';
-      const alert=document.getElementById('alert');
-      alert.hidden=false;alert.className='alert error';
-      alert.textContent='El módulo de Firebase no terminó de cargar. Revisa en el navegador F12 > Consola para encontrar el error y compártelo con soporte.';
-    }
-  },12000);
+var url='./archivos/index.html'+location.search+location.hash;
+var a=document.getElementById('continue');a.href=url;
+location.replace(url);
 })();
-</script>
-</body></html>
+</script></body></html>
