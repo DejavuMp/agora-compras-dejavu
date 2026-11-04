@@ -268,7 +268,7 @@ import * as dbSdk from "https://www.gstatic.com/firebasejs/13.1.0/firebase-fires
         }
       }catch(error){status('error',String(error?.message||error));}
     });
-    document.addEventListener('keydown',e=>{if(e.key==='Escape')panel.hidden=true;});render();
+    document.addEventListener('keydown',e=>{if(e.key==='Escape')panel.hidden=true;});document.addEventListener('pointerdown',e=>{if(panel&&!panel.hidden&&!panel.contains(e.target)&&!e.target.closest('[data-action="opencloud"]'))panel.hidden=true;});render();
   }
   async function checkUser(){
     if(!account)return false;
