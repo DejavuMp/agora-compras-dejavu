@@ -62,8 +62,24 @@ function fallback(event){
  let step=Number(img.dataset.step||0)+1;
  if(step<sources.length){img.dataset.step=String(step);img.src=sources[step];return}
  img.hidden=true;
+ const original=card.querySelector('.agora-image-meta a[href]')?.href||'';
+ const info=imageLinkInfo(original);
  const box=card.querySelector('.agora-image-unavailable');
- if(box){box.hidden=false;const msg=box.querySelector('span:last-child');if(msg)msg.textContent='Drive o el servidor no permite mostrar esta foto aquí. Puedes abrir el original y revisar sus permisos.'}
+ if(info.type==='drive-image'){
+   const frame=document.createElement('iframe');
+   const url=new URL('https://drive.google.com/file/d/'+encodeURIComponent(info.id)+'/preview');
+   const key=new URL(info.original).searchParams.get('resourcekey');
+   if(key)url.searchParams.set('resourcekey',key);
+   frame.src=url.href;frame.title='Vista previa desde Google Drive';
+   frame.loading='lazy';frame.referrerPolicy='no-referrer';
+   frame.className='agora-fallback-drive';
+   card.querySelector('.agora-image-visual')?.appendChild(frame);
+   if(box)box.hidden=true;
+ }else if(box){
+   box.hidden=false;
+   const msg=box.querySelector('span:last-child');
+   if(msg)msg.textContent='No se pudo mostrar esta foto. Abre el original y revisa sus permisos.';
+ }
  card.classList.add('agora-image-error');
 }
 function loaded(event){
@@ -99,7 +115,7 @@ function openViewer(raw){
  const link=overlay.querySelector('.agora-viewer-original');
  link.href=info.original;
  if(info.type==='drive-image'){
-  const src='https://drive.google.com/file/d/'+encodeURIComponent(info.id)+'/preview';
+  const embed=new URL('https://drive.google.com/file/d/'+encodeURIComponent(info.id)+'/preview');const key=new URL(info.original).searchParams.get('resourcekey');if(key)embed.searchParams.set('resourcekey',key);const src=embed.href;
   content.innerHTML='<iframe title="Vista de imagen en Google Drive" allow="fullscreen" loading="lazy" referrerpolicy="no-referrer" src="'+esc(src)+'"></iframe>';
  }else{
   content.innerHTML='<img alt="Vista ampliada del arte" src="'+esc(info.original)+'">';
