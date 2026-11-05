@@ -74,3 +74,12 @@ firebase deploy --only firestore:rules --project agora-dejavu-38b8c
 Alternativamente pega el contenido completo de `firestore.rules` en Firebase Console → Firestore Database → Reglas → Publicar. Conserva las reglas existentes de usuarios, compras y proveedores. GitHub Pages por sí solo **no publica estas reglas**.
 
 La regla permite editar solo expedientes pendientes sin ninguna respuesta registrada en la versión actual. Valida que se preserve el folio, propietario, destinatario, número de versión y el resto de los datos inmutables. Para comprobar que funciona, intenta guardar una nota de un expediente pendiente y revisa que conserve la versión y el enlace; después verifica que los ya confirmados solo permitan crear otra versión.
+
+## Corrección de expedientes revocados
+
+Si un expediente tiene estado **Revocado**, ÁGORA ahora muestra:
+- **Editar expediente**, cuando esa versión no tiene respuesta registrada. Permite corregir información e imágenes en el expediente original; la revocación se mantiene y el enlace antiguo **no** vuelve a funcionar.
+- **Duplicar y publicar nuevo enlace**, que precarga los datos y las imágenes en un formulario nuevo, permite actualizar al destinatario y crea una invitación distinta con un nuevo token para el proveedor. El registro original permanece intacto.
+- El acceso al correo para un expediente revocado se oculta para evitar enviar un enlace inactivo.
+
+**Necesario:** después de actualizar el código de GitHub, publica la nueva `firestore.rules` en Firebase Console. Las reglas publicadas previamente para editar expedientes pendientes no habilitan por sí solas la edición de los revocados. La duplicación a un envío nuevo utiliza el permiso de creación ya existente.
