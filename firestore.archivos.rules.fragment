@@ -82,6 +82,18 @@ match /agora_file_deliveries/{token} {
          'sampleImages','folderImages','revisions','updatedAt'
        ]))
       ||
+      // Expediente revocado: se permiten correcciones internas sin volver a
+      // activar el enlace. No se pueden modificar acuses ni el destinatario.
+      (resource.data.active == false && request.resource.data.active == false &&
+       request.resource.data.version == resource.data.version &&
+       request.resource.data.revisions.size() == resource.data.revisions.size() &&
+       request.resource.data.validUntil > request.time &&
+       !exists(/databases/$(database)/documents/agora_file_responses/$(token)/agora_file_reply_versions/$(string(resource.data.version))) &&
+       request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+         'project','category','title','driveUrl','validUntil','notes',
+         'sampleImages','folderImages','revisions','updatedAt'
+       ]))
+      ||
       // Revocación sin borrar el expediente.
       (resource.data.active == true && request.resource.data.active == false &&
        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active','updatedAt']))
