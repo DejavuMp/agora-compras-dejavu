@@ -100,7 +100,13 @@ function emailContent(r){
       '<span style="display:block;margin-top:5px">Abrir imagen '+(i+1)+'</span></a>';
     }).join('')+'</div>':'';
   const html='<div style="margin:auto;max-width:620px;background:#fff;font:14px/1.6 Arial,Helvetica,sans-serif;color:#29251f;border:1px solid #e4ddd1">'+
-  '<div style="background:#181715;color:#e1c083;padding:25px 26px;border-bottom:3px solid #bd9656"><div style="font-size:11px;letter-spacing:2px">ÁGORA · DEJAVÚ MARKETING</div><div style="font-size:21px;font-weight:bold;margin-top:5px">Entrega de archivos de producción</div></div>'+
+  '<div style="background:#181715;color:#e1c083;padding:22px 26px;border-bottom:3px solid #bd9656">'+
+  '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%"><tr>'+
+  '<td width="68" style="width:68px;vertical-align:middle;padding:0"><img src="https://dejavump.github.io/agora-compras-dejavu/archivos/dejavu-logo-oficial.png" alt="Dejavú Marketing" width="52" height="72" style="display:block;width:52px;height:72px;object-fit:contain;border:0"></td>'+
+  '<td style="vertical-align:middle;padding:0 0 0 13px">'+
+  '<div style="font-size:11px;line-height:1.5;letter-spacing:2px">ÁGORA · DEJAVÚ MARKETING</div>'+
+  '<div style="font-size:21px;line-height:1.3;font-weight:bold;margin-top:5px">Entrega de archivos de producción</div>'+
+  '</td></tr></table></div>'+
   '<div style="padding:26px"><p style="margin-top:0">Hola, <b>'+esc(r.recipientName)+'</b>:</p>'+
   '<p>Te compartimos los archivos que se utilizarán para las muestras. Por favor, abre la carpeta, revisa las imágenes y registra tu confirmación de recibido.</p>'+
   '<div style="background:#f8f5ef;border:1px solid #e7dccb;padding:15px 17px"><b>'+esc(r.title)+'</b><div style="font-size:12px;color:#73695d;margin-top:5px">'+esc(r.project)+' · '+esc(r.folio)+' · Versión '+Number(r.version)+'</div></div>'+
