@@ -44,7 +44,7 @@ export function previewTileHtml(raw,i=0){
      '<div class="agora-image-unavailable" '+(isFile?'hidden':'')+'><span class="agora-preview-symbol" aria-hidden="true">▧</span><span>'+esc(isFile?'No se pudo mostrar la miniatura. Verifica permisos en Drive.':info.message)+'</span></div>'+
    '</div>'+
    '<div class="agora-image-meta"><span>'+esc(title)+'</span>'+
-     (info.original?'<a href="'+esc(info.original)+'" target="_blank" rel="noopener noreferrer">Abrir original</a>':'')+
+     (info.original?'<button type="button" class="agora-image-open" data-preview-url="'+esc(info.original)+'">Ampliar</button><a href="'+esc(info.original)+'" target="_blank" rel="noopener noreferrer">Abrir original</a>':'')+
    '</div>'+
    (info.type==='drive-image'?'<p class="agora-image-hint">Imagen enlazada desde Drive</p>':'')+
    '</div>';
@@ -76,4 +76,45 @@ function loaded(event){
 if(typeof document!=='undefined'){
  document.addEventListener('error',fallback,true);
  document.addEventListener('load',loaded,true);
+}
+
+/* Vista ampliada: Drive se abre en su visor autenticado si no autoriza incrustar miniaturas. */
+function openViewer(raw){
+ const info=imageLinkInfo(raw);if(!info.original)return;
+ let overlay=document.getElementById('agoraImageViewer');
+ if(!overlay){
+  overlay=document.createElement('div');
+  overlay.id='agoraImageViewer';
+  overlay.className='agora-viewer-overlay';
+  overlay.hidden=true;
+  overlay.innerHTML='<div class="agora-viewer-dialog" role="dialog" aria-modal="true" aria-label="Vista ampliada de imagen">'+
+   '<div class="agora-viewer-bar"><b>Vista ampliada del arte</b><button type="button" class="agora-viewer-close" aria-label="Cerrar vista">✕</button></div>'+
+   '<div class="agora-viewer-content"></div>'+
+   '<div class="agora-viewer-footer"><a class="btn btn-gold agora-viewer-original" target="_blank" rel="noopener noreferrer">Abrir archivo original</a><small>Si Drive requiere permisos, accede con tu cuenta autorizada.</small></div></div>';
+  document.body.appendChild(overlay);
+  overlay.querySelector('.agora-viewer-close').addEventListener('click',()=>overlay.hidden=true);
+  overlay.addEventListener('click',event=>{if(event.target===overlay)overlay.hidden=true;});
+ }
+ const content=overlay.querySelector('.agora-viewer-content');
+ const link=overlay.querySelector('.agora-viewer-original');
+ link.href=info.original;
+ if(info.type==='drive-image'){
+  const src='https://drive.google.com/file/d/'+encodeURIComponent(info.id)+'/preview';
+  content.innerHTML='<iframe title="Vista de imagen en Google Drive" allow="fullscreen" loading="lazy" referrerpolicy="no-referrer" src="'+esc(src)+'"></iframe>';
+ }else{
+  content.innerHTML='<img alt="Vista ampliada del arte" src="'+esc(info.original)+'">';
+ }
+ overlay.hidden=false;
+}
+if(typeof document!=='undefined'){
+ document.addEventListener('click',event=>{
+  const trigger=event.target.closest?.('.agora-image-open');
+  if(trigger)openViewer(trigger.dataset.previewUrl);
+ });
+ document.addEventListener('keydown',event=>{
+  if(event.key==='Escape'){
+   const overlay=document.getElementById('agoraImageViewer');
+   if(overlay)overlay.hidden=true;
+  }
+ });
 }
