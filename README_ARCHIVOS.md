@@ -39,3 +39,15 @@ Los enlaces históricos `/archivos.html` y `/archivo-recibir.html#t=...` redirig
 El repositorio de GitHub Pages contiene ambas aplicaciones en subdirectorios distintos. La separación es funcional y de navegación, **no** implica que se hayan creado dos repositorios ni dos proyectos Firebase. GitHub Pages solo publica el sitio; Firestore y Storage deben conservar sus reglas y permisos publicados. Los archivos originales continúan en Drive. Comprueba que el destinatario tenga permiso para abrirlos.
 
 El repositorio es público: nunca subas presupuestos reales, fotos privadas, tokens, contraseñas ni respaldos.
+
+## Fotografías por enlace (noviembre de 2026)
+
+Las vistas de los artes y las evidencias de la carpeta de Drive admiten enlaces individuales a imágenes. Cada URL se analiza antes de publicar, con galería en el formulario, en el expediente y en la vista del destinatario.
+
+- Usa **un enlace individual por imagen** de `drive.google.com/file/d/ID/view` o una URL HTTPS directa a JPG/PNG/WebP. No pegues una carpeta en el campo de imágenes.
+- ÁGORA intenta cargar la miniatura de Drive y otras vistas públicas si falla la primera. Mantiene el enlace original sin cambiarlo ni copiar el archivo a otro servidor.
+- Si una imagen está restringida o Drive no permite incrustarla, se muestra un aviso visible y **Abrir original**; no se deja una tarjeta vacía. Esto no concede nuevos permisos.
+- En Drive, utiliza **Compartir → Acceso general → Cualquier persona con el enlace → Lector** solo si está autorizado compartir ese arte de esa forma. En materiales confidenciales, comparte únicamente con el correo del destinatario; podrá abrir la imagen en Drive, aunque la miniatura pública puede seguir sin mostrarse.
+- Las galerías antiguas se visualizan con el mismo mecanismo. Los envíos guardados en Firestore, sus tokens de recepción y sus comprobantes no se modifican.
+
+Se recuperó el logotipo **oficial dorado de Dejavú Marketing**, utilizado previamente en los correos de ÁGORA, en `archivos/brand.js`. El encabezado de ÁGORA conserva marca, iconografía y su paleta de ónix/negro, mármol claro y oro. El icono procede de `icons/icon-192.png` del repositorio original.
