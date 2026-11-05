@@ -75,3 +75,30 @@
  .agora-image-meta{flex-wrap:wrap}
 }
 @media print{.agora-image-tile{break-inside:avoid}.agora-image-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.agora-link-previews{display:none}}
+
+/* Edición de expedientes y previsualización de correo — ÁGORA × Dejavú Marketing */
+.email-dialog{width:min(800px,calc(100vw - 24px));max-width:800px}
+.email-address{display:flex;flex-wrap:wrap;gap:9px;padding:11px 12px;border-bottom:1px solid #ece7df;font:13px/1.4 Arial,sans-serif;overflow-wrap:anywhere}
+.email-address b{width:55px;color:#746047;flex:none}
+.email-preview-body{background:#eeeae3;padding:22px;border-radius:12px;margin:18px 0;overflow:auto;max-width:100%}
+.email-preview-body>div{box-shadow:0 6px 24px rgba(27,21,15,.08)}
+.email-preview-body a{cursor:pointer}
+.agora-image-meta{flex-wrap:wrap;gap:6px}
+.agora-image-meta .agora-image-open{background:transparent;color:#80622e;border:0;padding:0;font:700 11px Arial,sans-serif;text-decoration:underline;cursor:pointer}
+.agora-image-meta a{font-size:11px}
+.agora-viewer-overlay{position:fixed;inset:0;z-index:9999;background:rgba(9,9,10,.82);display:flex;align-items:center;justify-content:center;padding:14px}
+.agora-viewer-overlay[hidden]{display:none!important}
+.agora-viewer-dialog{background:#f7f4ee;color:#24211e;border-radius:14px;width:min(940px,100%);max-height:96dvh;display:flex;flex-direction:column;overflow:hidden;border:1px solid #ba965b;box-shadow:0 24px 70px #0007}
+.agora-viewer-bar{display:flex;justify-content:space-between;align-items:center;background:#1d1c1a;color:#dec18a;padding:15px 20px;font:700 15px Arial}
+.agora-viewer-close{border:1px solid #a78b5f;background:transparent;color:#f0e7d8;border-radius:7px;cursor:pointer;width:34px;height:34px}
+.agora-viewer-content{background:#e9e4dc;min-height:220px;height:min(66dvh,650px);display:flex;align-items:center;justify-content:center}
+.agora-viewer-content iframe{border:0;width:100%;height:100%;background:#fff}
+.agora-viewer-content img{width:100%;height:100%;object-fit:contain}
+.agora-viewer-footer{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:13px 20px;font:12px/1.4 Arial;color:#766b5d}
+@media(max-width:760px){
+ .email-preview-body{padding:8px;margin:13px 0}
+ .email-preview-body>div{max-width:100%}
+ .email-preview-body a{max-width:100%}
+ .agora-viewer-content{height:60dvh}
+ .agora-viewer-footer{flex-direction:column;align-items:stretch}
+}
