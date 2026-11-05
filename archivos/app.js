@@ -81,7 +81,7 @@ function renderDetail(r){const state=statusFor(r),res=responseFor(r.id,r.version
 function openDetail(id){const r=deliveries.find(d=>d.id===id);if(!r)return;openRecord=r.id;renderDetail(r);$('detailOverlay').hidden=false;document.body.style.overflow='hidden';}
 async function copyLink(url){try{await navigator.clipboard.writeText(url);notify('Enlace copiado. Puedes enviarlo por correo o mensaje.');}catch(e){notify('No se pudo copiar el enlace: '+e.message,true);}}
 async function copyEmailEvidence(r){
- const url=urlFor(r.id),drive=safeHttps(r.driveUrl),photos=arr=>(arr||[]).slice(0,8).map((src,i)=>safeHttps(src)?'<img src="'+esc(preferredImageUrl(src)||src)+'" alt="Captura '+(i+1)+'" width="125" style="width:125px;height:auto;max-height:125px;object-fit:contain;border:1px solid #e2d8c8;margin:5px">':'').join('');
+ const url=urlFor(r.id),drive=safeHttps(r.driveUrl),photos=arr=>(arr||[]).slice(0,8).map((src,i)=>safeHttps(src)?'<a href="'+esc(src)+'" style="display:inline-block;margin:5px;vertical-align:top;color:#80622e;font:11px Arial;text-decoration:underline"><img src="'+esc(preferredImageUrl(src)||src)+'" alt="Captura '+(i+1)+'" width="125" style="display:block;width:125px;height:auto;max-height:125px;object-fit:contain;border:1px solid #e2d8c8">Abrir imagen '+(i+1)+'</a>':'').join('');
  const text='Dejavú Marketing · Archivos de producción para muestras\nSolicitud: '+r.project+'\nArchivo: '+r.title+'\nAbre tu expediente y confirma de recibido: '+url+'\nDrive: '+drive;
  const html='<div style="font:14px Arial;color:#26221c;max-width:620px">'+
  '<div style="background:#111;color:#d4b377;padding:20px;font:bold 19px Arial">DÉJÀ VU MARKETING · ARCHIVOS DE PRODUCCIÓN</div>'+
