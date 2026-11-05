@@ -76,7 +76,8 @@ function renderDetail(r){const state=statusFor(r),res=responseFor(r.id,r.version
  <div class="detail-meta" style="margin-top:17px"><div class="meta-card"><small>DESTINATARIO</small><b>${esc(r.recipientName)}<br>${esc(r.recipientEmail)}</b></div><div class="meta-card"><small>PROYECTO / TIPO</small><b>${esc(r.project)}<br>${esc(r.category)}</b></div><div class="meta-card"><small>VIGENCIA</small><b>${fmt(r.validUntil)}</b></div></div>
  <h3 class="section-heading">Enlace de revisión</h3><div class="copy-block"><input readonly value="${esc(url)}" aria-label="Enlace de revisión"><button type="button" data-copy="link">Copiar</button></div>
  <div class="detail-actions">
- ${active?'<a class="btn btn-dark" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Abrir vista del proveedor</a><button class="btn btn-gold" type="button" data-emailpreview="1">✉ Vista previa del correo</button><button class="btn btn-outline" type="button" data-mail="1">Abrir Gmail</button>':''}
+ <button class="btn btn-gold" type="button" data-emailpreview="1">✉ Vista previa del correo</button>
+ ${active?'<a class="btn btn-dark" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Abrir vista del proveedor</a><button class="btn btn-outline" type="button" data-mail="1">Abrir Gmail</button>':''}
  ${res&&active?'<a class="btn btn-gold" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Ver comprobante de recibido / PDF</a>':''}
  ${!res?'<button class="btn btn-outline" data-edit="1">✎ Editar expediente</button>':''}
  ${active?'<button class="btn btn-gold" data-revision="1">＋ Publicar nueva versión</button><button class="btn btn-danger" data-revoke="1">Revocar enlace</button>':'<button class="btn btn-gold" data-duplicate="1">＋ Duplicar y publicar nuevo enlace</button>'}
@@ -120,7 +121,10 @@ function openEmailPreview(r){
   const content=emailContent(r);
   $('emailRecipient').textContent=r.recipientEmail;
   $('emailSubject').textContent='ÁGORA · Archivos de producción · '+r.folio;
-  $('emailPreviewContent').innerHTML=content.html;
+  $('emailPreviewTitle').textContent=r.active?'Vista previa del correo':'Vista previa del correo · expediente revocado';
+  $('copyEmailPreview').disabled=!r.active;
+  $('openGmailPreview').disabled=!r.active;
+  $('emailPreviewContent').innerHTML=(r.active?'':'<p class="notice"><b>Expediente revocado.</b> Este correo solo se muestra como referencia. Para poder enviarlo, duplica el expediente y publica un enlace nuevo.</p>')+content.html;
   $('emailOverlay').hidden=false;
   document.body.style.overflow='hidden';
 }
