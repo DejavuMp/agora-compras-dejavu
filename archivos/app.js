@@ -22,7 +22,7 @@ const secret=()=>{let bytes=crypto.getRandomValues(new Uint8Array(32));return bt
 const urlFor=id=>new URL('./recibir.html',location.href).href+'#t='+id;
 const assetHtml=(arr,heading)=>galleryHtml(arr,heading);
 let user=null,role=null,deliveries=[],responses=new Map(),editRecord=null,openRecord=null,subscriptions=[],readyDeliveries=false,readyResponses=false,firstResponses=true;
-let sampleSelected=[],folderSelected=[];
+let sampleSelected=[],folderSelected=[],editorMode='new',emailRecord=null;
 function notify(msg,error=false){$('alert').textContent=msg;$('alert').className='alert'+(error?' error':'');$('alert').hidden=false;setTimeout(()=>{if($('alert').textContent===msg)$('alert').hidden=true;},8500);}
 function authRequired(){if(!user||!['admin','coordinador'].includes(role))throw new Error('Inicia sesión con una cuenta de ÁGORA autorizada (admin o coordinador).');}
 function responseFor(id,version){return responses.get(`${id}_v${version}`)||null;}
@@ -50,7 +50,7 @@ function setupLinkPreviews(){
  updateLinkPreviews();
 }
 function clearFiles(){for(const v of [...sampleSelected,...folderSelected])URL.revokeObjectURL(v.preview);sampleSelected=[];folderSelected=[];imagesToDisplay(sampleSelected,'samplePreview');imagesToDisplay(folderSelected,'folderPreview');$('sampleFiles').value='';$('folderFiles').value='';}
-function openEditor(record=null){try{authRequired();}catch(e){notify(e.message,true);return;}editRecord=record;if(uploadProgress){uploadProgress.hidden=true;uploadProgress.dataset.error='0';uploadMeter.value=0;uploadMeter.hidden=false;uploadStatus.textContent='';}$('deliveryForm').reset();clearFiles();$('formTitle').textContent=record?'Publicar nueva versión de archivos':'Enviar archivos para fabricar muestras';$('formSubtitle').textContent=record?`Versión ${record.version+1}. El enlace de recepción será el mismo.`:'Crea un expediente que se guarda directamente en Firebase.';$('saveButton').textContent=record?'Publicar versión '+(record.version+1):'Publicar envío';$('sampleUrls').value=record?.sampleImages?.join('\n')||'';$('folderUrls').value=record?.folderImages?.join('\n')||'';const f=$('deliveryForm');for(const key of ['project','category','title','recipientName','recipientEmail','driveUrl','notes']){if(record)f.elements[key].value=record[key]||'';}f.elements.recipientName.readOnly=!!record;f.elements.recipientEmail.readOnly=!!record;const today=new Date();const y=today.getFullYear(),m=String(today.getMonth()+1).padStart(2,'0'),d=String(today.getDate()).padStart(2,'0');f.elements.validUntil.min=`${y}-${m}-${d}`;const prev=record?.validUntil?.toDate?.();const defaultUntil=new Date(today.getTime()+14*86400000);const target=prev&&prev>today?prev:defaultUntil;f.elements.validUntil.value=`${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,'0')}-${String(target.getDate()).padStart(2,'0')}`;
+function openEditor(record=null,mode='revision'){try{authRequired();}catch(e){notify(e.message,true);return;}editRecord=record;editorMode=record?mode:'new';if(uploadProgress){uploadProgress.hidden=true;uploadProgress.dataset.error='0';uploadMeter.value=0;uploadMeter.hidden=false;uploadStatus.textContent='';}$('deliveryForm').reset();clearFiles();$('formTitle').textContent=record?(editorMode==='edit'?'Editar expediente · '+record.folio:'Publicar nueva versión de archivos'):'Enviar archivos para fabricar muestras';$('formSubtitle').textContent=record?(editorMode==='edit'?'Corrige datos, fotografías e indicaciones sin cambiar el enlace ni la versión. Disponible antes del acuse.':'Se crea la versión '+(record.version+1)+' y se conserva el mismo enlace.'):'Crea un expediente que se guarda directamente en Firebase.';$('saveButton').textContent=record?(editorMode==='edit'?'Guardar cambios':'Publicar versión '+(record.version+1)):'Publicar envío';$('sampleUrls').value=record?.sampleImages?.join('\n')||'';$('folderUrls').value=record?.folderImages?.join('\n')||'';const f=$('deliveryForm');for(const key of ['project','category','title','recipientName','recipientEmail','driveUrl','notes']){if(record)f.elements[key].value=record[key]||'';}f.elements.recipientName.readOnly=!!record;f.elements.recipientEmail.readOnly=!!record;const today=new Date();const y=today.getFullYear(),m=String(today.getMonth()+1).padStart(2,'0'),d=String(today.getDate()).padStart(2,'0');f.elements.validUntil.min=`${y}-${m}-${d}`;const prev=record?.validUntil?.toDate?.();const defaultUntil=new Date(today.getTime()+14*86400000);const target=prev&&prev>today?prev:defaultUntil;f.elements.validUntil.value=`${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,'0')}-${String(target.getDate()).padStart(2,'0')}`;
  if(!record){
    const handoff=(()=>{try{return JSON.parse(sessionStorage.getItem('agora_sample_file_context')||'null')}catch{return null}})();
    if(handoff?.sampleFolio){
@@ -65,7 +65,7 @@ function openEditor(record=null){try{authRequired();}catch(e){notify(e.message,t
      sessionStorage.removeItem('agora_sample_file_context');
    }
  }updateLinkPreviews();$('editorOverlay').hidden=false;document.body.style.overflow='hidden';}
-function closeModals(){for(const id of ['editorOverlay','detailOverlay'])$(id).hidden=true;document.body.style.overflow='';}
+function closeModals(){for(const id of ['editorOverlay','detailOverlay','emailOverlay'])$(id).hidden=true;document.body.style.overflow='';}
 function recordLine(r){const state=statusFor(r);const recipient=r.recipientName||'—';return `<tr><td><strong>${esc(r.title)}</strong><small>${esc(r.folio||'Sin folio')} · Versión ${r.version}</small></td><td>${esc(r.project)}<br><small>${esc(r.category)}</small></td><td>${esc(recipient)}<br><small>${esc(r.recipientEmail)}</small></td><td>${fmt(r.validUntil)}</td><td><span class="status-pill ${state}">${statuses[state]}</span></td><td><button class="table-action" type="button" data-detail="${r.id}">Ver expediente</button></td></tr>`;}
 function updateCounters(){const results={};for(const r of deliveries)results[statusFor(r)]=(results[statusFor(r)]||0)+1;$('statTotal').textContent=deliveries.length;$('statPending').textContent=results.pendiente||0;$('statChanges').textContent=results.cambios||0;$('statReceived').textContent=(results.recibido||0)+(results.aprobado||0);}
 function renderList(){if(!readyDeliveries||!readyResponses)return;updateCounters();const q=$('search').value.toLowerCase().trim(),f=$('filter').value;const rows=deliveries.filter(r=>(f==='all'||statusFor(r)===f)&&[r.title,r.project,r.recipientName,r.recipientEmail,r.folio,r.category].join(' ').toLowerCase().includes(q));$('deliveryRows').innerHTML=rows.length?rows.map(recordLine).join(''):'<tr><td colspan="6" class="empty-cell">No se encontraron envíos con estos filtros.</td></tr>';$('syncState').textContent='● Firebase · actualizado';$('syncState').style.color='#2a7355';retrySyncButton.hidden=true;$('deliveryRows').querySelectorAll('[data-detail]').forEach(el=>el.addEventListener('click',()=>openDetail(el.dataset.detail)));if(openRecord&&!$('detailOverlay').hidden){const updated=deliveries.find(r=>r.id===openRecord);if(updated)renderDetail(updated);}}
@@ -74,33 +74,65 @@ function renderDetail(r){const state=statusFor(r),res=responseFor(r.id,r.version
  <div class="head-row"><span class="status-pill ${state}">${statuses[state]}</span><small class="muted">Actualizado: ${fmtTime(r.updatedAt)}</small></div>
  <div class="detail-meta" style="margin-top:17px"><div class="meta-card"><small>DESTINATARIO</small><b>${esc(r.recipientName)}<br>${esc(r.recipientEmail)}</b></div><div class="meta-card"><small>PROYECTO / TIPO</small><b>${esc(r.project)}<br>${esc(r.category)}</b></div><div class="meta-card"><small>VIGENCIA</small><b>${fmt(r.validUntil)}</b></div></div>
  <h3 class="section-heading">Enlace de revisión</h3><div class="copy-block"><input readonly value="${esc(url)}" aria-label="Enlace de revisión"><button type="button" data-copy="link">Copiar</button></div>
- <div class="detail-actions"><a class="btn btn-dark" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Abrir vista del proveedor</a><button class="btn btn-outline" type="button" data-mail="1">Abrir Gmail</button><button class="btn btn-outline" type="button" data-emailhtml="1">Copiar correo con evidencia</button>${res?`<a class="btn btn-gold" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Ver comprobante de recibido / PDF</a>`:''}${active?`<button class="btn btn-gold" data-revision="1">＋ Publicar nueva versión</button><button class="btn btn-danger" data-revoke="1">Revocar enlace</button>`:''}</div>
+ <div class="detail-actions"><a class="btn btn-dark" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Abrir vista del proveedor</a><button class="btn btn-gold" type="button" data-emailpreview="1">✉ Vista previa del correo</button><button class="btn btn-outline" type="button" data-mail="1">Abrir Gmail</button>${res?`<a class="btn btn-gold" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Ver comprobante de recibido / PDF</a>`:''}${active?`${!res&&state==='pendiente'?'<button class="btn btn-outline" data-edit="1">✎ Editar expediente</button>':''}<button class="btn btn-gold" data-revision="1">＋ Publicar nueva versión</button><button class="btn btn-danger" data-revoke="1">Revocar enlace</button>`:''}</div>
  ${res?`<div class="notice"><b>Última respuesta · ${statuses[res.status]||res.status}</b><br>Registrada por ${esc(res.receiverName)} (${esc(res.receiverEmail)}), ${fmtTime(res.createdAt)}.${res.comments?`<br><br>“${esc(res.comments)}”`:''}</div>`:'<div class="notice">El destinatario todavía no registra una respuesta a esta versión.</div>'}
  <div class="two-col"><div><h3 class="section-heading">Archivos para aplicar en las muestras</h3><a href="${esc(link)}" target="_blank" rel="noopener noreferrer" class="btn btn-outline">Abrir carpeta de Drive</a>${assetHtml(r.sampleImages,'Artes y vistas de aplicación')}${assetHtml(r.folderImages,'Evidencia de los archivos enviados por Drive')}</div><div><h3 class="section-heading">Historial de revisiones y respuestas</h3><div class="timeline">${responseTimeline(r)}</div></div></div>`;
- $('detailContent').querySelector('[data-copy]')?.addEventListener('click',()=>copyLink(url));$('detailContent').querySelector('[data-mail]')?.addEventListener('click',()=>prepareEmail(r));$('detailContent').querySelector('[data-emailhtml]')?.addEventListener('click',()=>copyEmailEvidence(r));$('detailContent').querySelector('[data-revision]')?.addEventListener('click',()=>{closeModals();openEditor(r);});$('detailContent').querySelector('[data-revoke]')?.addEventListener('click',()=>revoke(r));}
+ $('detailContent').querySelector('[data-copy]')?.addEventListener('click',()=>copyLink(url));$('detailContent').querySelector('[data-mail]')?.addEventListener('click',()=>prepareEmail(r));$('detailContent').querySelector('[data-emailpreview]')?.addEventListener('click',()=>openEmailPreview(r));$('detailContent').querySelector('[data-edit]')?.addEventListener('click',()=>{closeModals();openEditor(r,'edit');});$('detailContent').querySelector('[data-revision]')?.addEventListener('click',()=>{closeModals();openEditor(r);});$('detailContent').querySelector('[data-revoke]')?.addEventListener('click',()=>revoke(r));}
 function openDetail(id){const r=deliveries.find(d=>d.id===id);if(!r)return;openRecord=r.id;renderDetail(r);$('detailOverlay').hidden=false;document.body.style.overflow='hidden';}
 async function copyLink(url){try{await navigator.clipboard.writeText(url);notify('Enlace copiado. Puedes enviarlo por correo o mensaje.');}catch(e){notify('No se pudo copiar el enlace: '+e.message,true);}}
-async function copyEmailEvidence(r){
- const url=urlFor(r.id),drive=safeHttps(r.driveUrl),photos=arr=>(arr||[]).slice(0,8).map((src,i)=>safeHttps(src)?'<a href="'+esc(src)+'" style="display:inline-block;margin:5px;vertical-align:top;color:#80622e;font:11px Arial;text-decoration:underline"><img src="'+esc(preferredImageUrl(src)||src)+'" alt="Captura '+(i+1)+'" width="125" style="display:block;width:125px;height:auto;max-height:125px;object-fit:contain;border:1px solid #e2d8c8">Abrir imagen '+(i+1)+'</a>':'').join('');
- const text='Dejavú Marketing · Archivos de producción para muestras\nSolicitud: '+r.project+'\nArchivo: '+r.title+'\nAbre tu expediente y confirma de recibido: '+url+'\nDrive: '+drive;
- const html='<div style="font:14px Arial;color:#26221c;max-width:620px">'+
- '<div style="background:#111;color:#d4b377;padding:20px;font:bold 19px Arial">DÉJÀ VU MARKETING · ARCHIVOS DE PRODUCCIÓN</div>'+
- '<div style="padding:18px"><p>Buen día, '+esc(r.recipientName)+'.</p><p>Compartimos los artes finales y archivos que deberán aplicarse en las muestras de <b>'+esc(r.project)+'</b>.</p>'+
- '<p><b>Archivo:</b> '+esc(r.title)+' · <b>Versión:</b> '+r.version+'</p>'+
- '<p><a href="'+esc(url)+'" style="display:inline-block;padding:12px 18px;background:#b58d51;color:white;text-decoration:none">Abrir expediente y confirmar recibido</a></p>'+
- '<p><a href="'+esc(drive)+'">Abrir carpeta de archivos en Drive</a></p>'+
- '<p><b>Indicaciones:</b> '+esc(r.notes||'Revisar todos los artes, medidas y materiales.')+'</p>'+
- ((r.sampleImages||[]).length?'<h3>Vistas de los artes</h3>'+photos(r.sampleImages):'')+
- ((r.folderImages||[]).length?'<h3>Evidencia de archivos compartidos</h3>'+photos(r.folderImages):'')+
- '<p style="font-size:12px;color:#6b6256">La recepción se registra al confirmar dentro de ÁGORA. Dejavú Marketing.</p></div></div>';
- try{
-  if(navigator.clipboard?.write&&typeof ClipboardItem!=='undefined'){
-   await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([text],{type:'text/plain'})})]);
-   notify('Correo visual con capturas copiado. Abre Gmail, pega en el cuerpo y revisa las imágenes antes de enviar.');
-  }else{await navigator.clipboard.writeText(text);notify('Enlaces copiados en texto. Pégalos en Gmail.');}
- }catch(err){notify('No fue posible copiar el correo: '+err.message,true)}
-}
 
+function emailContent(r){
+  const url=urlFor(r.id),confirmUrl=url+'&accion=recibido',drive=safeHttps(r.driveUrl);
+  const imageRows=(arr,heading)=>(arr||[]).length?
+    '<h3 style="font:700 14px Arial;color:#5a431f;margin:22px 0 10px">'+esc(heading)+'</h3>'+
+    '<div style="font-size:0">'+arr.slice(0,8).map((src,i)=>{
+      const photo=safeHttps(src);
+      if(!photo)return '';
+      return '<a href="'+esc(photo)+'" style="display:inline-block;vertical-align:top;width:130px;margin:0 9px 12px 0;text-decoration:none;color:#80622e;font:11px Arial">'+
+      '<img src="'+esc(preferredImageUrl(src)||src)+'" alt="Imagen de referencia '+(i+1)+'" width="128" style="width:128px;height:108px;object-fit:contain;border:1px solid #dfd5c5;background:#f7f5f1;display:block">'+
+      '<span style="display:block;margin-top:5px">Abrir imagen '+(i+1)+'</span></a>';
+    }).join('')+'</div>':'';
+  const html='<div style="margin:auto;max-width:620px;background:#fff;font:14px/1.6 Arial,Helvetica,sans-serif;color:#29251f;border:1px solid #e4ddd1">'+
+  '<div style="background:#181715;color:#e1c083;padding:25px 26px;border-bottom:3px solid #bd9656"><div style="font-size:11px;letter-spacing:2px">ÁGORA · DEJAVÚ MARKETING</div><div style="font-size:21px;font-weight:bold;margin-top:5px">Entrega de archivos de producción</div></div>'+
+  '<div style="padding:26px"><p style="margin-top:0">Hola, <b>'+esc(r.recipientName)+'</b>:</p>'+
+  '<p>Te compartimos los archivos que se utilizarán para las muestras. Por favor, abre la carpeta, revisa las imágenes y registra tu confirmación de recibido.</p>'+
+  '<div style="background:#f8f5ef;border:1px solid #e7dccb;padding:15px 17px"><b>'+esc(r.title)+'</b><div style="font-size:12px;color:#73695d;margin-top:5px">'+esc(r.project)+' · '+esc(r.folio)+' · Versión '+Number(r.version)+'</div></div>'+
+  '<p style="margin:24px 0 12px"><a href="'+esc(confirmUrl)+'" style="display:inline-block;padding:13px 22px;background:#b78e4d;color:#fff;border-radius:5px;text-decoration:none;font-weight:bold">✓ Confirmar de recibido</a></p>'+
+  '<p style="margin:0 0 18px"><a href="'+esc(drive)+'" style="display:inline-block;padding:13px 22px;background:#24211c;color:#fff;border-radius:5px;text-decoration:none;font-weight:bold">↗ Abrir archivos en Drive</a></p>'+
+  '<p style="font-size:12px;color:#756858">El primer botón abre el formulario de confirmación en ÁGORA; no registra una respuesta automáticamente.</p>'+
+  '<p><b>Indicaciones de producción:</b> '+esc(r.notes||'Revisa las artes y confirma que recibiste los archivos.')+'</p>'+
+  imageRows(r.sampleImages,'Vistas de artes y aplicaciones')+imageRows(r.folderImages,'Evidencia de archivos compartidos')+
+  '<div style="border-top:1px solid #e9e1d4;margin-top:22px;padding-top:15px;font-size:12px;color:#73695d">Vigencia: '+esc(fmt(r.validUntil))+'. Si no puedes abrir los archivos o necesitas cambios, repórtalo desde el mismo expediente. <br>Dejavú Marketing · ÁGORA Archivos.</div>'+
+  '</div></div>';
+  const plain='ÁGORA · DEJAVÚ MARKETING\nEntrega de archivos: '+r.title+'\nProyecto: '+r.project+
+    '\n\nConfirmar de recibido: '+confirmUrl+'\nAbrir archivos en Drive: '+drive+
+    '\n\nIndicaciones: '+(r.notes||'Revisar los archivos')+'\nVigencia: '+fmt(r.validUntil);
+  return {html,plain,confirmUrl,drive};
+}
+function openEmailPreview(r){
+  emailRecord=r;
+  const content=emailContent(r);
+  $('emailRecipient').textContent=r.recipientEmail;
+  $('emailSubject').textContent='ÁGORA · Archivos de producción · '+r.folio;
+  $('emailPreviewContent').innerHTML=content.html;
+  $('emailOverlay').hidden=false;
+  document.body.style.overflow='hidden';
+}
+async function copyEmailEvidence(r){
+  const {html,plain}=emailContent(r);
+  try{
+    if(navigator.clipboard?.write&&typeof ClipboardItem!=='undefined'){
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html':new Blob([html],{type:'text/html'}),
+        'text/plain':new Blob([plain],{type:'text/plain'})
+      })]);
+      notify('Correo visual copiado. Pégalo en Gmail y comprueba imágenes y botones antes de enviar.');
+    }else{
+      await navigator.clipboard.writeText(plain);
+      notify('Se copió el correo en texto con ambos enlaces. Pégalo en Gmail.');
+    }
+  }catch(err){notify('No fue posible copiar el correo: '+err.message,true);}
+}
 function prepareEmail(r){const url=urlFor(r.id);const subject=`ÁGORA · Archivos de aplicación para muestras · ${r.folio}`;const content=`Hola ${r.recipientName},\n\nDejavú Marketing te comparte los artes y archivos de producción para ${r.project}.\n\n1. Abre el enlace de ÁGORA para ver las capturas de evidencia y las indicaciones:\n${url}\n\n2. Accede a los archivos originales en Google Drive:\n${safeHttps(r.driveUrl)}\n\n3. Confirma de recibido desde ÁGORA para generar el comprobante digital. Si falta algún archivo o no puedes abrirlo, repórtalo en el mismo formulario.\n\nVigencia: ${fmt(r.validUntil)}\nVersión: ${r.version}\n\nSaludos,\nDejavú Marketing`;const gmail='https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(r.recipientEmail)+'&su='+encodeURIComponent(subject)+'&body='+encodeURIComponent(content);window.open(gmail,'_blank','noopener,noreferrer');notify('Abrimos Gmail con los enlaces. Revisa y envía. Puedes pegar el correo visual si deseas mostrar las capturas dentro del mensaje.');}
 function revoke(r){if(!confirm('¿Revocar este enlace? El destinatario dejará de poder abrirlo o responder. La información del expediente se conservará.'))return;authRequired();runTransaction(db,async tx=>{const refDoc=doc(db,'agora_file_deliveries',r.id),s=await tx.get(refDoc);if(!s.exists()||!s.data().active)throw Error('El envío ya fue revocado o no existe.');tx.update(refDoc,{active:false,updatedAt:serverTimestamp()});}).then(()=>{closeModals();notify('Enlace revocado. El expediente permanece en el historial.');}).catch(e=>notify(e.message,true));}
 function parseValidUntil(value){const d=new Date(value+'T23:59:59');if(Number.isNaN(+d)||d.getTime()<=Date.now())throw Error('Selecciona una vigencia futura.');return Timestamp.fromDate(d);}
@@ -202,7 +234,71 @@ async function uploadAllImages(samples,folders,id,version){
   return result;
 }
 function normalizeDrive(raw){const uri=safeHttps(String(raw||'').trim());if(!uri)throw Error('Agrega un enlace válido de Drive con https://');const host=new URL(uri).hostname;if(!['drive.google.com','docs.google.com'].includes(host))throw Error('El enlace debe ser de Google Drive o Google Docs.');return uri;}
-async function saveDelivery(event){event.preventDefault();let btn=$('saveButton');if(btn.disabled)return;btn.disabled=true;btn.textContent='Guardando en Firebase…';try{authRequired();const f=$('deliveryForm'),fd=new FormData(f),read=x=>String(fd.get(x)||'').trim();const recipientEmail=read('recipientEmail').toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail))throw Error('Indica un correo válido para el destinatario.');const validUntil=parseValidUntil(read('validUntil'));const driveUrl=normalizeDrive(read('driveUrl'));const id=editRecord?.id||secret(),version=(editRecord?.version||0)+1;if(sampleSelected.length>8||folderSelected.length>6)throw Error('Hay demasiadas imágenes.');let samples=readImageUrls('sampleUrls',8),folders=readImageUrls('folderUrls',6);if(samples.length+sampleSelected.length>8||folders.length+folderSelected.length>6)throw Error('Se superó el límite entre archivos e imágenes por URL.');if(sampleSelected.length||folderSelected.length){const prepared=await uploadAllImages(sampleSelected,folderSelected,id,version);samples=[...samples,...prepared.samples];folders=[...folders,...prepared.folders];btn.textContent='Guardando expediente…';}const payload={project:read('project'),category:read('category'),title:read('title'),recipientName:read('recipientName'),recipientEmail,driveUrl,validUntil,notes:read('notes'),sampleImages:samples,folderImages:folders};if(!payload.project||!payload.title||!payload.recipientName)throw Error('Completa los campos obligatorios.');const rev={version,title:payload.title,notes:payload.notes,driveUrl,sampleImages:samples,folderImages:folders,publishedAt:new Date().toISOString(),editorEmail:user.email||''};if(editRecord){await runTransaction(db,async tx=>{const path=doc(db,'agora_file_deliveries',id),snap=await tx.get(path);if(!snap.exists())throw Error('El expediente ya no existe.');const old=snap.data();if(old.version!==editRecord.version||!old.active)throw Error('El expediente fue actualizado o revocado por otro usuario. Cierra y abre de nuevo el registro.');if(old.recipientEmail!==recipientEmail)throw Error('No se puede cambiar el destinatario del mismo enlace.');tx.update(path,{...payload,version,revisions:[...old.revisions,rev],updatedAt:serverTimestamp()});});}else{const createdAt=new Date(),folio='ARC-'+createdAt.getFullYear()+'-'+createdAt.toISOString().replace(/\D/g,'').slice(4,12)+'-'+id.slice(0,4).toUpperCase();await setDoc(doc(db,'agora_file_deliveries',id),{...payload,folio,id,version,active:true,createdBy:user.uid,createdByEmail:user.email||'',createdAt:serverTimestamp(),updatedAt:serverTimestamp(),revisions:[rev]});}closeModals();notify(`Envío ${editRecord?'actualizado':'publicado'} en Firebase. El enlace ${editRecord?'continúa siendo el mismo':'ya se puede compartir'}.`);openDetail(id);}catch(e){const message=e.message||String(e);notify(message,true);updateUploadStatus(message,null,true);}finally{btn.disabled=false;btn.textContent=editRecord?'Publicar nueva versión':'Publicar envío';}}
+
+async function saveDelivery(event){
+ event.preventDefault();
+ const btn=$('saveButton');if(btn.disabled)return;
+ btn.disabled=true;btn.textContent='Guardando en Firebase…';
+ try{
+  authRequired();
+  const fd=new FormData($('deliveryForm')),read=k=>String(fd.get(k)||'').trim();
+  const recipientEmail=read('recipientEmail').toLowerCase();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail))throw Error('Indica un correo válido.');
+  const validUntil=parseValidUntil(read('validUntil')),driveUrl=normalizeDrive(read('driveUrl'));
+  const id=editRecord?.id||secret(),isEdit=!!editRecord&&editorMode==='edit';
+  const version=isEdit?editRecord.version:(editRecord?.version||0)+1;
+  let samples=readImageUrls('sampleUrls',8),folders=readImageUrls('folderUrls',6);
+  if(samples.length+sampleSelected.length>8||folders.length+folderSelected.length>6)throw Error('Se superó el límite de imágenes por sección.');
+  if(sampleSelected.length||folderSelected.length){
+   const prepared=await uploadAllImages(sampleSelected,folderSelected,id,version);
+   samples=[...samples,...prepared.samples];folders=[...folders,...prepared.folders];
+  }
+  const payload={project:read('project'),category:read('category'),title:read('title'),
+   recipientName:read('recipientName'),recipientEmail,driveUrl,validUntil,
+   notes:read('notes'),sampleImages:samples,folderImages:folders};
+  if(!payload.project||!payload.title||!payload.recipientName)throw Error('Completa los campos obligatorios.');
+  const rev={version,title:payload.title,notes:payload.notes,driveUrl,
+   sampleImages:samples,folderImages:folders,publishedAt:new Date().toISOString(),editorEmail:user.email||''};
+  if(editRecord){
+   await runTransaction(db,async tx=>{
+    const target=doc(db,'agora_file_deliveries',id);
+    const snap=await tx.get(target);
+    if(!snap.exists())throw Error('El expediente ya no existe.');
+    const old=snap.data();
+    if(old.version!==editRecord.version||!old.active||old.updatedAt?.toMillis?.()!==editRecord.updatedAt?.toMillis?.())
+     throw Error('El expediente fue modificado por otra persona. Vuelve a abrirlo.');
+    if(old.recipientEmail!==recipientEmail||old.recipientName!==payload.recipientName)
+     throw Error('Para cambiar de destinatario, crea un nuevo envío con un enlace diferente.');
+    if(isEdit){
+     const receipt=await tx.get(doc(db,'agora_file_responses',id,'agora_file_reply_versions',String(version)));
+     if(receipt.exists())throw Error('Este expediente ya tiene acuse. Publica una nueva versión para cambiarlo.');
+     const revisions=Array.isArray(old.revisions)?old.revisions.slice():[];
+     if(!revisions.length)throw Error('El expediente no tiene historial de versiones válido.');
+     revisions[revisions.length-1]={...revisions[revisions.length-1],...rev,
+      publishedAt:revisions[revisions.length-1].publishedAt,editedAt:new Date().toISOString()};
+     tx.update(target,{...payload,revisions,updatedAt:serverTimestamp()});
+    }else{
+     if(old.version>=30)throw Error('Se alcanzó el máximo de 30 versiones.');
+     tx.update(target,{...payload,version,revisions:[...old.revisions,rev],updatedAt:serverTimestamp()});
+    }
+   });
+  }else{
+   const now=new Date(),folio='ARC-'+now.getFullYear()+'-'+now.toISOString().replace(/\D/g,'').slice(4,12)+'-'+id.slice(0,4).toUpperCase();
+   await setDoc(doc(db,'agora_file_deliveries',id),{...payload,folio,id,version,
+    active:true,createdBy:user.uid,createdByEmail:user.email||'',
+    createdAt:serverTimestamp(),updatedAt:serverTimestamp(),revisions:[rev]});
+  }
+  closeModals();
+  notify(isEdit?'Cambios del expediente guardados. El enlace y la versión no cambiaron.':
+    editRecord?'Nueva versión publicada. El enlace es el mismo.':'Envío publicado. Ya puedes compartir el enlace.');
+  openDetail(id);
+ }catch(e){
+  const message=e?.message||String(e);notify(message,true);updateUploadStatus(message,null,true);
+ }finally{
+  btn.disabled=false;
+  btn.textContent=editorMode==='edit'?'Guardar cambios':editRecord?'Publicar nueva versión':'Publicar envío';
+ }
+}
 function stopListeners(){for(const u of subscriptions)u();subscriptions=[];readyDeliveries=false;readyResponses=false;deliveries=[];responses.clear();firstResponses=true;}
 /* Estado visible y recuperable: nunca mostrar "sin conexión" indefinidamente. */
 const retrySyncButton=document.createElement('button');
@@ -293,6 +389,9 @@ $('authButton').addEventListener('click',async()=>{try{if(user)await signOut(aut
 $('deliveryForm').addEventListener('submit',saveDelivery);$('sampleFiles').addEventListener('change',e=>addFiles(e.target,sampleSelected,'samplePreview',8));$('folderFiles').addEventListener('change',e=>addFiles(e.target,folderSelected,'folderPreview',6));$('search').addEventListener('input',renderList);$('filter').addEventListener('change',renderList);
 $('newButton').addEventListener('click',()=>openEditor());$('menuNew').addEventListener('click',()=>openEditor());$('menuHistory').addEventListener('click',()=>{$('search').focus();$('sidebar').classList.remove('mobile-open');});
 for(const el of document.querySelectorAll('[data-close]'))el.addEventListener('click',closeModals);
-for(const name of ['editorOverlay','detailOverlay'])$(name).addEventListener('click',e=>{if(e.target===$(name))closeModals();});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModals();});
+for(const name of ['editorOverlay','detailOverlay','emailOverlay'])$(name).addEventListener('click',e=>{if(e.target===$(name))closeModals();});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModals();});
 $('toggleSide').addEventListener('click',()=>{const side=$('sidebar');if(window.innerWidth<=760)side.classList.toggle('mobile-open');else side.classList.toggle('collapsed');});document.addEventListener('click',e=>{if(window.innerWidth<=760&&!e.target.closest('.sidebar,#toggleSide'))$('sidebar').classList.remove('mobile-open');});
 setupLinkPreviews();
+
+$('copyEmailPreview').addEventListener('click',()=>{if(emailRecord)copyEmailEvidence(emailRecord);});
+$('openGmailPreview').addEventListener('click',()=>{if(emailRecord)prepareEmail(emailRecord);});
