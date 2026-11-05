@@ -1,6 +1,6 @@
 // ÁGORA Archivos · caché propio, independiente de Compras & Producción
-const CACHE='agora-archivos-web-v5-edicion-revocados';
-const ASSETS=['./','./index.html','./app.js','./style.css','./recibir.html','./recibir.js','./image-preview.js','./brand.js','./manifest.webmanifest'];
+const CACHE='agora-archivos-web-v6-logo-correo';
+const ASSETS=['./','./index.html','./app.js','./style.css','./recibir.html','./recibir.js','./image-preview.js','./brand.js','./dejavu-logo-oficial.png','./manifest.webmanifest'];
 self.addEventListener('install',event=>event.waitUntil(
   caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())
 ));
