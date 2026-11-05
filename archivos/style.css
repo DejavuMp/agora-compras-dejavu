@@ -102,3 +102,6 @@
  .agora-viewer-content{height:60dvh}
  .agora-viewer-footer{flex-direction:column;align-items:stretch}
 }
+
+.agora-fallback-drive{width:100%;height:100%;border:0;background:#fff;display:block}
+.choice-highlight{border-color:#b78e4d!important;background:#fcf6ea!important;box-shadow:0 0 0 2px rgba(183,142,77,.2)}
