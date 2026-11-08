@@ -66,7 +66,7 @@ tbody td{padding:14px 10px;border-bottom:1px solid #eceeea;font-size:12px;vertic
  <div class="content">
   <div class="hero">
    <div><div class="eyebrow">Centro documental</div><h1>Fichas de Evento</h1><p class="lead">Consulta fichas anteriores, localiza documentos por proyecto, fecha o folio y descarga siempre la versión publicada más reciente desde un único enlace.</p></div>
-   <div class="actions"><button class="btn light" id="refresh">↻ Actualizar</button><a class="btn gold" href="https://github.com/DejavuMp/agora-compras-dejavu/tree/main/fichas/archivo" target="_blank" rel="noopener noreferrer">+ Agregar archivo en GitHub</a></div>
+   <div class="actions"><a class="btn" href="./herramienta/actual.html">Abrir herramienta actual</a><button class="btn light" id="refresh">↻ Actualizar</button><a class="btn gold" href="https://github.com/DejavuMp/agora-compras-dejavu/tree/main/fichas/archivo" target="_blank" rel="noopener noreferrer">+ Agregar archivo en GitHub</a></div>
   </div>
   <div class="stats">
    <div class="stat"><div><label>Fichas disponibles</label><b id="total">—</b></div><div class="mini-icon">▤</div></div>
@@ -136,7 +136,7 @@ function render(){
  el('count').textContent=list.length+' ficha(s) · '+(state.loading?'Consultando…':state.hasError?'Error de consulta':'Catálogo actualizado');
  r.innerHTML=state.loading?'<div class="empty"><p>Consultando archivos publicados…</p></div>':list.length?table(list):empty(state.hasError);
  let history=allRows();el('versions').innerHTML=history.length?table(history):empty(false);
- let docs=(state.manifest.tools||[]).filter(x=>x&&x.url);el('tool-links').innerHTML=docs.length?docs.map(x=>'<div class="instruction"><div class="num">↗</div><div><strong>'+esc(x.label||x.version||'Herramienta')+'</strong><br><a class="muted-link" href="'+esc(safeLink(x.url))+'" target="_blank" rel="noopener noreferrer">Abrir / descargar</a></div></div>').join(''):'<div class="empty"><p>La aplicación no se ha publicado en esta carpeta. El portal de histórico puede utilizarse de forma independiente.</p></div>';
+ let docs=(state.manifest.tools||[]).filter(x=>x&&x.url);el('tool-links').innerHTML=docs.length?docs.map(x=>'<div class="instruction"><div class="num">↗</div><div><strong>'+esc(x.label||x.version||'Herramienta')+'</strong><br><a class="muted-link" href="'+esc(safeLink(x.url))+'" target="_blank" rel="noopener noreferrer">Abrir</a>'+(!x.current?' &nbsp;·&nbsp; <a class="muted-link" href="'+esc(safeLink(x.url))+'" download>Descargar HTML</a>':'')+'</div></div>').join(''):'<div class="empty"><p>La aplicación no se ha publicado en esta carpeta. El portal de histórico puede utilizarse de forma independiente.</p></div>';
  bindShare();
 }
 function bindShare(){document.querySelectorAll('[data-share]').forEach(btn=>{btn.onclick=async()=>{let id=btn.getAttribute('data-share');const link=location.origin+location.pathname+'?ficha='+encodeURIComponent(id);try{await navigator.clipboard.writeText(link);btn.textContent='Copiado ✓';setTimeout(()=>btn.textContent='Copiar enlace',1300)}catch{window.prompt('Copia este enlace:',link)}}})}
