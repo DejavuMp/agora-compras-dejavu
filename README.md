@@ -26,3 +26,12 @@ La aplicación original continúa funcionando y guardando en IndexedDB. Se agreg
 **Guía paso a paso:** [PUESTA_EN_MARCHA_FIREBASE.md](./PUESTA_EN_MARCHA_FIREBASE.md).
 
 **Uso automático de Firebase y modo sin conexión:** [SINCRONIZACION_AUTOMATICA.md](./SINCRONIZACION_AUTOMATICA.md).
+
+
+## Fichas de Staff · Enlace permanente al formulario mensual
+
+- **Portal:** https://dejavump.github.io/agora-compras-dejavu/fichas/staff/
+- **Generador:** https://dejavump.github.io/agora-compras-dejavu/fichas/staff/herramienta/
+- **Formulario (enlace permanente):** https://dejavump.github.io/agora-compras-dejavu/fichas/staff/formulario/
+
+La configuración mensual se mantiene en `fichas/staff/config.json`. Las fichas privadas y sus respaldos con datos personales no se publican en este repositorio público.
