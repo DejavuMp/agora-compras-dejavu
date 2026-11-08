@@ -3,5 +3,23 @@
   "updated": "2026-11-08",
   "description": "Metadatos de fichas autorizadas para ser listadas. Los archivos internos y datos personales no deben subirse a repositorios públicos.",
   "fichas": [],
-  "tools": []
+  "tools": [
+    {
+      "label": "Versión actual · Abrir Fichas Dejavú",
+      "version": "1.4",
+      "url": "./herramienta/actual.html",
+      "current": true
+    },
+    {
+      "label": "Histórico de la herramienta · v1.4",
+      "version": "1.4",
+      "url": "./herramienta/v1.4.html"
+    },
+    {
+      "label": "Histórico de la herramienta · v1.3",
+      "version": "1.3",
+      "url": "./herramienta/v1.3.html"
+    }
+  ],
+  "currentTool": "./herramienta/v1.4.html"
 }
