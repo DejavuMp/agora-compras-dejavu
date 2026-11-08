@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#151718">
+<meta name="description" content="Archivo y descarga de fichas de evento Dejavú Marketing.">
+<title>Fichas Dejavú · Archivo de eventos</title>
+<style>
+:root{--bg:#f6f6f2;--ink:#181b1f;--muted:#6b7079;--line:#e5e5df;--gold:#d9ae49;--nav:#151718;--white:#fff;--soft:#f8f1df;font-family:Arial,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
+*{box-sizing:border-box}body{margin:0;min-height:100vh}button,input,select{font:inherit}a{text-decoration:none;color:inherit}
+.app{display:grid;grid-template-columns:245px 1fr;min-height:100vh}
+.side{background:var(--nav);color:#f8f8f4;padding:27px 17px;display:flex;flex-direction:column;gap:18px}
+.mark{padding:7px 12px 24px;border-bottom:1px solid #303334}
+.mark strong{font-size:26px;letter-spacing:-1px}.mark small{display:block;color:#d5b15b;letter-spacing:2.5px;font-size:10px;margin-top:5px}
+.nav{display:grid;gap:6px}.nav a,.nav button{display:flex;gap:11px;align-items:center;border:0;background:transparent;color:#c5c7c6;border-radius:10px;padding:12px;text-align:left;font-size:13px;cursor:pointer;width:100%}
+.nav .sel,.nav a:hover,.nav button:hover{background:#282a2a;color:#fff}.nav .sel:before{content:"";width:3px;height:15px;background:var(--gold);border-radius:2px}
+.spacer{flex:1}.side-foot{font-size:11px;color:#989c9b;border-top:1px solid #303334;padding:18px 10px;line-height:1.6}
+.main{min-width:0}.top{background:#fff;display:flex;align-items:center;justify-content:space-between;gap:15px;padding:17px 36px;border-bottom:1px solid var(--line)}
+.crumb{font-size:12px;color:var(--muted)}.top .user{border:1px solid var(--line);border-radius:999px;padding:8px 12px;font-size:11px;white-space:nowrap}
+.content{padding:34px 36px 60px;max-width:1420px;margin:auto}
+.eyebrow{font-size:11px;font-weight:bold;letter-spacing:2px;color:#917021;text-transform:uppercase}
+h1{font-size:clamp(27px,3vw,40px);letter-spacing:-1.3px;margin:10px 0 12px;line-height:1.15}
+.lead{font-size:14px;color:var(--muted);line-height:1.7;margin:0;max-width:780px}
+.hero{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;margin-bottom:28px}
+.actions{display:flex;flex-wrap:wrap;gap:9px}.btn{background:var(--nav);color:white;border:1px solid var(--nav);padding:12px 14px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:bold;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
+.btn.gold{background:#e1bd66;border-color:#e1bd66;color:#24211d}.btn.light{background:white;border-color:var(--line);color:var(--ink)}.btn:hover{opacity:.88}.btn:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #ddb54c;outline-offset:2px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:22px 0}
+.stat,.panel,.tile{background:white;border:1px solid var(--line);border-radius:13px}.stat{padding:18px 20px;display:flex;justify-content:space-between;align-items:center}
+.stat b{display:block;font-size:26px;margin:7px 0}.stat label{font-size:12px;color:var(--muted)}.mini-icon{display:grid;place-items:center;border-radius:10px;width:38px;height:38px;background:#f7f4ea;color:#9b752c;font-size:18px}
+.panel{padding:22px;margin-top:18px}.panel h2{font-size:17px;margin:0 0 6px}.sub{font-size:12px;color:var(--muted);line-height:1.55}
+.tools{display:grid;grid-template-columns:minmax(230px,1fr) 165px 165px auto;gap:10px;margin-top:19px}
+.input,.select{height:43px;background:#fff;border:1px solid #dbded9;border-radius:9px;padding:0 13px;font-size:12px;width:100%}
+.count{font-size:12px;color:var(--muted);margin:18px 0 12px}.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:650px}thead th{text-transform:uppercase;letter-spacing:1px;text-align:left;font-size:10px;color:#81868b;padding:12px 10px;border-bottom:1px solid var(--line)}
+tbody td{padding:14px 10px;border-bottom:1px solid #eceeea;font-size:12px;vertical-align:middle}tbody tr:last-child td{border-bottom:0}
+.row-title{font-weight:700;font-size:13px;line-height:1.5}.mono{font-size:11px;font-family:ui-monospace,Consolas,monospace;color:#686d73}
+.tag{background:#f4f0e4;color:#795e23;border:1px solid #e8d8aa;border-radius:99px;padding:6px 9px;font-size:10px;display:inline-block}
+.cell-links{display:flex;gap:7px}.smallbtn{background:#fff;border:1px solid #ddd;padding:8px 10px;border-radius:7px;font-size:11px;cursor:pointer;white-space:nowrap}
+.smallbtn.primary{background:#202222;color:#fff;border-color:#202222}
+.empty{border:1px dashed #d8d7ce;border-radius:12px;background:#fcfcfa;text-align:center;padding:38px 22px;color:#6d7375}
+.empty .sym{font-size:27px;color:#a17e32}.empty h3{color:#222;font-size:16px;margin:14px 0 7px}.empty p{max-width:470px;margin:0 auto 14px;line-height:1.7;font-size:12px}
+.notice{background:#faf6e9;border-left:3px solid var(--gold);padding:13px 15px;font-size:12px;line-height:1.65;margin-top:17px;border-radius:0 8px 8px 0}
+.columns{display:grid;grid-template-columns:1.1fr .9fr;gap:16px;margin-top:16px}.instruction{display:flex;gap:13px;margin:15px 0;font-size:12px;line-height:1.6}.num{background:#232626;color:#fff;border-radius:50%;width:25px;height:25px;flex:0 0 25px;display:grid;place-items:center;font-size:11px}
+.code{background:#f3f4f2;padding:13px 15px;border-radius:8px;font-family:Consolas,monospace;font-size:11px;overflow:auto;line-height:1.7}
+.footer{margin-top:24px;color:#858988;font-size:11px;line-height:1.6}.muted-link{color:#84672b;text-decoration:underline;text-underline-offset:3px}
+.hidden{display:none!important}.pill{padding:6px 9px;font-size:10px;border:1px solid #ddd;border-radius:30px;color:#5a5c5a}
+@media(max-width:1000px){.app{grid-template-columns:1fr}.side{padding:12px 15px;gap:0}.mark{padding:5px;border:0}.mark strong{font-size:19px}.mark small{font-size:8px}.nav{display:flex;overflow:auto;margin-top:9px}.nav a,.nav button{white-space:nowrap;padding:9px}.spacer,.side-foot{display:none}.content{padding:23px 18px}.top{padding:13px 18px}.hero{flex-direction:column;align-items:flex-start}.tools{grid-template-columns:1fr 1fr}.tools .input{grid-column:1/-1}}
+@media(max-width:600px){.stats{grid-template-columns:1fr 1fr}.stats .stat:last-child{grid-column:1/-1}.columns{grid-template-columns:1fr}.tools{grid-template-columns:1fr 1fr}.tools .btn{grid-column:1/-1}.panel{padding:16px}.top .user{display:none}.hero .actions{width:100%}.hero .actions .btn{flex:1}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="side">
+ <div class="mark"><strong>DEJAVÚ<span style="color:#deb654">.</span></strong><small>MARKETING · ARCHIVOS</small></div>
+ <nav class="nav">
+  <a href="#archivo" id="nav-archivo" class="sel">▦ &nbsp; Archivo de fichas</a>
+  <a href="#versiones" id="nav-versiones">↻ &nbsp; Versiones</a>
+  <a href="#instrucciones" id="nav-instrucciones">☷ &nbsp; Cómo actualizar</a>
+  <a href="https://github.com/DejavuMp/agora-compras-dejavu" target="_blank" rel="noopener noreferrer">↗ &nbsp; Repositorio</a>
+ </nav>
+ <div class="spacer"></div><div class="side-foot">DEJAVÚ MARKETING<br>Archivo web de consulta y descarga.<br>Publicación GitHub Pages · No es un portal privado.</div>
+</aside>
+<main class="main">
+ <div class="top"><span class="crumb">DEJAVÚ / OPERACIÓN / HISTORIAL DE FICHAS</span><span class="user">Repositorio público · Solo documentos aprobados</span></div>
+ <div class="content">
+  <div class="hero">
+   <div><div class="eyebrow">Centro documental</div><h1>Fichas de Evento</h1><p class="lead">Consulta fichas anteriores, localiza documentos por proyecto, fecha o folio y descarga siempre la versión publicada más reciente desde un único enlace.</p></div>
+   <div class="actions"><button class="btn light" id="refresh">↻ Actualizar</button><a class="btn gold" href="https://github.com/DejavuMp/agora-compras-dejavu/tree/main/fichas/archivo" target="_blank" rel="noopener noreferrer">+ Agregar archivo en GitHub</a></div>
+  </div>
+  <div class="stats">
+   <div class="stat"><div><label>Fichas disponibles</label><b id="total">—</b></div><div class="mini-icon">▤</div></div>
+   <div class="stat"><div><label>Proyectos registrados</label><b id="projects">—</b></div><div class="mini-icon">▦</div></div>
+   <div class="stat"><div><label>Última consulta</label><b id="updated" style="font-size:15px">—</b></div><div class="mini-icon">↻</div></div>
+  </div>
+  <section id="view-archivo">
+   <div class="panel">
+    <div><h2>Biblioteca de fichas</h2><div class="sub">Los archivos aprobados añadidos a <b>fichas/archivo</b> aparecen automáticamente. El enlace de este portal no cambia.</div></div>
+    <div class="tools"><input id="search" class="input" type="search" placeholder="Buscar por ID, campaña, sucursal o nombre..." aria-label="Buscar fichas"><select id="type" class="select" aria-label="Filtrar tipo"><option value="">Todos los tipos</option></select><select id="year" class="select" aria-label="Filtrar año"><option value="">Todos los años</option></select><button class="btn light" id="clear">Limpiar</button></div>
+    <div class="count" id="count">Consultando el catálogo…</div><div id="results"></div>
+   </div>
+   <div class="notice"><b>Privacidad:</b> GitHub Pages y los archivos de este repositorio son públicos. No subas fichas con teléfonos, identificaciones, placas, datos de Staff, información financiera ni otros datos confidenciales. Publica versiones depuradas o usa enlaces a Drive con acceso restringido.</div>
+  </section>
+  <section id="view-versiones" class="hidden">
+   <div class="panel"><h2>Versiones y enlaces permanentes</h2><p class="sub">El enlace general del portal permanece igual. Para una ficha concreta, comparte la liga que aparece al abrir su registro; seguirá apuntando al folio incluso si después se publica una versión nueva.</p><div id="versions"></div></div>
+   <div class="panel"><h2>Aplicación generadora de fichas</h2><p class="sub">Esta plataforma es el archivo de consulta. La herramienta donde se crean y editan las fichas sigue siendo independiente. Para publicar aquí una nueva versión de la herramienta, agrega el HTML aprobado a la carpeta <code>fichas/herramienta</code> y registra su enlace en <code>catalogo.json</code>.</p><div id="tool-links"></div></div>
+  </section>
+  <section id="view-instrucciones" class="hidden">
+   <div class="columns">
+    <div class="panel"><h2>Actualizar el archivo sin cambiar el enlace</h2>
+     <div class="instruction"><div class="num">1</div><div>Abre la carpeta <a class="muted-link" href="https://github.com/DejavuMp/agora-compras-dejavu/tree/main/fichas/archivo" target="_blank" rel="noopener noreferrer">fichas/archivo en GitHub</a> e inicia sesión con tu cuenta autorizada.</div></div>
+     <div class="instruction"><div class="num">2</div><div>Selecciona <b>Add file → Upload files</b> y agrega únicamente fichas depuradas y autorizadas para consulta pública.</div></div>
+     <div class="instruction"><div class="num">3</div><div>Usa el nombre indicado abajo para que el portal identifique automáticamente folio, proyecto, fecha, tipo y versión.</div></div>
+     <div class="instruction"><div class="num">4</div><div>Guarda con <b>Commit changes</b>. GitHub Pages actualizará el contenido. Pulsa <b>Actualizar</b> en este portal para recargar el catálogo.</div></div>
+     <div class="code">DVM-EVT-2026-0001__HOT-CRUJI-BRAVO__2026-11-08__activacion__v1.pdf</div>
+     <p class="sub">Para publicar una revisión del mismo evento, conserva el folio y utiliza v2, v3… El portal ofrece la versión más alta y conserva el acceso a las anteriores.</p>
+    </div>
+    <div class="panel"><h2>Documentos privados</h2><p class="sub">Para fichas internas con datos de personal, no utilices la carpeta pública. Mantén el archivo en almacenamiento con autenticación (por ejemplo, Google Drive de la agencia) y agrega únicamente su referencia aprobada al catálogo, respetando sus permisos. Un enlace público no protege la información aunque no aparezca en el listado.</p><h2 style="margin-top:28px">Consulta por folio</h2><p class="sub">Cuando una ficha tiene folio, la opción <b>Compartir enlace</b> genera una dirección que conserva ese folio y abre la versión más reciente publicada.</p><div class="notice">Esta web es de consulta. Para cargar archivos sin entrar a GitHub y manejar permisos privados, se necesitará un backend autenticado, por ejemplo Firebase, integrado en una siguiente etapa.</div></div>
+   </div>
+  </section>
+  <p class="footer">© Dejavú Marketing · Archivo independiente de Ágora · Origen: repositorio GitHub <a class="muted-link" href="https://github.com/DejavuMp/agora-compras-dejavu/tree/main/fichas" target="_blank" rel="noopener noreferrer">ver archivos</a>.</p>
+ </div>
+</main>
+</div>
+<script>
+(function(){
+'use strict';
+const API='https://api.github.com/repos/DejavuMp/agora-compras-dejavu/contents/fichas/archivo';
+const allowed=/\.(pdf|png|jpg|jpeg|webp|html|csv|json)$/i;
+const state={items:[],versions:[],manifest:{},loading:true,hasError:false};
+const el=id=>document.getElementById(id);
+const clean=s=>String(s||'').trim();
+const human=s=>clean(s).replace(/[-_]+/g,' ').replace(/\s+/g,' ').trim();
+const esc=s=>clean(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+function fmtDate(s){if(!/^\d{4}-\d{2}-\d{2}$/.test(clean(s)))return 'Por registrar';let [y,m,d]=s.split('-');return d+'/'+m+'/'+y}
+function safeLink(url){try{let u=new URL(url,location.href);return u.protocol==='https:'||u.protocol==='http:'?u.href:''}catch{return ''}}
+function fromFile(file){
+ let name=clean(file.name), parts=name.replace(/\.[^.]+$/,'').split('__'), extension=name.split('.').pop().toUpperCase();
+ let version=(parts[4]||'v1').match(/v(\d+)/i),rawid=parts.length>=2?parts[0]:name.replace(/\.[^.]+$/,'');
+ return {id:rawid,folio:rawid,project:parts.length>=2?human(parts[1]):'',date:parts.length>=3?parts[2]:'',type:parts.length>=4?human(parts[3]):extension,version:version?Number(version[1]):1,title:parts.length>=2?human(parts[1]):human(rawid),file:safeLink(file.download_url||file.html_url),preview:safeLink(file.html_url||file.download_url),size:Number(file.size||0),source:'github'};
+}
+function normalizeManifest(x){return {id:clean(x.id||x.folio),folio:clean(x.folio||x.id),title:clean(x.title||x.evento||x.project),project:clean(x.project||x.proyecto||''),date:clean(x.date||x.fecha||''),type:clean(x.type||x.tipo||'Ficha'),version:Number(x.version||1),file:safeLink(x.file||x.download||''),preview:safeLink(x.preview||x.file||x.download||''),source:'catalogo',private:!!x.private}}
+function allRows(){const seen=new Map();state.items.forEach(x=>{if(!x.id||!x.file)return;const key=x.id+'|'+x.version;let old=seen.get(key);if(!old||x.source==='catalogo')seen.set(key,x)});return Array.from(seen.values()).sort((a,b)=>String(b.date).localeCompare(String(a.date))||b.version-a.version)}
+function latestRows(){const map=new Map();allRows().forEach(x=>{let prev=map.get(x.id);if(!prev||x.version>prev.version||x.version===prev.version&&String(x.date)>String(prev.date))map.set(x.id,x)});return Array.from(map.values()).sort((a,b)=>String(b.date).localeCompare(String(a.date)))}
+function filtered(rows){let q=clean(el('search').value).toLowerCase(),type=el('type').value,year=el('year').value;return rows.filter(x=>(!q||[x.id,x.title,x.project,x.type,x.date].join(' ').toLowerCase().includes(q))&&(!type||x.type===type)&&(!year||x.date.slice(0,4)===year))}
+function fileButton(x,label){let u=safeLink(x.file);return u?'<a class="smallbtn primary" href="'+esc(u)+'" target="_blank" rel="noopener noreferrer" download>'+esc(label||'Descargar')+'</a>':'<span class="pill">No disponible</span>'}
+function shareButton(x){return '<button class="smallbtn" data-share="'+esc(x.id)+'">Copiar enlace</button>'}
+function row(x,withVersion){return '<tr><td><div class="row-title">'+esc(x.title||x.id)+'</div><div class="mono">'+esc(x.folio)+'</div></td><td>'+esc(x.project||'—')+'</td><td>'+esc(fmtDate(x.date))+'</td><td><span class="tag">'+esc(x.type)+'</span></td><td><span class="pill">v'+x.version+'</span></td><td><div class="cell-links">'+fileButton(x,x.source==='github'?'Descargar':'Abrir ficha')+shareButton(x)+'</div></td></tr>'}
+function table(rows){return '<div class="tablewrap"><table><thead><tr><th>Ficha / folio</th><th>Proyecto</th><th>Fecha</th><th>Tipo</th><th>Versión</th><th>Acciones</th></tr></thead><tbody>'+rows.map(x=>row(x)).join('')+'</tbody></table></div>'}
+function empty(isError){return '<div class="empty"><div class="sym">▤</div><h3>'+(isError?'No se pudo consultar GitHub':'Aún no hay fichas publicadas')+'</h3><p>'+(isError?'Revisa tu conexión e inténtalo con el botón Actualizar. Si GitHub limita temporalmente las consultas, vuelve a intentarlo más tarde.':'Cuando agregues PDFs aprobados a la carpeta del repositorio, aparecerán aquí. No se han añadido documentos de demostración ni datos ficticios.')+'</p><a href="https://github.com/DejavuMp/agora-compras-dejavu/tree/main/fichas/archivo" class="btn light" target="_blank" rel="noopener noreferrer">Ver carpeta del archivo</a></div>'}
+function options(){let rows=latestRows();let types=[...new Set(rows.map(x=>x.type).filter(Boolean))].sort(), years=[...new Set(rows.map(x=>x.date.slice(0,4)).filter(x=>/^\d{4}$/.test(x)))].sort().reverse();const update=(id,options,label)=>{let old=el(id).value;el(id).innerHTML='<option value="">'+label+'</option>'+options.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');el(id).value=options.includes(old)?old:''};update('type',types,'Todos los tipos');update('year',years,'Todos los años')}
+function render(){
+ let rows=latestRows(),list=filtered(rows),r=el('results');
+ el('total').textContent=rows.length;el('projects').textContent=new Set(rows.map(x=>x.project).filter(Boolean)).size;el('updated').textContent=new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+ el('count').textContent=list.length+' ficha(s) · '+(state.loading?'Consultando…':state.hasError?'Error de consulta':'Catálogo actualizado');
+ r.innerHTML=state.loading?'<div class="empty"><p>Consultando archivos publicados…</p></div>':list.length?table(list):empty(state.hasError);
+ let history=allRows();el('versions').innerHTML=history.length?table(history):empty(false);
+ let docs=(state.manifest.tools||[]).filter(x=>x&&x.url);el('tool-links').innerHTML=docs.length?docs.map(x=>'<div class="instruction"><div class="num">↗</div><div><strong>'+esc(x.label||x.version||'Herramienta')+'</strong><br><a class="muted-link" href="'+esc(safeLink(x.url))+'" target="_blank" rel="noopener noreferrer">Abrir / descargar</a></div></div>').join(''):'<div class="empty"><p>La aplicación no se ha publicado en esta carpeta. El portal de histórico puede utilizarse de forma independiente.</p></div>';
+ bindShare();
+}
+function bindShare(){document.querySelectorAll('[data-share]').forEach(btn=>{btn.onclick=async()=>{let id=btn.getAttribute('data-share');const link=location.origin+location.pathname+'?ficha='+encodeURIComponent(id);try{await navigator.clipboard.writeText(link);btn.textContent='Copiado ✓';setTimeout(()=>btn.textContent='Copiar enlace',1300)}catch{window.prompt('Copia este enlace:',link)}}})}
+function applyDeepLink(){let id=new URLSearchParams(location.search).get('ficha');if(!id)return;const item=latestRows().find(x=>x.id.toLowerCase()===id.toLowerCase());if(item){el('search').value=item.id;render()} }
+async function load(){
+ state.loading=true;state.hasError=false;render();
+ try{
+  const request={cache:'no-store'};
+  const [manifest,api]=await Promise.allSettled([fetch('./catalogo.json?ts='+Date.now(),request),fetch(API+'?ref=main&ts='+Date.now(),{headers:{Accept:'application/vnd.github+json'},cache:'no-store'})]);
+  if(manifest.status==='fulfilled'&&manifest.value.ok){const m=await manifest.value.json();state.manifest=m;state.items=(Array.isArray(m.fichas)?m.fichas:[]).map(normalizeManifest).filter(x=>x.id&&x.file)}
+  else{state.manifest={};state.items=[]}
+  if(api.status==='fulfilled'&&api.value.ok){const files=await api.value.json();if(Array.isArray(files))files.filter(x=>x.type==='file'&&allowed.test(x.name)&&x.name.toLowerCase()!=='readme.md').forEach(x=>state.items.push(fromFile(x)));else state.hasError=true}
+  else if(!state.items.length)state.hasError=true;
+ }catch(err){state.hasError=true;console.warn('Archivo no disponible',err)}
+ state.loading=false;options();render();applyDeepLink();
+}
+function navigation(){let h=location.hash.replace('#','')||'archivo';if(!['archivo','versiones','instrucciones'].includes(h))h='archivo';['archivo','versiones','instrucciones'].forEach(id=>{el('view-'+id).classList.toggle('hidden',id!==h);el('nav-'+id).classList.toggle('sel',id===h)})}
+['search','type','year'].forEach(id=>el(id).addEventListener(id==='search'?'input':'change',render));
+el('refresh').addEventListener('click',load);el('clear').addEventListener('click',()=>{el('search').value='';el('type').value='';el('year').value='';render()});
+window.addEventListener('hashchange',navigation);navigation();load();
+})();
+</script>
+</body>
+</html>
