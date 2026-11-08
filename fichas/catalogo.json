@@ -1,0 +1,7 @@
+{
+  "schema": "dejavu-fichas-archive-v1",
+  "updated": "2026-11-08",
+  "description": "Metadatos de fichas autorizadas para ser listadas. Los archivos internos y datos personales no deben subirse a repositorios públicos.",
+  "fichas": [],
+  "tools": []
+}
