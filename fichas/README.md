@@ -27,8 +27,15 @@ Usar `?ficha=DVM-EVT-2026-0001` a continuación de la URL del portal. El registr
 - `index.html`: portal web responsive.
 - `catalogo.json`: referencias autorizadas externas. Inicia vacío.
 - `archivo/`: archivos aprobados y públicos.
-- `herramienta/`: versiones publicadas de la aplicación generadora, cuando se autoricen.
+- `herramienta/`: aplicación publicable, con `actual.html` como acceso estable y respaldos de las versiones 1.4 y 1.3.
 
 ## Limitaciones
 
 El frontend puede listar y descargar pero no escribir archivos directamente al repositorio porque GitHub Pages no tiene backend. Para subida desde el navegador con permisos, requiere autenticación y almacenamiento protegido, por ejemplo Firebase. Para un número muy alto de documentos GitHub API pública tiene límites de consultas y se recomienda un índice generado automáticamente.
+
+## Estado inicial al 8 de noviembre de 2026
+
+- Portal y enlace fijo de la herramienta publicados en GitHub.
+- Versiones 1.4 y 1.3 disponibles desde la sección **Versiones**.
+- Aún no hay fichas históricas de eventos en el archivo público; no se inventaron expedientes.
+- La URL de GitHub Pages depende de que su despliegue continúe habilitado en el repositorio.
