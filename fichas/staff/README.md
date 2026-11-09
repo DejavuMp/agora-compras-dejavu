@@ -8,6 +8,14 @@
 
 La página del personal se titula **Información para formulario de pagos** y tiene **Fichas e historial** y **Formulario de pagos**. No pide iniciar sesión al personal. Todos pueden consultar **todas las fichas expresamente publicadas por Dejavú**, buscar campaña, fecha o ubicación, abrirlas y descargarlas como imagen o imprimirlas/guardarlas como PDF. El formulario de pago conserva un enlace permanente aunque cambie de mes.
 
+## Publicación disponible desde ahora, sin configurar Firebase
+
+En **Fichas anteriores** del generador, el botón **Compartir todas mis fichas ahora** prepara un enlace de catálogo que contiene los datos de actividad de las fichas guardadas en ese navegador. Se puede copiar o enviar por WhatsApp al staff. La página del personal interpreta ese enlace y permite buscar, abrir, imprimir y descargar las fichas, sin iniciar sesión.
+
+**Este mecanismo es un catálogo estático compartido por enlace, NO sincronización automática.** Los datos van codificados (y comprimidos cuando el navegador lo permite) en el fragmento `#catalog=` del enlace. No están cifrados, así que cualquiera que tenga el enlace puede leerlos. Nunca incluye correo del personal, fotografía o datos bancarios. Si se modifican o añaden fichas, el coordinador debe generar y enviar un **nuevo enlace**. Si se supera el límite de longitud de enlace, la herramienta lo indicará.
+
+La publicación automática en el **enlace permanente sin fragmento** sigue pendiente hasta que se desplieguen y prueben las reglas de Firebase. El botón de publicación automática permanece separado y la interfaz no debe confundir ambos modos.
+
 ## Trabajo del coordinador
 
 1. Abrir el generador desde el mismo navegador donde están las fichas guardadas. Crear/editar fichas como siempre; guardado original local en localStorage y evidencia en IndexedDB.
