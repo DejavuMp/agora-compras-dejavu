@@ -56,8 +56,14 @@ footer{margin:35px 0 0;text-align:center;font-size:11px;color:#89847b;line-heigh
   <div class="note print-hide"><b>Tu historial personal:</b> cada ficha que abras mediante un enlace individual se guardará en este navegador. No se sincroniza con otros dispositivos y puede ser visible para otras personas que usen este mismo navegador.</div>
  </section>
  <section id="section-history" hidden aria-labelledby="heading-history">
-  <div class="section-title"><div><h2 id="heading-history">Historial de fichas</h2><p>Actividades que has abierto en este navegador. Solo tus enlaces recibidos, no los expedientes administrativos de otras personas.</p></div></div>
-  <input id="search-history" class="search" type="search" placeholder="Buscar campaña, fecha o ubicación…" aria-label="Buscar fichas anteriores">
+  <div class="section-title"><div><h2 id="heading-history">Historial de fichas</h2><p>Consulta tus actividades asignadas en la nube y los enlaces que ya abriste en este dispositivo.</p></div></div>
+  <div class="panel" style="padding:18px;margin-bottom:20px">
+  <div class="history-bar"><div><strong style="display:block;font-size:14px;color:#242321">Mis fichas en la nube</strong><p id="staffCloudStatus" class="small" role="status" aria-live="polite" style="margin:7px 0 0">Preparando conexión segura…</p></div><div style="display:flex;gap:7px;flex-wrap:wrap"><button id="staffCloudLogin" type="button" class="btn">Ingresar con Google</button><button id="staffCloudRefresh" type="button" class="btn btn-outline" hidden>Actualizar</button><button id="staffCloudLogout" type="button" class="btn btn-outline" hidden>Salir</button></div></div>
+  <div id="staffCloudList" class="history-grid"></div>
+  <p class="small" style="margin:13px 0 0">Tu correo debe coincidir con el asignado por Dejavú. La sincronización se habilitará cuando estén activadas las reglas de seguridad de Firebase.</p>
+</div>
+<div class="section-title"><div><h2 style="font-size:17px">Historial de este dispositivo</h2><p>Fichas abiertas anteriormente aquí; no se sincronizan entre teléfonos.</p></div></div>
+<input id="search-history" class="search" type="search" placeholder="Buscar campaña, fecha o ubicación…" aria-label="Buscar fichas anteriores">
   <div class="history-bar"><strong id="history-count">0 fichas guardadas</strong><button id="clear-history" class="btn btn-outline" type="button">Borrar historial de este equipo</button></div>
   <div id="history-list" class="history-grid" aria-live="polite"></div>
   <div class="note"><b>Importante:</b> este historial solo se conserva en tu navegador. Si cambias de teléfono, borras los datos de navegación o usas otro equipo, necesitarás abrir de nuevo los enlaces que te compartió tu coordinador.</div>
@@ -185,9 +191,16 @@ $('clear-history').addEventListener('click',()=>{
 $('print-ficha').addEventListener('click',()=>{if(current)window.print()});
 $('copy-ficha').addEventListener('click',copyData);
 $('goto-payment').addEventListener('click',()=>openTab('payment'));
+window.addEventListener('dejavu:staff-cloud-open',ev=>{
+ const r=ev.detail?.record;
+ if(!r||!r.campaign||!r.activityDate)return;
+ current=r;renderCurrent(r);openTab('ficha');
+ window.scrollTo({top:0,behavior:'smooth'});
+});
 window.addEventListener('hashchange',()=>selectedFromHash());
 if(!selectedFromHash())openTab('payment');
 payments();
 })();
 </script>
+<script type="module" src="./cloud-staff.js"></script>
 </body></html>
