@@ -1608,7 +1608,7 @@ async function importBackup(){
    if(photo){try{await photoPut(id,photo);photos++}catch(e){item.hasEvidence=false;console.warn(e);}}
   }
   records.sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
-  saveStorage();renderList();toast('Importadas '+added+' fichas y '+photos+' fotografías. Omitidas: '+skipped+'.');
+  saveStorage();renderList();window.dispatchEvent(new CustomEvent('dejavu:staff-imported',{detail:{count:added}}));toast('Importadas '+added+' fichas y '+photos+' fotografías. Omitidas: '+skipped+'.');
  };
  inp.click();
 }
