@@ -117,9 +117,10 @@ body{background:var(--paper);font-family:Arial,Helvetica,sans-serif}
     <div class="navlabel">DEJAVÚ MARKETING <span class="nav-slash">/</span> STAFF</div>
     <nav aria-label="Secciones">
       <button id="navCreate" type="button" class="navitem active" aria-current="page"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 8v8M8 12h8"/></svg><span class="nav-text">Nueva ficha</span></button>
-      <button id="navSaved" type="button" class="navitem"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg><span class="nav-text">Fichas guardadas</span></button>
+      <button id="navSaved" type="button" class="navitem"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg><span class="nav-text">Archivo de fichas</span></button>
+      <button id="navForms" type="button" class="navitem"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M7 2v6M17 2v6M4 11h16M9 15h6"/></svg><span class="nav-text">Formulario mensual</span></button>
     </nav>
-    <div class="sidebottom"><div class="side-emblem" role="img" aria-label="Emblema original del Portal Dejavú"></div><strong>Fichas de staff</strong><br>Información clara, en un solo lugar.<div class="app-version">V3.1 · DEJAVÚ MARKETING</div></div>
+    <div class="sidebottom"><div class="side-emblem" role="img" aria-label="Emblema original del Portal Dejavú"></div><strong>Fichas de staff</strong><br>Información clara, en un solo lugar.<div class="app-version">V3.2 · DEJAVÚ MARKETING</div></div>
   </aside>
   <main class="main">
     <header class="topbar"><div class="breadcrumb"><span>DEJAVÚ MARKETING</span> <span>/</span> <strong id="breadcrumbText">Generador de fichas</strong></div><div class="top-meta"><span class="dot"></span> HERRAMIENTAS / STAFF</div></header>
@@ -159,9 +160,17 @@ body{background:var(--paper);font-family:Arial,Helvetica,sans-serif}
       </div>
     </div>
     <div class="content" id="savedScreen" hidden>
-      <div class="page-intro"><div><div class="eyebrow"><span class="tiny-gold-square"></span> ARCHIVO LOCAL</div><h1>Fichas guardadas</h1><p class="intro-note">Consulta, edita o comparte las fichas y fotografías guardadas en este dispositivo.</p></div><div class="count-card"><div class="count-number" id="savedCount">00</div><div class="count-label">registros locales</div></div></div>
-      <div class="toolbar"><input class="searchbox" id="filterInput" aria-label="Buscar fichas" type="search" placeholder="Buscar por campaña, persona o lugar..."><button id="backupBtn" class="btn btn-outline" type="button">Exportar respaldo JSON</button><button id="importBackupBtn" class="btn btn-outline" type="button">Importar respaldo JSON</button><a class="btn btn-outline" href="../" target="_blank" rel="noopener noreferrer">Archivo en GitHub</a></div>
+      <div class="page-intro"><div><div class="eyebrow"><span class="tiny-gold-square"></span> ARCHIVO LOCAL</div><h1>Archivo de fichas</h1><p class="intro-note">Consulta, edita, reutiliza y descarga tus fichas anteriores aquí mismo. Se conservan en este navegador.</p></div><div class="count-card"><div class="count-number" id="savedCount">00</div><div class="count-label">registros locales</div></div></div>
+      <div class="toolbar"><input class="searchbox" id="filterInput" aria-label="Buscar fichas" type="search" placeholder="Buscar por campaña, persona o lugar..."><input id="filterMonth" type="month" aria-label="Filtrar por mes" title="Filtrar por mes" style="min-height:42px;border:1px solid #d9d6cf;border-radius:8px;padding:0 9px;background:white;color:#252525"><button id="backupBtn" class="btn btn-outline" type="button">Respaldar mis fichas</button><button id="importBackupBtn" class="btn btn-outline" type="button">Recuperar respaldo</button></div>
       <div id="savedList" class="record-list"></div>
+    </div>
+
+    <div class="content" id="formsScreen" hidden>
+      <div class="page-intro"><div><div class="eyebrow"><span class="tiny-gold-square"></span> FORMULARIO / STAFF</div><h1>Formulario mensual</h1><p class="intro-note">Consulta el formulario vigente y su historial desde esta misma herramienta. El enlace que compartes con el personal siempre es el mismo.</p></div></div>
+      <div class="two-col">
+        <section class="panel"><div class="panel-heading"><span class="circle-num">01</span><div><h2>Formulario vigente</h2><p>Usa este enlace permanente en tus fichas y mensajes.</p></div></div><div class="form-body"><p id="monthlyCurrent" style="font-weight:700;font-size:19px">Consultando el mes vigente...</p><p id="monthlyNote" style="color:#777;font-size:12px">La configuración se actualiza cuando cambia el formulario.</p><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px"><a id="monthlyOpen" class="btn btn-primary" href="../formulario/" target="_blank" rel="noopener noreferrer">Abrir formulario</a><button id="monthlyCopy" class="btn btn-outline" type="button">Copiar enlace fijo</button></div><div class="payment-notice" style="margin-top:22px"><div class="payment-notice-label">Cambios de mes</div><p style="margin:8px 0">Cuando cambie el formulario, envíame la nueva liga por este chat. Yo actualizo el enlace para todos, sin que tengas que entrar a GitHub.</p></div></div></section>
+        <section class="panel"><div class="panel-heading"><span class="circle-num">02</span><div><h2>Formularios anteriores</h2><p>Registro de enlaces por mes.</p></div></div><div class="form-body" id="monthlyHistory"><p>Consultando historial...</p></div></section>
+      </div>
     </div>
   </main>
 </div>
@@ -1496,7 +1505,7 @@ function cardHtml(data,code){const values=[['campaign','Campaña',data.campaign]
  return `<article class="staff-card"><div class="staff-card-header"><div class="staff-card-kicker"><img class="card-logo" src="${BRAND_LOGO}" alt="Dejavú Marketing"><span class="portal-chip">STAFF / FICHA</span></div><div class="staff-company">DEJAVÚ MARKETING</div><div class="staff-card-title">Información de actividad</div><p class="staff-card-desc">${code?'Referencia '+esc(code):'Ficha informativa para el personal'}</p></div><div class="staff-card-content">${values.map(([key,label,value])=>`<div class="staff-row"><div class="staff-icon" aria-hidden="true">${icons[key]}</div><div><div class="staff-label">${label}</div><div class="staff-value ${value?'':'placeholder'}">${value?esc(value):'Por definir'}</div></div></div>`).join('')}${photoHtml(data)}</div><div class="staff-card-bottom"><div class="payment-notice" role="note"><div class="payment-notice-label">Información de pago</div><p>El pago se realizará en un plazo de <strong>3 semanas</strong>.</p></div><span>Al finalizar tu actividad, ingresa al formulario de información de pago:</span><a class="btn btn-primary full" target="_blank" rel="noopener noreferrer" href="${FORM_URL}">Abrir formulario de pago ↗</a><div class="staff-card-footnote">DEJAVÚ MARKETING · INFORMACIÓN PARA STAFF</div></div></article>`;
 }
 function updatePreview(){const data={...getForm(),evidenceDataUrl:evidenceData};updatePhotoMeta();$('liveCard').innerHTML=cardHtml(data,!dirty&&activeId?activeId:null);const good=!dirty&&!!activeId;$('saveStatus').textContent=good?'Ficha guardada ✓':'Guarda para habilitar acciones';$('saveLabel').textContent=editingId?'Guardar cambios':'Generar y guardar ficha';$('recordCount').textContent=String(records.length).padStart(2,'0');$('savedCount').textContent=String(records.length).padStart(2,'0'); $('hostingNotice').hidden=published;}
-function showScreen(which){const save=which==='saved';$('createScreen').hidden=save;$('savedScreen').hidden=!save;$('navCreate').classList.toggle('active',!save);$('navSaved').classList.toggle('active',save);$('breadcrumbText').textContent=save?'Fichas guardadas':'Generador de fichas';if(save)renderList();window.scrollTo({top:0,behavior:'instant'});}
+function showScreen(which){const save=which==='saved',forms=which==='forms';$('createScreen').hidden=save||forms;$('savedScreen').hidden=!save;$('formsScreen').hidden=!forms;$('navCreate').classList.toggle('active',!save&&!forms);$('navSaved').classList.toggle('active',save);$('navForms').classList.toggle('active',forms);$('breadcrumbText').textContent=save?'Archivo de fichas':forms?'Formulario mensual':'Generador de fichas';if(save)renderList();if(forms)loadMonthlyForms();window.scrollTo({top:0,behavior:'instant'});}
 function resetForm(){++photoLoadSeq;evidenceData='';evidenceName='';$('evidenceInput').value='';editingId=null;activeId=null;dirty=true;fields.forEach(k=>$(k).value='');$('activityDate').value=today();updatePreview();showScreen('create');$('campaign').focus();}
 async function storeCurrent(){const data=getForm();if(!valid(data)){$('fichaForm').reportValidity();toast('Completa los cuatro datos antes de generar la ficha.');return null;}
  const id=editingId&&records.some(r=>r.id===editingId)?editingId:makeId();
@@ -1535,7 +1544,7 @@ async function downloadImage(data){const canvas=document.createElement('canvas')
  const qrC=document.createElement('canvas');try{window.drawLocalQR(FORM_URL,qrC,200);c.drawImage(qrC,776,bottom-25,200,200)}catch(e){console.warn('QR not drawn',e)}
  dl(canvas,'Ficha_'+data.activityDate+'_'+data.campaign.replace(/[^a-z0-9áéíóúüñ]+/gi,'_').slice(0,36));}
 function printFicha(data){$('printPage').innerHTML=cardHtml(data,data.id||'');const holder=document.createElement('div');holder.className='print-qr';const canvas=document.createElement('canvas');try{window.drawLocalQR(FORM_URL,canvas,140)}catch(e){}holder.appendChild(canvas);const p=document.createElement('p');p.textContent='Escanea este código para abrir el formulario de información de pago.';holder.appendChild(p);$('printPage').appendChild(holder);window.print()}
-function renderList(){const query=$('filterInput').value.toLowerCase().trim();const items=records.filter(r=>[r.campaign,r.responsible,r.location,r.activityDate,r.id].some(t=>String(t||'').toLowerCase().includes(query)));$('recordCount').textContent=String(records.length).padStart(2,'0');$('savedCount').textContent=String(records.length).padStart(2,'0');const target=$('savedList');if(!items.length){target.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="empty-symbol">✦</div><strong>${records.length?'Sin coincidencias':'Todavía no tienes fichas'}</strong><p>${records.length?'Prueba con otro nombre o lugar.':'Genera tu primera ficha con campaña, responsable, fecha y ubicación.'}</p><button class="btn btn-primary" id="emptyNew">Crear ficha</button></div>`;$('emptyNew').addEventListener('click',resetForm);return;}
+function renderList(){const query=$('filterInput').value.toLowerCase().trim();const month=$('filterMonth').value;const items=records.filter(r=>(!month||String(r.activityDate||'').startsWith(month))&&[r.campaign,r.responsible,r.location,r.activityDate,r.id].some(t=>String(t||'').toLowerCase().includes(query)));$('recordCount').textContent=String(records.length).padStart(2,'0');$('savedCount').textContent=String(records.length).padStart(2,'0');const target=$('savedList');if(!items.length){target.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="empty-symbol">✦</div><strong>${records.length?'Sin coincidencias':'Todavía no tienes fichas'}</strong><p>${records.length?'Prueba con otro nombre o lugar.':'Genera tu primera ficha con campaña, responsable, fecha y ubicación.'}</p><button class="btn btn-primary" id="emptyNew">Crear ficha</button></div>`;$('emptyNew').addEventListener('click',resetForm);return;}
  target.innerHTML=items.map(r=>`<article class="record-card" data-id="${esc(r.id)}"><div class="record-head"><span class="record-code">${esc(r.id)}</span><button class="icon-btn" data-action="delete" title="Eliminar ficha" aria-label="Eliminar ficha">×</button></div><h3 class="record-title">${esc(r.campaign)}</h3><div class="record-sub">${esc(formatDate(r.activityDate))}<br>${esc(r.responsible)}<br>${esc(r.location)}${r.hasEvidence?'<span class="record-evidence">◧ Foto de evidencia</span>':''}</div><div class="record-actions"><button class="btn btn-outline" data-action="edit">Editar</button><button class="btn btn-gold" data-action="share">Compartir</button></div></article>`).join('');}
 function editRecord(id){const r=records.find(x=>x.id===id);if(!r)return;editingId=id;activeId=id;dirty=false;showValues(r);showScreen('create');loadPhotoForRecord(id);toast('Ficha cargada para consulta o edición.');}
 function doDelete(id){const item=records.find(r=>r.id===id);if(!item)return;if(!window.confirm(`¿Eliminar la ficha “${item.campaign}”? Esto no se puede deshacer.`))return;records=records.filter(r=>r.id!==id);if(activeId===id){activeId=null;editingId=null;dirty=true;}photoRemove(id).catch(console.warn);saveStorage();updatePreview();renderList();toast('Ficha eliminada del dispositivo.');}
@@ -1565,12 +1574,37 @@ async function importBackup(){
 }
 
 function showPublic(){const data=decode(location.hash.slice(3));if(!data){$('mainApp').hidden=true;$('sharedPage').hidden=false;$('publicCard').innerHTML='<div class="empty"><strong>Ficha no disponible</strong><p>El enlace parece estar incompleto o modificado. Solicita uno nuevo a tu coordinador.</p></div>';$('publicCopyBtn').disabled=true;$('publicShareBtn').disabled=true;return;}lastPublic=data;$('mainApp').hidden=true;$('sharedPage').hidden=false;$('publicCard').innerHTML=cardHtml(data,null);document.title='Mi actividad | Dejavú Marketing';}
+
+const PUBLIC_MONTHLY_FORM='https://dejavump.github.io/agora-compras-dejavu/fichas/staff/formulario/';
+async function loadMonthlyForms(){
+ const title=$('monthlyCurrent'),note=$('monthlyNote'),history=$('monthlyHistory');
+ if(!title||!note||!history)return;
+ try{
+  const r=await fetch('../config.json?refresh='+Date.now(),{cache:'no-store'});
+  if(!r.ok)throw Error('No se encontró el catálogo');
+  const cfg=await r.json(),forms=Array.isArray(cfg.forms)?cfg.forms:[],active=forms.find(x=>x.id===cfg.activeFormId);
+  title.textContent=active?.title||'Formulario no configurado';
+  note.textContent=active?'Vigente: '+(active.month||'sin mes')+'. El botón abre el enlace permanente.':'Solicita la publicación del formulario mensual.';
+  history.replaceChildren();
+  if(!forms.length){history.textContent='Aún no hay formularios registrados.';return;}
+  forms.slice().reverse().forEach(f=>{
+   let row=document.createElement('div');row.style.cssText='padding:13px 0;border-bottom:1px solid #e7e3dd;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap';
+   let caption=document.createElement('div'),strong=document.createElement('strong'),small=document.createElement('small');
+   strong.textContent=f.title||f.month||'Formulario anterior';strong.style.fontSize='13px';strong.style.display='block';
+   small.textContent=f.id===cfg.activeFormId?'VIGENTE':('Mes '+(f.month||'sin fecha'));small.style.cssText='display:block;font-size:10px;letter-spacing:1px;margin-top:5px;color:#97805c';
+   caption.append(strong,small);row.append(caption);
+   try{let url=new URL(String(f.url||''));if(url.protocol==='https:'){let a=document.createElement('a');a.className='btn btn-outline';a.href=url.href;a.target='_blank';a.rel='noopener noreferrer';a.textContent='Consultar';row.append(a)}}catch(e){}
+   history.append(row);
+  });
+ }catch(e){title.textContent='El formulario está disponible desde el botón';note.textContent='No se pudo recuperar el historial. Comprueba tu conexión.';history.textContent='No se pudo consultar el historial en este momento.'}
+}
+
 function routeHash(){if(location.hash.startsWith('#f=')){showPublic()}else{$('sharedPage').hidden=true;$('mainApp').hidden=false;document.title='Fichas de actividad | Dejavú Marketing'}}
-$('fichaForm').addEventListener('submit',e=>{e.preventDefault();storeCurrent()});fields.forEach(name=>$(name).addEventListener('input',()=>{dirty=true;updatePreview()}));
+$('monthlyCopy').addEventListener('click',()=>copyText(PUBLIC_MONTHLY_FORM));$('fichaForm').addEventListener('submit',e=>{e.preventDefault();storeCurrent()});fields.forEach(name=>$(name).addEventListener('input',()=>{dirty=true;updatePreview()}));
 $('evidenceInput').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;const seq=++photoLoadSeq;try{toast('Preparando fotografía...');const image=await preparePhoto(file);if(seq!==photoLoadSeq)return;evidenceData=image;evidenceName=file.name;dirty=true;updatePreview();toast('Foto cargada; guarda la ficha para conservarla.');}catch(error){toast(error.message||'No se pudo leer la foto.');e.target.value='';}});
 $('removeEvidence').addEventListener('click',()=>{++photoLoadSeq;evidenceData='';evidenceName='';$('evidenceInput').value='';dirty=true;updatePreview();toast('Foto retirada. Guarda los cambios.');});
 $('fullHtmlBtn').addEventListener('click',()=>{const r=activeData();if(r)downloadStandalone(r)});
-$('resetBtn').addEventListener('click',resetForm);$('navCreate').addEventListener('click',()=>showScreen('create'));$('navSaved').addEventListener('click',()=>showScreen('saved'));$('filterInput').addEventListener('input',renderList);$('backupBtn').addEventListener('click',backup);$('importBackupBtn').addEventListener('click',importBackup);
+$('resetBtn').addEventListener('click',resetForm);$('navCreate').addEventListener('click',()=>showScreen('create'));$('navSaved').addEventListener('click',()=>showScreen('saved'));$('navForms').addEventListener('click',()=>showScreen('forms'));$('filterInput').addEventListener('input',renderList);$('filterMonth').addEventListener('change',renderList);$('backupBtn').addEventListener('click',backup);$('importBackupBtn').addEventListener('click',importBackup);
 $('whatsappBtn').addEventListener('click',()=>{const r=activeData();if(r)whatsapp(r)});
 $('pngBtn').addEventListener('click',()=>{const r=activeData();if(r)downloadImage(r)});
 $('pdfBtn').addEventListener('click',()=>{const r=activeData();if(r)printFicha(r)});
