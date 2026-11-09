@@ -57,14 +57,21 @@ async function refresh(){
   const snap=await getDocs(query(collection(fb.firestore,COL),orderBy('updatedAt','desc'),limit(650)));
   const cloud=snap.docs.map(cloudToLocal).filter(valid);
   window.DEJAVU_STAFF_BRIDGE?.merge?.(cloud);
-  const cloudIds=new Set(snap.docs.map(x=>x.id));
-  let imported=0,unassigned=0,failed=0;
+  const cloudMap=new Map(snap.docs.map(x=>[x.id,x.data()]));
+  let imported=0,unassigned=0,failed=0,updated=0;
   for(const r of (window.DEJAVU_STAFF_BRIDGE?.list?.()||[])){
-   if(!valid(r)||cloudIds.has(r.id))continue;
-   if(!r.staffEmail){unassigned++;continue;}
-   try{await writeRecord(r,true);imported++}catch(err){failed++;console.warn('Dejavú: ficha no sincronizada',r.id,err)}
+   if(!valid(r))continue;
+   const remote=cloudMap.get(r.id);
+   if(!remote){
+    try{await writeRecord(r,true);imported++;if(!r.staffEmail)unassigned++}
+    catch(err){failed++;console.warn('Dejavú: ficha no sincronizada',r.id,err)}
+   }else if(String(r.updatedAt||'')>String(remote.localUpdatedAt||'')&&
+     Number(r.cloudRevision||0)===Number(remote.revision||0)){
+    try{await writeRecord(r);updated++}
+    catch(err){failed++;console.warn('Dejavú: actualización pendiente',r.id,err)}
+   }
   }
-  message(failed?'Archivo local conservado · '+failed+' ficha(s) pendientes de sincronizar.':('Nube conectada · '+snap.size+' fichas, '+imported+' importadas'+(unassigned?' · '+unassigned+' sin destinatario':'')));
+  message(failed?'Archivo local conservado · '+failed+' ficha(s) pendientes de sincronizar.':('Nube conectada · '+snap.size+' fichas · '+imported+' nuevas · '+updated+' actualizadas'+(unassigned?' · '+unassigned+' sin correo asignado':'')));
  }catch(error){message('Sin sincronización de nube: '+(error?.code==='permission-denied'?'faltan activar permisos de Firebase':'no se pudo consultar Firebase')+'. Tus fichas locales están a salvo.');console.warn(error)}
  finally{busy=false}
 }
