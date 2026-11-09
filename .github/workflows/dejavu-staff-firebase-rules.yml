@@ -1,0 +1,88 @@
+name: "Dejavú Staff · Firebase (reglas seguras)"
+on:
+  workflow_dispatch:
+    inputs:
+      project_confirmation:
+        description: "Escribe agora-dejavu-38b8c para confirmar el proyecto"
+        required: true
+        type: string
+
+concurrency:
+  group: dejavu-staff-firestore-rules
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  rules-tests:
+    name: "Verificar permisos en emulador, sin tocar producción"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Instalar dependencias temporales de test
+        run: npm install --no-save firebase@13.2.0 @firebase/rules-unit-testing firebase-tools
+      - name: Probar accesos de visitantes, personal y coordinadores
+        run: npx firebase emulators:exec --only firestore --project demo-dejavu-fichas-staff --non-interactive 'node .github/firebase-staff/test-rules.mjs'
+
+  rules-deploy:
+    name: "Activar únicamente reglas Firestore cuando la base actual coincida"
+    needs: rules-tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      FIREBASE_PROJECT_ID: agora-dejavu-38b8c
+    steps:
+      - name: Confirmar proyecto exacto
+        env:
+          CONFIRMATION: ${{ inputs.project_confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != "$FIREBASE_PROJECT_ID" ]; then
+            echo "::error::Confirmación de proyecto no válida. No se desplegará nada."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - name: Comprobar conexión autorizada con Google Cloud
+        env:
+          WIF_PROVIDER: ${{ vars.DEJAVU_FIREBASE_WIF_PROVIDER }}
+          WIF_SERVICE_ACCOUNT: ${{ vars.DEJAVU_FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$WIF_PROVIDER" ] || [ -z "$WIF_SERVICE_ACCOUNT" ]; then
+            echo "::error::Falta configurar Workload Identity Federation y cuenta de servicio Dejavú en las variables del repositorio. No se modificó Firebase."
+            exit 1
+          fi
+      - id: google_auth
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: agora-dejavu-38b8c
+          workload_identity_provider: ${{ vars.DEJAVU_FIREBASE_WIF_PROVIDER }}
+          service_account: ${{ vars.DEJAVU_FIREBASE_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_lifetime: "600s"
+      - name: Comparar y respaldar reglas vigentes antes de modificar Firebase
+        env:
+          FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
+        run: node .github/firebase-staff/safe-rules-preflight.mjs
+      - name: Guardar respaldo de reglas de Ágora
+        uses: actions/upload-artifact@v4
+        with:
+          name: respaldo-reglas-agora-antes-dejavu-staff
+          path: .github/firebase-staff/.preflight/
+          retention-days: 30
+          if-no-files-found: error
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Instalar Firebase CLI
+        run: npm install --global firebase-tools
+      - name: Activar SOLO reglas de Firestore; sin desplegar Hosting, Storage ni Functions
+        run: firebase deploy --only firestore:rules --project agora-dejavu-38b8c --non-interactive
