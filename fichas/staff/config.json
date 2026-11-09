@@ -1,7 +1,7 @@
 {
   "schema": "dejavu-staff-links-v1",
-  "updatedAt": "2026-11-08",
-  "activeFormId": "pago-2026-11",
+  "updatedAt": "2026-11-09",
+  "activeFormId": "pago-2026-11-v2",
   "forms": [
     {
       "id": "pago-2026-11",
@@ -9,6 +9,13 @@
       "title": "Información de pago · noviembre 2026",
       "url": "https://docs.google.com/forms/d/e/1FAIpQLScVCg-N104z-6xmtzz61Ertp47JO5_278qvJDwVb_81ZwQyxA/viewform",
       "note": "Enlace utilizado por la herramienta local anterior."
+    },
+    {
+      "id": "pago-2026-11-v2",
+      "month": "2026-11",
+      "title": "Información de pago · noviembre 2026 · formulario actualizado",
+      "url": "https://docs.google.com/forms/d/e/1FAIpQLSfN6Cx5U7bEaUTVpPwco8LhMAFY-w8xYN1xMFy9h7J7zo8-TA/viewform",
+      "note": "Nuevo formulario proporcionado por Dejavú Marketing el 9 de noviembre de 2026."
     }
   ],
   "fichas": []
