@@ -1,5 +1,12 @@
 name: "Dejavú Staff · Firebase (reglas seguras)"
 on:
+  push:
+    branches: [main]
+    paths:
+      - "firestore.rules"
+      - "firebase.json"
+      - ".github/firebase-staff/**"
+      - ".github/workflows/dejavu-staff-firebase-rules.yml"
   workflow_dispatch:
     inputs:
       project_confirmation:
@@ -35,6 +42,7 @@ jobs:
   rules-deploy:
     name: "Activar únicamente reglas Firestore cuando la base actual coincida"
     needs: rules-tests
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
