@@ -167,6 +167,7 @@ body{background:var(--paper);font-family:Arial,Helvetica,sans-serif}
             <div class="form-grid">
               <div class="field"><label for="campaign">Campaña <span class="required">*</span></label><input required maxlength="95" id="campaign" name="campaign" autocomplete="off" placeholder="Ej. Desayunos KFC · Sampling"></div>
               <div class="field"><label for="responsible">Solicitado por / Quién asigna <span class="required">*</span></label><input required maxlength="95" id="responsible" name="responsible" autocomplete="name" placeholder="Nombre de quien solicita al personal"></div>
+              <div class="field"><label for="staffEmail">Correo del trabajador (para su historial privado)</label><input type="email" maxlength="240" id="staffEmail" name="staffEmail" autocomplete="email" placeholder="correo@ejemplo.com"><small>Opcional para fichas locales. Necesario para asignar una ficha en la nube.</small></div>
               <div class="field"><label for="activityDate">Fecha de la actividad <span class="required">*</span></label><input required type="date" id="activityDate" name="activityDate"></div>
               <div class="field"><label for="location">Ubicación <span class="required">*</span></label><textarea required id="location" maxlength="240" rows="2" name="location" placeholder="Sucursal, punto de encuentro o dirección"></textarea></div>
               <div class="evidence-upload"><div class="evidence-upload-title"><span class="circle-num">✦</span><div><strong>Foto de evidencia</strong><small>Opcional · Tú la subes, el staff puede verla y descargarla.</small></div></div>
@@ -195,6 +196,11 @@ body{background:var(--paper);font-family:Arial,Helvetica,sans-serif}
     </div>
     <div class="content" id="savedScreen" hidden>
       <div class="page-intro"><div><div class="eyebrow"><span class="tiny-gold-square"></span> ARCHIVO LOCAL</div><h1>Fichas anteriores</h1><p class="intro-note">Aquí aparecen las fichas guardadas en este navegador. Puedes buscarlas, editarlas, compartirlas o descargar su respaldo, sin subir nada a GitHub.</p></div><div class="count-card"><div class="count-number" id="savedCount">00</div><div class="count-label">registros locales</div></div></div>
+      <div class="panel" id="dejavuCloudPanel" style="padding:17px 20px;margin-bottom:18px">
+  <div style="display:flex;align-items:center;flex-wrap:wrap;gap:9px;justify-content:space-between"><strong style="font-size:13px">Archivo privado de Dejavú · Firebase</strong><div style="display:flex;gap:7px;flex-wrap:wrap"><button id="dejavuCloudLogin" class="btn btn-outline" type="button">Conectar con Google</button><button id="dejavuCloudSync" class="btn btn-outline" type="button" hidden>Sincronizar fichas</button><button id="dejavuCloudLogout" class="btn btn-quiet" type="button" hidden>Cerrar sesión</button></div></div>
+  <p id="dejavuCloudStatus" role="status" aria-live="polite" style="font-size:12px;margin:9px 0 0">Preparando conexión. Tus fichas locales permanecen guardadas.</p>
+  <p style="font-size:11px;color:#77716b;margin:6px 0 0">Las fichas con correo asignado se pueden sincronizar una vez autorizadas las reglas de Firebase. Las fotos siguen guardándose en el dispositivo.</p>
+</div>
       <div class="toolbar"><input class="searchbox" id="filterInput" aria-label="Buscar fichas" type="search" placeholder="Buscar por campaña, persona o lugar..."><input id="filterMonth" type="month" aria-label="Filtrar por mes" title="Filtrar por mes" style="min-height:42px;border:1px solid #d9d6cf;border-radius:8px;padding:0 9px;background:white;color:#252525"><button id="backupBtn" class="btn btn-outline" type="button">Respaldar mis fichas</button><button id="importBackupBtn" class="btn btn-outline" type="button">Importar fichas anteriores</button></div>
       <div id="savedList" class="record-list"></div><p style="font-size:12px;color:#77736b;margin:16px 0 0">Las fichas y fotos se conservan en este navegador. Utiliza «Respaldar mis fichas» antes de cambiar de equipo o borrar datos del navegador.</p>
     </div>
@@ -1500,10 +1506,10 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function toast(msg){const t=$('toast'); t.textContent=msg;t.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.hidden=true,4200);}
 function formatDate(input){if(!/^\d{4}-\d{2}-\d{2}$/.test(input||''))return 'Pendiente';const date=new Date(input+'T12:00:00');if(Number.isNaN(date.getTime()))return 'Pendiente';return new Intl.DateTimeFormat('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(date).replace(/^./,c=>c.toUpperCase());}
 function today(){const d=new Date();const n=number=>String(number).padStart(2,'0');return [d.getFullYear(),n(d.getMonth()+1),n(d.getDate())].join('-');}
-function getForm(){return Object.fromEntries(fields.map(name=>[name,$(name).value.trim()]));}
-function showValues(data){fields.forEach(k=>$(k).value=data[k]||'');updatePreview();}
+function getForm(){return {...Object.fromEntries(fields.map(name=>[name,$(name).value.trim()])),staffEmail:$('staffEmail').value.trim().toLowerCase()};}
+function showValues(data){fields.forEach(k=>$(k).value=data[k]||'');$('staffEmail').value=data.staffEmail||'';updatePreview();}
 function valid(data){return fields.every(k=>typeof data[k]==='string'&&data[k].trim());}
-function clean(data){return {campaign:String(data.campaign||'').slice(0,95),responsible:String(data.responsible||'').slice(0,95),activityDate:String(data.activityDate||'').slice(0,10),location:String(data.location||'').slice(0,240)};}
+function clean(data){return {campaign:String(data.campaign||'').slice(0,95),responsible:String(data.responsible||'').slice(0,95),activityDate:String(data.activityDate||'').slice(0,10),location:String(data.location||'').slice(0,240),staffEmail:String(data.staffEmail||'').trim().toLowerCase().slice(0,240)};}
 function saveStorage(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(records));return true}catch(e){toast('No fue posible guardar en este navegador. Puedes descargar la ficha como imagen.');return false}}
 function loadStorage(){try{const v=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');return Array.isArray(v)?v.filter(x=>x&&typeof x.id==='string').slice(0,800):[]}catch(e){return []}}
 
@@ -1540,14 +1546,14 @@ function cardHtml(data,code){const values=[['campaign','Campaña',data.campaign]
 }
 function updatePreview(){const data={...getForm(),evidenceDataUrl:evidenceData};updatePhotoMeta();$('liveCard').innerHTML=cardHtml(data,!dirty&&activeId?activeId:null);const good=!dirty&&!!activeId;$('saveStatus').textContent=good?'Ficha guardada ✓':'Guarda para habilitar acciones';$('saveLabel').textContent=editingId?'Guardar cambios':'Generar y guardar ficha';$('recordCount').textContent=String(records.length).padStart(2,'0');$('savedCount').textContent=String(records.length).padStart(2,'0'); $('hostingNotice').hidden=published;}
 function showScreen(which){const save=which==='saved',forms=which==='forms';$('createScreen').hidden=save||forms;$('savedScreen').hidden=!save;$('formsScreen').hidden=!forms;$('navCreate').classList.toggle('active',!save&&!forms);$('navSaved').classList.toggle('active',save);$('navForms').classList.toggle('active',forms);$('breadcrumbText').textContent=save?'Fichas anteriores':forms?'Formulario de pago':'Generador de fichas';if(save)renderList();if(forms)loadMonthlyForms();window.scrollTo({top:0,behavior:'instant'});}
-function resetForm(){++photoLoadSeq;evidenceData='';evidenceName='';$('evidenceInput').value='';editingId=null;activeId=null;dirty=true;fields.forEach(k=>$(k).value='');$('activityDate').value=today();updatePreview();showScreen('create');$('campaign').focus();}
-async function storeCurrent(){const data=getForm();if(!valid(data)){$('fichaForm').reportValidity();toast('Completa los cuatro datos antes de generar la ficha.');return null;}
+function resetForm(){++photoLoadSeq;evidenceData='';evidenceName='';$('evidenceInput').value='';editingId=null;activeId=null;dirty=true;fields.forEach(k=>$(k).value='');$('staffEmail').value='';$('activityDate').value=today();updatePreview();showScreen('create');$('campaign').focus();}
+async function storeCurrent(){const data=getForm();if(!valid(data)||!$('staffEmail').checkValidity()){$('fichaForm').reportValidity();toast('Revisa los datos y el correo del trabajador antes de guardar.');return null;}
  const id=editingId&&records.some(r=>r.id===editingId)?editingId:makeId();
  try{if(evidenceData)await photoPut(id,evidenceData);else await photoRemove(id);}catch(e){console.warn(e);toast('No se pudo guardar la fotografía. Revisa el espacio del dispositivo.');return null;}
  const now=new Date().toISOString(),meta={...data,hasEvidence:!!evidenceData,evidenceName:evidenceData?evidenceName:''};
  if(editingId){const item=records.find(r=>r.id===editingId);if(item){Object.assign(item,meta,{updatedAt:now});activeId=item.id;}else{activeId=id;records.unshift({...meta,id,createdAt:now,updatedAt:now});}}
  else{activeId=id;records.unshift({...meta,id,createdAt:now,updatedAt:now});}
- dirty=false;editingId=activeId;saveStorage();updatePreview();renderList();toast('Ficha guardada, con su evidencia cuando corresponde.');return {...meta,id:activeId,evidenceDataUrl:evidenceData};
+ dirty=false;editingId=activeId;saveStorage();updatePreview();renderList();window.dispatchEvent(new CustomEvent('dejavu:staff-saved',{detail:{record:{...records.find(r=>r.id===activeId)}}}));toast('Ficha guardada, con su evidencia cuando corresponde.');return {...meta,id:activeId,evidenceDataUrl:evidenceData};
 }
 function activeData(){const data=getForm();if(!valid(data)){$('fichaForm').reportValidity();toast('Completa primero los cuatro datos.');return null;}if(dirty||!activeId){toast('Primero selecciona “Generar y guardar ficha”.');return null;}return {...data,id:activeId,evidenceDataUrl:evidenceData,evidenceName};}
 function encode(data){const minimal=clean(data);const bytes=new TextEncoder().encode(JSON.stringify([minimal.campaign,minimal.responsible,minimal.activityDate,minimal.location]));let bin='';bytes.forEach(b=>bin+=String.fromCharCode(b));return btoa(bin).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');}
@@ -1581,7 +1587,7 @@ function printFicha(data){$('printPage').innerHTML=cardHtml(data,data.id||'');co
 function renderList(){const query=$('filterInput').value.toLowerCase().trim();const month=$('filterMonth').value;const items=records.filter(r=>(!month||String(r.activityDate||'').startsWith(month))&&[r.campaign,r.responsible,r.location,r.activityDate,r.id].some(t=>String(t||'').toLowerCase().includes(query)));$('recordCount').textContent=String(records.length).padStart(2,'0');$('savedCount').textContent=String(records.length).padStart(2,'0');const target=$('savedList');if(!items.length){target.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="empty-symbol">✦</div><strong>${records.length?'Sin coincidencias':'Todavía no tienes fichas'}</strong><p>${records.length?'Prueba con otro nombre o lugar.':'Crea tu primera ficha o utiliza «Importar fichas anteriores» para recuperar un respaldo de otra versión.'}</p><button class="btn btn-primary" id="emptyNew">Crear ficha</button></div>`;$('emptyNew').addEventListener('click',resetForm);return;}
  target.innerHTML=items.map(r=>`<article class="record-card" data-id="${esc(r.id)}"><div class="record-head"><span class="record-code">${esc(r.id)}</span><button class="icon-btn" data-action="delete" title="Eliminar ficha" aria-label="Eliminar ficha">×</button></div><h3 class="record-title">${esc(r.campaign)}</h3><div class="record-sub">${esc(formatDate(r.activityDate))}<br>${esc(r.responsible)}<br>${esc(r.location)}${r.hasEvidence?'<span class="record-evidence">◧ Foto de evidencia</span>':''}</div><div class="record-actions"><button class="btn btn-outline" data-action="edit">Editar</button><button class="btn btn-gold" data-action="share">Compartir</button></div></article>`).join('');}
 function editRecord(id){const r=records.find(x=>x.id===id);if(!r)return;editingId=id;activeId=id;dirty=false;showValues(r);showScreen('create');loadPhotoForRecord(id);toast('Ficha cargada para consulta o edición.');}
-function doDelete(id){const item=records.find(r=>r.id===id);if(!item)return;if(!window.confirm(`¿Eliminar la ficha “${item.campaign}”? Esto no se puede deshacer.`))return;records=records.filter(r=>r.id!==id);if(activeId===id){activeId=null;editingId=null;dirty=true;}photoRemove(id).catch(console.warn);saveStorage();updatePreview();renderList();toast('Ficha eliminada del dispositivo.');}
+function doDelete(id){const item=records.find(r=>r.id===id);if(!item)return;if(!window.confirm(`¿Eliminar la ficha “${item.campaign}”? Esto no se puede deshacer.`))return;records=records.filter(r=>r.id!==id);if(activeId===id){activeId=null;editingId=null;dirty=true;}photoRemove(id).catch(console.warn);saveStorage();updatePreview();renderList();window.dispatchEvent(new CustomEvent('dejavu:staff-deleted',{detail:{id}}));toast('Ficha eliminada del dispositivo.');}
 async function backup(){const withPhotos=await Promise.all(records.map(async r=>({...r,evidenceDataUrl:r.hasEvidence?await photoGet(r.id).catch(()=>''):''})));const blob=new Blob([JSON.stringify({app:'Dejavu Fichas Staff',version:2,exportedAt:new Date().toISOString(),records:withPhotos},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Dejavu_Respaldo_Fichas_'+today()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);toast('Respaldo descargado.');}
 
 async function importBackup(){
@@ -1638,7 +1644,7 @@ $('monthlyCopy').addEventListener('click',()=>copyText(PUBLIC_MONTHLY_FORM));$('
 $('evidenceInput').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;const seq=++photoLoadSeq;try{toast('Preparando fotografía...');const image=await preparePhoto(file);if(seq!==photoLoadSeq)return;evidenceData=image;evidenceName=file.name;dirty=true;updatePreview();toast('Foto cargada; guarda la ficha para conservarla.');}catch(error){toast(error.message||'No se pudo leer la foto.');e.target.value='';}});
 $('removeEvidence').addEventListener('click',()=>{++photoLoadSeq;evidenceData='';evidenceName='';$('evidenceInput').value='';dirty=true;updatePreview();toast('Foto retirada. Guarda los cambios.');});
 $('fullHtmlBtn').addEventListener('click',()=>{const r=activeData();if(r)downloadStandalone(r)});
-$('resetBtn').addEventListener('click',resetForm);$('navCreate').addEventListener('click',()=>showScreen('create'));$('navSaved').addEventListener('click',()=>showScreen('saved'));$('navForms').addEventListener('click',()=>showScreen('forms'));$('filterInput').addEventListener('input',renderList);$('filterMonth').addEventListener('change',renderList);$('backupBtn').addEventListener('click',backup);$('importBackupBtn').addEventListener('click',importBackup);
+$('resetBtn').addEventListener('click',resetForm);$('navCreate').addEventListener('click',()=>showScreen('create'));$('navSaved').addEventListener('click',()=>showScreen('saved'));$('navForms').addEventListener('click',()=>showScreen('forms'));$('filterInput').addEventListener('input',renderList);$('filterMonth').addEventListener('change',renderList);$('staffEmail').addEventListener('input',()=>{dirty=true;updatePreview()});$('backupBtn').addEventListener('click',backup);$('importBackupBtn').addEventListener('click',importBackup);
 $('whatsappBtn').addEventListener('click',()=>{const r=activeData();if(r)whatsapp(r)});
 $('pngBtn').addEventListener('click',()=>{const r=activeData();if(r)downloadImage(r)});
 $('pdfBtn').addEventListener('click',()=>{const r=activeData();if(r)printFicha(r)});
@@ -1651,7 +1657,23 @@ $('copyQrLink').addEventListener('click',()=>{const r=activeData();if(r&&checkPh
 $('publicCopyBtn').addEventListener('click',()=>lastPublic&&copyText(summary(lastPublic,false)));
 $('publicShareBtn').addEventListener('click',()=>lastPublic&&whatsapp(lastPublic));
 window.addEventListener('hashchange',routeHash);
+window.DEJAVU_STAFF_BRIDGE=Object.freeze({
+ list:()=>records.map(r=>({...r})),
+ setRevision:(id,revision)=>{const rec=records.find(r=>r.id===id);if(!rec)return;rec.cloudRevision=Number(revision);saveStorage();},
+ merge:(cloudRows)=>{
+  let changed=false;
+  for(const row of cloudRows){
+   const local=records.find(r=>r.id===row.id);
+   if(!local){records.unshift({...row});changed=true;continue}
+   if(Number(row.cloudRevision||0)>Number(local.cloudRevision||0)&&String(row.updatedAt||'')>=String(local.updatedAt||'')){
+    Object.assign(local,{...row,hasEvidence:local.hasEvidence,evidenceName:local.evidenceName});changed=true;
+   }
+  }
+  if(changed){records.sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));saveStorage();renderList();}
+ }
+});
 records=loadStorage();$('activityDate').value=today();updatePreview();renderList();routeHash();
 })();
 </script>
+<script type="module" src="./cloud-admin.js"></script>
 </body></html>
