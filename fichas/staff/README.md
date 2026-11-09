@@ -1,36 +1,23 @@
 # Fichas de Staff · Dejavú Marketing
 
-**Portal:** https://dejavump.github.io/agora-compras-dejavu/fichas/staff/
+## Una sola herramienta
 
-**Formulario de pago (URL permanente):** https://dejavump.github.io/agora-compras-dejavu/fichas/staff/formulario/
+**Enlace para trabajar**: https://dejavump.github.io/agora-compras-dejavu/fichas/staff/
 
-**Generador publicado:** https://dejavump.github.io/agora-compras-dejavu/fichas/staff/herramienta/
+En esta dirección se puede crear una ficha, buscar fichas guardadas, editarlas, compartirlas y consultar el formulario mensual y los enlaces anteriores. El enlace anterior `/fichas/staff/herramienta/` ahora redirige a la dirección única, preservando enlaces compartidos con un fragmento `#f=`.
 
-Estos enlaces son diferentes al generador de fichas de eventos en `/fichas/`.
+## Formulario de pago
 
-## Cambiar el formulario de cada mes
-1. Edita `fichas/staff/config.json` desde GitHub (icono lápiz).
-2. Agrega a `forms` un registro con un ID nuevo, mes, título y URL HTTPS.
-3. Sustituye `activeFormId` por el ID nuevo.
-4. Actualiza `updatedAt` y guarda **Commit changes**.
-5. Comprueba la URL permanente `/fichas/staff/formulario/`; no hace falta modificar ni reenviar fichas previas.
+El enlace permanente que recibe el personal es https://dejavump.github.io/agora-compras-dejavu/fichas/staff/formulario/
 
-Los registros antiguos en `forms` permanecen como historial; no borrar a menos que sea necesario por privacidad. La nueva herramienta de Staff utiliza la URL permanente tanto para el botón como para el QR, las fichas HTML e indicaciones por WhatsApp. Las fichas generadas anteriormente con un enlace absoluto **no cambian retroactivamente**.
+Cada mes el enlace real del formulario se actualiza en `fichas/staff/config.json`, que sigue siendo gestionado por Dejavú. **El usuario final no necesita abrir GitHub**: puede mandar la nueva URL a quien administre el repositorio para efectuar la actualización. La interfaz muestra el formulario vigente y el historial pero **no publica cambios de configuración desde el navegador**.
 
-## Archivo de fichas públicas aprobadas
-- Coloca únicamente documentos anonimizados y autorizados en `fichas/staff/archivo/`. Pueden ser PDF, PNG, JPG, WEBP o HTML.
-- Nombre recomendado: `DJV-20261108-001__HOT-CRUJI__2026-11-08__v1.pdf`.
-- El buscador intenta detectar folio, campaña, fecha y versión del nombre. Versiones v2, v3 mantienen mismo folio.
-- También puedes añadir referencias externas autorizadas en `config.json`, lista `fichas` con campos `folio`, `campana`, `fecha`, `version`, `url`.
+## Archivo de fichas y respaldos
 
-## Protección de datos y respaldos
-**El repositorio y GitHub Pages son públicos.** No publiques fichas que tengan nombres de staff, teléfonos, datos de pago, fotografías de personas o evidencias confidenciales. Usa Drive privado con permisos de agencia para fichas completas; en el portal público solo publica material depurado. Los vínculos de Drive privados mantienen sus permisos, pero evita revelar datos sensibles en la ficha del catálogo.
+Las fichas se guardan **automáticamente en el mismo navegador** (metadatos en localStorage y fotos en IndexedDB), sin subirlas a GitHub. El archivo incluye búsqueda y filtro por mes. Para cambiar de computadora o recuperar registros guardados en una versión de archivo local, usar **Archivo de fichas → Respaldar mis fichas**, seguido de **Recuperar respaldo** en el nuevo sitio. Este respaldo JSON contiene datos personales y debe guardarse de forma privada.
 
-La herramienta original almacena fichas en localStorage e imágenes en IndexedDB: las seis fichas de una computadora no se sincronizan al abrir GitHub Pages. En la aplicación local selecciona **Fichas guardadas → Exportar respaldo JSON** para conservarlas; importa ese respaldo en la nueva herramienta con **Importar respaldo JSON**. No subas ese JSON a GitHub.
+La herramienta **no proporciona todavía archivo compartido en la nube**, sincronización entre dispositivos, ni permisos de acceso para expedientes personales. Para esos fines hará falta integrar almacenamiento privado con autenticación y políticas adecuadas. Los archivos en `fichas/staff/archivo/` sólo son aptos para documentos depurados y públicos; no deben usarse con fichas reales de personal.
 
-## Estructura
-- `index.html`: sitio de consultas.
-- `config.json`: formulario vigente, historial mensual y entradas depuradas.
-- `formulario/index.html`: acceso permanente que redirige al enlace mensual.
-- `herramienta/index.html`: generador publicado con referencia al enlace permanente.
-- `archivo/`: repositorio opcional de documentos depurados.
+## Compatibilidad
+
+Las fichas compartidas en enlaces de la versión anterior siguen abriendo gracias a la redirección, y apuntan al mismo enlace permanente del formulario de pago. Las seis fichas de una instalación local no se copian a la página web hasta que se importe el respaldo.
