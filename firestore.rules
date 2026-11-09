@@ -252,6 +252,92 @@ service cloud.firestore {
       allow list: if activeStaff();
     }
 
+    // Dejavú Staff: cada ficha pertenece al correo verificado asignado.
+    // Los coordinadores activos administran el archivo; los trabajadores
+    // únicamente consultan fichas dirigidas a su propio correo.
+    // No se publican fichas en GitHub ni se admite lectura anónima.
+    function validStaffFichaFields() {
+      return request.resource.data.keys().hasOnly([
+        'id','campaign','responsible','activityDate','location',
+        'staffEmail','localUpdatedAt','active','revision',
+        'createdBy','createdAt','updatedBy','updatedAt'
+      ]) &&
+      request.resource.data.keys().hasAll([
+        'id','campaign','responsible','activityDate','location',
+        'staffEmail','localUpdatedAt','active','revision',
+        'createdBy','createdAt','updatedBy','updatedAt'
+      ]) &&
+      request.resource.data.id is string &&
+      request.resource.data.campaign is string &&
+      request.resource.data.campaign.size() >= 1 &&
+      request.resource.data.campaign.size() <= 95 &&
+      request.resource.data.responsible is string &&
+      request.resource.data.responsible.size() >= 1 &&
+      request.resource.data.responsible.size() <= 95 &&
+      request.resource.data.activityDate is string &&
+      request.resource.data.activityDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+) &&
+      request.resource.data.location is string &&
+      request.resource.data.location.size() >= 1 &&
+      request.resource.data.location.size() <= 240 &&
+      request.resource.data.staffEmail is string &&
+      request.resource.data.staffEmail.size() <= 240 &&
+      (request.resource.data.staffEmail == '' ||
+        request.resource.data.staffEmail.matches('^[^ ]+@[^ ]+[.][^ ]+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+)) &&
+      request.resource.data.localUpdatedAt is string &&
+      request.resource.data.localUpdatedAt.size() <= 40 &&
+      request.resource.data.active == true &&
+      request.resource.data.revision is int &&
+      request.resource.data.revision >= 1 &&
+      request.resource.data.createdBy is string &&
+      request.resource.data.createdAt is timestamp &&
+      request.resource.data.updatedBy is string &&
+      request.resource.data.updatedAt is timestamp;
+    }
+    function isFichaRecipient() {
+      return signedIn() &&
+        resource.data.staffEmail is string &&
+        resource.data.staffEmail != '' &&
+        resource.data.staffEmail == request.auth.token.email;
+    }
+    match /dejavu_staff_fichas/{fichaId} {
+      allow get, list: if canEdit() || isFichaRecipient();
+      allow create: if canEdit() &&
+        fichaId.matches('^DJV-[0-9]{8}-[0-9]{3,}
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+) &&
+        validStaffFichaFields() &&
+        request.resource.data.id == fichaId &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.revision == 1;
+      allow update: if canEdit() && validStaffFichaFields() &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.revision == resource.data.revision + 1;
+      allow delete: if canEdit();
+    }
+
     // Todas las demás colecciones permanecen cerradas.
     match /{document=**} {
       allow read, write: if false;
