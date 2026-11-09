@@ -88,7 +88,7 @@ h2{font-size:23px;letter-spacing:-.5px;margin:0 0 7px}.section-note{font-size:12
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
-let cards=[],selected=null,error='',refreshCallback=null;
+let cards=[],selected=null,error='',refreshCallback=null,sharedSnapshot=location.hash.startsWith('#catalog=');
 const fields=['campaign','responsible','activityDate','location'];
 const safe=x=>String(x??'');
 const niceDate=s=>/^\d{4}-\d{2}-\d{2}$/.test(safe(s))?s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4):safe(s);
@@ -115,10 +115,10 @@ function openCard(record,hash=true){
  for(const k of fields)$('d-'+k).textContent=k==='activityDate'?niceDate(selected[k]):selected[k];
  $('detail-id').textContent=selected.id&&/^DJV-/.test(selected.id)?'Folio '+selected.id:'Ficha informativa del personal';
  $('cards-list').hidden=true;$('detail').hidden=false;tab('cards');
- if(hash&&selected.id){location.hash='ficha='+encodeURIComponent(selected.id)}
+ if(hash&&selected.id&&!sharedSnapshot){location.hash='ficha='+encodeURIComponent(selected.id)}
  window.scrollTo({top:0,behavior:'instant'});
 }
-function closeCard(){selected=null;$('detail').hidden=true;$('cards-list').hidden=false;if(location.hash)history.replaceState(null,'',location.pathname+location.search);tab('cards')}
+function closeCard(){selected=null;$('detail').hidden=true;$('cards-list').hidden=false;if(location.hash&&!sharedSnapshot)history.replaceState(null,'',location.pathname+location.search);tab('cards')}
 function decodeOld(h){
  try{
   if(!/^[A-Za-z0-9_-]{8,2048}$/.test(h))return null;
@@ -168,11 +168,45 @@ async function downloadImage(){
  ctx.font='bold 19px Arial';ctx.fillStyle='#997847';ctx.fillText('DEJAVÚ MARKETING · INFORMACIÓN PARA PERSONAL',104,1334);
  c.toBlob(blob=>{if(!blob)return;const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='Ficha_Dejavu_'+(selected.id||selected.activityDate||'actividad')+'.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),12000)},'image/png');
 }
+
+async function readSharedCatalog(){
+ const encoded=location.hash.slice('#catalog='.length),match=encoded.match(/^([gj])\.([A-Za-z0-9_-]{40,21000})$/);
+ if(!match){setError('Este enlace de fichas no tiene un formato válido. Pide al coordinador que comparta uno nuevo.');return}
+ try{
+  const base=match[2].replaceAll('-','+').replaceAll('_','/'),b64=base+'='.repeat((4-base.length%4)%4);
+  let bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+  if(match[1]==='g'){
+   if(typeof DecompressionStream==='undefined')throw Error('El navegador no admite descompresión de enlaces.');
+   const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+   bytes=new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+  if(bytes.length>650000)throw Error('Catálogo demasiado grande');
+  const payload=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
+  if(payload.v!==1||!Array.isArray(payload.records)||payload.records.length>800)throw Error('Versión no compatible');
+  const result=[];
+  for(const r of payload.records){
+   if(!Array.isArray(r)||r.length!==5)continue;
+   const [id,campaign,responsible,activityDate,location]=r;
+   if(typeof id!=='string'||!/^DJV-[0-9]{8}-[0-9]{3,}$/.test(id)||
+      typeof campaign!=='string'||campaign.length>95||
+      typeof responsible!=='string'||responsible.length>95||
+      typeof activityDate!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(activityDate)||
+      typeof location!=='string'||location.length>240)continue;
+   result.push({id,campaign,responsible,activityDate,location});
+  }
+  if(!result.length)throw Error('Catálogo vacío');
+  cards=result;error='';render();
+  $('count').textContent=result.length+' fichas compartidas por Dejavú · copia del '+new Date(payload.generatedAt||Date.now()).toLocaleDateString('es-MX');
+ }catch(e){
+  console.warn('Catálogo de fichas:',e);
+  setError('El enlace de fichas no pudo abrirse en este dispositivo. Pide a Dejavú que lo vuelva a compartir.');
+ }
+}
 function setCards(r){cards=Array.isArray(r)?r:[];error='';render();}
 function setError(msg){error=msg;render();}
 function setLoading(msg){$('count').textContent=msg}
 function refresh(fn){refreshCallback=fn}
-window.DEJAVU_PUBLIC_APP={setCards,setError,setLoading,onRefresh:refresh,currentRequestedId,openCard,notFound};
+window.DEJAVU_PUBLIC_APP={setCards,setError,setLoading,onRefresh:refresh,currentRequestedId,openCard,notFound,hasSharedCatalog:()=>sharedSnapshot};
 $('search').addEventListener('input',render);
 $('month').addEventListener('input',render);
 $('tab-cards').addEventListener('click',()=>tab('cards'));
@@ -182,11 +216,12 @@ $('back').addEventListener('click',closeCard);
 $('pdf').addEventListener('click',pdf);
 $('png').addEventListener('click',downloadImage);
 $('copy').addEventListener('click',async()=>{if(!selected)return;
- const link=selected.id?new URL('./#ficha='+encodeURIComponent(selected.id),location.href).href:location.href;
+ const link=sharedSnapshot?location.href:(selected.id?new URL('./#ficha='+encodeURIComponent(selected.id),location.href).href:location.href);
  try{await navigator.clipboard.writeText(link);$('copy').textContent='Enlace copiado ✓'}catch(e){window.prompt('Copia este enlace',link)}
 });
 window.addEventListener('hashchange',routeHash);
 if(location.hash.startsWith('#f='))routeHash();
+if(sharedSnapshot){setLoading('Abriendo las fichas compartidas…');readSharedCatalog();}
 fetch('../config.json?revision='+Date.now(),{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('No se encontró el catálogo');return r.json()}).then(data=>{
  const item=(Array.isArray(data.forms)?data.forms:[]).find(x=>x.id===data.activeFormId);
  if(!item?.url)throw Error('Formulario no configurado');
