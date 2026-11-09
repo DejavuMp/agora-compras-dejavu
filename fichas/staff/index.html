@@ -198,14 +198,26 @@ body{background:var(--paper);font-family:Arial,Helvetica,sans-serif}
       <div class="page-intro"><div><div class="eyebrow"><span class="tiny-gold-square"></span> ARCHIVO LOCAL</div><h1>Fichas anteriores</h1><p class="intro-note">Aquí aparecen las fichas guardadas en este navegador. Puedes buscarlas, editarlas, compartirlas o descargar su respaldo, sin subir nada a GitHub.</p></div><div class="count-card"><div class="count-number" id="savedCount">00</div><div class="count-label">registros locales</div></div></div>
       <div class="panel" id="publicPublishPanel" style="padding:18px 21px;margin-bottom:18px">
   <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:space-between">
-   <div><strong style="font-size:15px">Publicar fichas para todo el staff</strong><p style="margin:6px 0 0;font-size:12px">Tus fichas guardadas pueden aparecer automáticamente en la página “Información para formulario de pagos”.</p></div>
+   <div><strong style="font-size:15px">Compartir las fichas guardadas con todo el staff</strong><p style="margin:6px 0 0;font-size:12px">Crea un enlace para consultar todas las fichas de este navegador. No necesitas entrar a GitHub ni a Firebase.</p></div>
    <div style="display:flex;gap:8px;flex-wrap:wrap">
-     <button id="publicLogin" class="btn btn-outline" type="button">Conectar cuenta Dejavú</button>
-     <button id="publicAll" class="btn btn-primary" type="button" disabled>Publicar mis fichas</button><a class="btn btn-outline" href="./formulario/" target="_blank" rel="noopener noreferrer">Ver página del staff</a>
+     <button id="shareCatalogBtn" class="btn btn-primary" type="button">Compartir todas mis fichas ahora</button>
+     <a class="btn btn-outline" href="./formulario/" target="_blank" rel="noopener noreferrer">Ver página del staff</a>
+     <button id="publicLogin" class="btn btn-outline" type="button">Conectar nube</button>
+     <button id="publicAll" class="btn btn-outline" type="button" disabled>Sincronizar automáticamente (pendiente)</button>
      <button id="publicLogout" class="btn btn-outline" type="button" hidden>Desconectar</button>
    </div>
   </div>
-  <p style="font-size:12px;margin:12px 0 4px" id="publicStatus" role="status" aria-live="polite">Las fichas siguen guardadas localmente hasta que las publiques.</p>
+  <div id="catalogShareResult" style="margin-top:14px;padding:14px;border:1px solid #ddcfb8;background:#f9f5ec;border-radius:10px" hidden>
+  <strong style="font-size:12px">Enlace preparado para compartir por WhatsApp</strong>
+  <textarea id="catalogShareUrl" readonly rows="2" aria-label="Enlace de las fichas compartidas" style="display:block;width:100%;min-height:62px;border:1px solid #d9ceba;background:#fff;border-radius:7px;padding:10px;font-size:12px;margin:9px 0 7px;overflow-wrap:anywhere"></textarea>
+  <div style="display:flex;flex-wrap:wrap;gap:8px">
+    <button id="catalogCopyBtn" class="btn btn-primary" type="button">Copiar enlace</button>
+    <button id="catalogWhatsappBtn" class="btn btn-outline" type="button">Enviar por WhatsApp</button>
+    <button id="catalogOpenBtn" class="btn btn-outline" type="button">Revisar catálogo</button>
+  </div>
+  <p style="font-size:11px;margin:11px 0 0;color:#6f6659">Este enlace contiene las fichas que tienes guardadas ahora. Si agregas o modificas fichas, genera y comparte un nuevo enlace. No incluye fotografías ni datos de pago.</p>
+</div>
+<p style="font-size:12px;margin:12px 0 4px" id="publicStatus" role="status" aria-live="polite">Para compartir ahora usa «Compartir todas mis fichas ahora». La sincronización automática en la nube está pendiente de activación.</p>
   <p style="font-size:11px;margin:0" id="publicCount">0 fichas visibles en el catálogo del personal</p>
   <p style="font-size:11px;margin:8px 0 0;color:#8b7350"><strong>Importante:</strong> las fichas publicadas serán visibles para cualquiera con el enlace. Se comparten campaña, responsable, fecha y ubicación; no correos privados ni fotografías.</p>
 </div>
@@ -1509,6 +1521,33 @@ const $=id=>document.getElementById(id);
 const fields=['campaign','responsible','activityDate','location'];
 let records=[],activeId=null,editingId=null,dirty=true,lastPublic=null,toastTimer=0,evidenceData='',evidenceName='',photoLoadSeq=0;
 const published=/^https?:$/.test(location.protocol)&& !['localhost','127.0.0.1','0.0.0.0'].includes(location.hostname);
+
+async function shareCatalogSnapshot(){
+ const rows=records.filter(valid).map(r=>[r.id,r.campaign,r.responsible,r.activityDate,r.location]);
+ if(!rows.length){toast('No hay fichas guardadas. Crea una ficha o importa las anteriores desde este navegador.');return}
+ const data=new TextEncoder().encode(JSON.stringify({v:1,generatedAt:new Date().toISOString(),records:rows}));
+ let buffer=data,mode='j';
+ if(typeof CompressionStream!=='undefined'){
+  try{
+   const stream=new Blob([data]).stream().pipeThrough(new CompressionStream('gzip'));
+   buffer=new Uint8Array(await new Response(stream).arrayBuffer());
+   mode='g';
+  }catch(err){console.warn('Compresión no disponible',err)}
+ }
+ let binary='';
+ for(let i=0;i<buffer.length;i+=8192)binary+=String.fromCharCode(...buffer.slice(i,i+8192));
+ const token=btoa(binary).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');
+ const url=new URL('./formulario/',location.href);
+ url.search='';url.hash='catalog='+mode+'.'+token;
+ if(url.href.length>16000){
+  toast('El catálogo completo genera un enlace demasiado largo para compartir. Se requiere terminar la sincronización en Firebase.');
+  return;
+ }
+ $('catalogShareUrl').value=url.href;
+ $('catalogShareResult').hidden=false;
+ toast(rows.length+' fichas listas en un enlace compartible.');
+}
+
 const icons={'campaign': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h11l5 6-5 6H4z"/><circle cx="8" cy="12" r="1"/></svg>', 'responsible': '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3"/><path d="M5 20v-2a7 7 0 0 1 14 0v2"/></svg>', 'activityDate': '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v5M16 3v5M4 10h16"/></svg>', 'location': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0z"/><circle cx="12" cy="10" r="2"/></svg>'};
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function toast(msg){const t=$('toast'); t.textContent=msg;t.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.hidden=true,4200);}
@@ -1657,6 +1696,16 @@ $('whatsappBtn').addEventListener('click',()=>{const r=activeData();if(r)whatsap
 $('pngBtn').addEventListener('click',()=>{const r=activeData();if(r)downloadImage(r)});
 $('pdfBtn').addEventListener('click',()=>{const r=activeData();if(r)printFicha(r)});
 $('qrBtn').addEventListener('click',()=>{const r=activeData();if(r)showQR(r)});
+$('shareCatalogBtn').addEventListener('click',()=>shareCatalogSnapshot().catch(err=>{console.error(err);toast('No se pudo generar el catálogo. Conserva las fichas y prueba de nuevo.');}));
+$('catalogCopyBtn').addEventListener('click',()=>{if($('catalogShareUrl').value)copyText($('catalogShareUrl').value)});
+$('catalogOpenBtn').addEventListener('click',()=>{if($('catalogShareUrl').value)window.open($('catalogShareUrl').value,'_blank','noopener,noreferrer')});
+$('catalogWhatsappBtn').addEventListener('click',()=>{
+ const url=$('catalogShareUrl').value;if(!url)return;
+ const text='Dejavú Marketing · Fichas e historial de actividades para Staff: '+url;
+ if(navigator.share){navigator.share({title:'Fichas Dejavú Staff',text}).catch(e=>{if(e?.name!=='AbortError')copyText(text)})}
+ else if(url.length<6500)window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener,noreferrer');
+ else copyText(text);
+});
 $('copyBtn').addEventListener('click',()=>{const r=activeData();if(r&&checkPhotoLink(r)&&checkHosted())copyText(shareLink(r))});
 $('savedList').addEventListener('click',e=>{const btn=e.target.closest('button[data-action]');if(!btn)return;const id=btn.closest('[data-id]').dataset.id;const action=btn.dataset.action;if(action==='edit')editRecord(id);if(action==='delete')doDelete(id);if(action==='share')editRecord(id)});
 $('closeQr').addEventListener('click',()=>$('qrModal').hidden=true);$('qrModal').addEventListener('click',e=>{if(e.target===$('qrModal'))$('qrModal').hidden=true});window.addEventListener('keydown',e=>{if(e.key==='Escape')$('qrModal').hidden=true});
