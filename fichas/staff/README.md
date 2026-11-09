@@ -1,23 +1,36 @@
-# Fichas de Staff · Dejavú Marketing
+# Dejavú Marketing · Fichas de Staff
 
-## Una sola herramienta
+## Una sola herramienta administrativa
+**Generador, archivo e historial:** https://dejavump.github.io/agora-compras-dejavu/fichas/staff/
 
-**Enlace para trabajar**: https://dejavump.github.io/agora-compras-dejavu/fichas/staff/
+**Portal del personal, "Información para formulario de pagos":** https://dejavump.github.io/agora-compras-dejavu/fichas/staff/formulario/
 
-En esta dirección se puede crear una ficha, buscar fichas guardadas, editarlas, compartirlas y consultar el formulario mensual y los enlaces anteriores. El enlace anterior `/fichas/staff/herramienta/` ahora redirige a la dirección única, preservando enlaces compartidos con un fragmento `#f=`.
+El enlace de pago se configura en `fichas/staff/config.json`; no se modifica para los usuarios finales al cambiar cada mes. El formulario vigente se abre desde el portal del personal.
 
-## Formulario de pago
+## Archivo de fichas y sincronización
+- La herramienta **siempre guarda el original local** en el navegador: metadatos en localStorage y fotografías en IndexedDB.
+- Se agregó el campo **Correo del trabajador** para vincular cada ficha a un destinatario verificado. Las fichas sin correo asignado siguen siendo visibles para el equipo autorizado, pero no aparecerán en el historial personal de nadie.
+- El administrador autorizado (rol **admin** o **coordinador** en `agora_users`) puede iniciar sesión con Google y sincronizar metadatos de las fichas a la colección `dejavu_staff_fichas`.
+- El personal inicia sesión con Google usando exactamente su correo registrado; solo puede consultar los documentos de ese correo.
+- En el portal del personal, **Historial** combina los enlaces que la persona abrió en ese navegador y, cuando Firebase esté activo, las fichas que la agencia le asignó en la nube.
+- La colección en Firestore tiene reglas preparadas en `firestore.rules`, con lectura exclusiva del destinatario o de administradores autorizados y edición solo para el equipo coordinador.
 
-El enlace permanente que recibe el personal es https://dejavump.github.io/agora-compras-dejavu/fichas/staff/formulario/
+**Estado técnico al 9 nov 2026:** código de interfaces y reglas en GitHub; GitHub Pages despliega solamente archivos web. **Hace falta desplegar las reglas Firestore con una cuenta autorizada y probar acceso para admin, trabajador asignado y trabajador no asignado.** Hasta concluirlo, la nube NO se considera activa. La aplicación conserva el guardado local y mostrará un aviso si las reglas no están habilitadas.
 
-Cada mes el enlace real del formulario se actualiza en `fichas/staff/config.json`, que sigue siendo gestionado por Dejavú. **El usuario final no necesita abrir GitHub**: puede mandar la nueva URL a quien administre el repositorio para efectuar la actualización. La interfaz muestra el formulario vigente y el historial pero **no publica cambios de configuración desde el navegador**.
+**Fotografías:** siguen guardándose localmente, no se sincronizan aún con Cloud Storage. Las imágenes de fichas anteriores se conservan en el respaldo JSON y no deben ponerse en un repositorio público.
 
-## Archivo de fichas y respaldos
+## Recuperar las fichas anteriores
+Las fichas guardadas en un archivo HTML local o en otro navegador no migran por sí mismas. En la herramienta anterior usa **Fichas guardadas → Exportar respaldo JSON**. En la versión web utiliza **Fichas anteriores → Importar fichas anteriores**. No borrar el respaldo original. Al conectar Firebase y activar las reglas, la herramienta podrá sincronizar las fichas locales importadas, incluyendo las que todavía no tienen correo de destinatario.
 
-Las fichas se guardan **automáticamente en el mismo navegador** (metadatos en localStorage y fotos en IndexedDB), sin subirlas a GitHub. El archivo incluye búsqueda y filtro por mes. Para cambiar de computadora o recuperar registros guardados en una versión de archivo local, usar **Archivo de fichas → Respaldar mis fichas**, seguido de **Recuperar respaldo** en el nuevo sitio. Este respaldo JSON contiene datos personales y debe guardarse de forma privada.
+## Plan de verificación antes de uso real
+1. Verificar que GitHub Pages sirve la última versión de ambas páginas.
+2. Revisar el despliegue de reglas en Firebase proyecto `agora-dejavu-38b8c` (no sustituir una versión más reciente sin comparar).
+3. Verificar que el dominio `dejavump.github.io` está autorizado en Firebase Authentication.
+4. Iniciar sesión como coordinador autorizado en la herramienta; comprobar estado de sincronización y crear ficha de prueba con correo del trabajador.
+5. Iniciar sesión como el trabajador destinatario y confirmar que ve la ficha asignada desde otro dispositivo.
+6. Iniciar sesión como otra cuenta no destinataria y confirmar que no puede consultar aquella ficha.
+7. Editar una ficha y usar "Actualizar" en el historial del trabajador para verificar cambios. Probar importación JSON y retorno a guardado local sin conexión.
+8. Probar borrado y manejo de versiones conflictivas, y respaldar antes de purgar datos de cualquier dispositivo.
 
-La herramienta **no proporciona todavía archivo compartido en la nube**, sincronización entre dispositivos, ni permisos de acceso para expedientes personales. Para esos fines hará falta integrar almacenamiento privado con autenticación y políticas adecuadas. Los archivos en `fichas/staff/archivo/` sólo son aptos para documentos depurados y públicos; no deben usarse con fichas reales de personal.
-
-## Compatibilidad
-
-Las fichas compartidas en enlaces de la versión anterior siguen abriendo gracias a la redirección, y apuntan al mismo enlace permanente del formulario de pago. Las seis fichas de una instalación local no se copian a la página web hasta que se importe el respaldo.
+## Política de privacidad
+El repositorio y GitHub Pages son públicos. Nunca subir expedientes, respaldos JSON reales, correos personales o fotografías de staff a GitHub. Los enlaces estáticos de fichas `#f=` que ya se enviaron contienen información de actividad codificada, **no cifrada**; cualquiera que reciba el enlace puede leerla. El historial privado en Firebase sí requiere autenticación y reglas de acceso. Para restringir completamente fichas individuales con datos personales, deberá migrarse el intercambio a enlaces autenticados cuando la conexión haya superado las pruebas.
