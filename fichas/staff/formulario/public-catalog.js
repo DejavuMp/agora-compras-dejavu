@@ -28,5 +28,4 @@ async function load(){
   app.setError(e?.code==='permission-denied'?'El catálogo aún no está habilitado en Firebase. Mientras tanto, el formulario de pagos sigue disponible.':'No pudimos consultar las fichas publicadas. Comprueba tu conexión o vuelve a intentarlo.');
  }
 }
-app.onRefresh(load);
-load();
+if(!app.hasSharedCatalog()){app.onRefresh(load);load();}else{app.onRefresh(()=>app.setLoading('Estás viendo un catálogo compartido. Para recibir fichas nuevas, pide a Dejavú un enlace actualizado.'));}
