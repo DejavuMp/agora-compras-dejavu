@@ -12,8 +12,8 @@ const expectedProject='agora-dejavu-38b8c';
 if(project!==expectedProject)throw Error('Proyecto Firebase distinto al autorizado');
 if(!token)throw Error('No hay credencial temporal para consultar reglas vigentes');
 const candidate=readFileSync('firestore.rules','utf8');
-const start='    // Dejavú Staff: cada ficha pertenece al correo verificado asignado.';
-const middle='    // Catálogo público de fichas que un coordinador de Dejavú DECIDIÓ publicar.';
+const start='    // Dejavú Staff: archivo privado opcional por correo verificado.';
+const middle='    // Catálogo de fichas que un coordinador DECIDIÓ publicar para todo el staff.';
 const end='    // Todas las demás colecciones permanecen cerradas.';
 function assertIndexOrder(text){
  const a=text.indexOf(start),b=text.indexOf(middle),c=text.indexOf(end);
