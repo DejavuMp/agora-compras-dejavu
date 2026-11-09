@@ -95,6 +95,7 @@ else {
  if(logout)logout.addEventListener('click',()=>signOut(fb.auth).catch(console.warn));
  if(sync)sync.addEventListener('click',refresh);
  window.addEventListener('dejavu:staff-saved',onRecord);
+ window.addEventListener('dejavu:staff-imported',()=>{if(canWrite)refresh();});
  window.addEventListener('dejavu:staff-deleted',onDelete);
  onAuthStateChanged(fb.auth,async(u)=>{
   user=u;canWrite=false;const id=u?.uid;
