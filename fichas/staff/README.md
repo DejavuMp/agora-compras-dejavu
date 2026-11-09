@@ -1,36 +1,39 @@
-# Dejavú Marketing · Fichas de Staff
+# Fichas Dejavú Marketing · Operación y Staff
 
-## Una sola herramienta administrativa
-**Generador, archivo e historial:** https://dejavump.github.io/agora-compras-dejavu/fichas/staff/
+## Dos vistas, un solo archivo compartido
 
-**Portal del personal, "Información para formulario de pagos":** https://dejavump.github.io/agora-compras-dejavu/fichas/staff/formulario/
+**Generador para el equipo Dejavú:** https://dejavump.github.io/agora-compras-dejavu/fichas/staff/
 
-El enlace de pago se configura en `fichas/staff/config.json`; no se modifica para los usuarios finales al cambiar cada mes. El formulario vigente se abre desde el portal del personal.
+**Página para el personal:** https://dejavump.github.io/agora-compras-dejavu/fichas/staff/formulario/
 
-## Archivo de fichas y sincronización
-- La herramienta **siempre guarda el original local** en el navegador: metadatos en localStorage y fotografías en IndexedDB.
-- Se agregó el campo **Correo del trabajador** para vincular cada ficha a un destinatario verificado. Las fichas sin correo asignado siguen siendo visibles para el equipo autorizado, pero no aparecerán en el historial personal de nadie.
-- El administrador autorizado (rol **admin** o **coordinador** en `agora_users`) puede iniciar sesión con Google y sincronizar metadatos de las fichas a la colección `dejavu_staff_fichas`.
-- El personal inicia sesión con Google usando exactamente su correo registrado; solo puede consultar los documentos de ese correo.
-- En el portal del personal, **Historial** combina los enlaces que la persona abrió en ese navegador y, cuando Firebase esté activo, las fichas que la agencia le asignó en la nube.
-- La colección en Firestore tiene reglas preparadas en `firestore.rules`, con lectura exclusiva del destinatario o de administradores autorizados y edición solo para el equipo coordinador.
+La página del personal se titula **Información para formulario de pagos** y tiene **Fichas e historial** y **Formulario de pagos**. No pide iniciar sesión al personal. Todos pueden consultar **todas las fichas expresamente publicadas por Dejavú**, buscar campaña, fecha o ubicación, abrirlas y descargarlas como imagen o imprimirlas/guardarlas como PDF. El formulario de pago conserva un enlace permanente aunque cambie de mes.
 
-**Estado técnico al 9 nov 2026:** código de interfaces y reglas en GitHub; GitHub Pages despliega solamente archivos web. **Hace falta desplegar las reglas Firestore con una cuenta autorizada y probar acceso para admin, trabajador asignado y trabajador no asignado.** Hasta concluirlo, la nube NO se considera activa. La aplicación conserva el guardado local y mostrará un aviso si las reglas no están habilitadas.
+## Trabajo del coordinador
 
-**Fotografías:** siguen guardándose localmente, no se sincronizan aún con Cloud Storage. Las imágenes de fichas anteriores se conservan en el respaldo JSON y no deben ponerse en un repositorio público.
+1. Abrir el generador desde el mismo navegador donde están las fichas guardadas. Crear/editar fichas como siempre; guardado original local en localStorage y evidencia en IndexedDB.
+2. Abrir **Fichas anteriores → Publicar fichas para todo el staff**. Conectar con Google utilizando una cuenta activa **admin** o **coordinador** del proyecto Firebase de Ágora (tabla `agora_users`).
+3. Pulsar **Publicar mis fichas** y confirmar que los detalles de actividad quedarán visibles para cualquier persona con el enlace del Staff. Una vez autorizado, los cambios y nuevas fichas se publican automáticamente al guardar mientras la sesión y Firebase estén disponibles.
+4. Usar **Ver página del staff** para consultar el mismo archivo compartido. La edición permanece en el generador Dejavú.
+5. Conservar siempre el respaldo JSON. Los registros antiguos guardados en otro navegador o archivo HTML deben recuperarse una sola vez con **Importar fichas anteriores**. La importación añade el contenido local y luego intenta publicarlo cuando se ha autorizado la publicación.
 
-## Recuperar las fichas anteriores
-Las fichas guardadas en un archivo HTML local o en otro navegador no migran por sí mismas. En la herramienta anterior usa **Fichas guardadas → Exportar respaldo JSON**. En la versión web utiliza **Fichas anteriores → Importar fichas anteriores**. No borrar el respaldo original. Al conectar Firebase y activar las reglas, la herramienta podrá sincronizar las fichas locales importadas, incluyendo las que todavía no tienen correo de destinatario.
+La colección `dejavu_staff_publicadas` de Firestore solo contiene: `id`, `campaign`, `responsible`, `activityDate`, `location`, `publishedBy`, `publishedAt`, `updatedAt`.
 
-## Plan de verificación antes de uso real
-1. Verificar que GitHub Pages sirve la última versión de ambas páginas.
-2. Revisar el despliegue de reglas en Firebase proyecto `agora-dejavu-38b8c` (no sustituir una versión más reciente sin comparar).
-3. Verificar que el dominio `dejavump.github.io` está autorizado en Firebase Authentication.
-4. Iniciar sesión como coordinador autorizado en la herramienta; comprobar estado de sincronización y crear ficha de prueba con correo del trabajador.
-5. Iniciar sesión como el trabajador destinatario y confirmar que ve la ficha asignada desde otro dispositivo.
-6. Iniciar sesión como otra cuenta no destinataria y confirmar que no puede consultar aquella ficha.
-7. Editar una ficha y usar "Actualizar" en el historial del trabajador para verificar cambios. Probar importación JSON y retorno a guardado local sin conexión.
-8. Probar borrado y manejo de versiones conflictivas, y respaldar antes de purgar datos de cualquier dispositivo.
+**Nunca se publican correos de los trabajadores, datos bancarios ni evidencias fotográficas.** No se suben fichas privadas ni respaldos JSON al repositorio público GitHub. La colección es un catálogo de datos de actividad público: cualquiera con acceso a la aplicación puede leerlo; no es un sistema de acceso individual.
 
-## Política de privacidad
-El repositorio y GitHub Pages son públicos. Nunca subir expedientes, respaldos JSON reales, correos personales o fotografías de staff a GitHub. Los enlaces estáticos de fichas `#f=` que ya se enviaron contienen información de actividad codificada, **no cifrada**; cualquiera que reciba el enlace puede leerla. El historial privado en Firebase sí requiere autenticación y reglas de acceso. Para restringir completamente fichas individuales con datos personales, deberá migrarse el intercambio a enlaces autenticados cuando la conexión haya superado las pruebas.
+## Despliegue pendiente de Firebase
+
+GitHub Pages solo publica HTML, CSS y JS. Las reglas de Firestore en `firestore.rules` se editaron y están versionadas en GitHub, pero **no se activan automáticamente al publicar el repositorio**.
+
+Para activar de forma segura el catálogo es necesario que una cuenta autorizada despliegue las reglas actualizadas en el proyecto `agora-dejavu-38b8c`, preservando las reglas ya operativas de Compras y Archivos. Verificar además el dominio autorizado de Firebase Authentication para `dejavump.github.io`, permisos de `agora_users` y acceso de los roles. El usuario no debe subir contraseñas ni secretos a GitHub.
+
+Pruebas antes de declarar la nube activa:
+- Un coordinador inicia sesión y publica una ficha de prueba con datos ficticios; confirma estado publicado y edición posterior.
+- El personal abre la misma página **sin iniciar sesión**, ve esa ficha y descarga PNG/PDF.
+- Un usuario no autenticado no puede crear, modificar ni borrar documentos en Firestore.
+- La búsqueda funciona por campaña, mes y ubicación. El botón del formulario abre la versión vigente.
+- La importación JSON conserva fichas previas y fotos locales, y el respaldo original no se elimina.
+- Sin internet o sin permiso, el generador sigue guardando localmente y muestra que publicar está pendiente.
+
+## Compatibilidad
+
+Los enlaces anteriores con `#f=` continúan mostrando su contenido estático, sin depender de Firebase; los nuevos enlaces con `#ficha=DJV-...` abren la versión actualizada de una ficha publicada. Enlaces de versiones antiguas del generador redirigen a la página del personal. Los enlaces estáticos `#f=` contienen datos codificados, no cifrados, y deben compartirse solo si se desea dar acceso a esa información.
