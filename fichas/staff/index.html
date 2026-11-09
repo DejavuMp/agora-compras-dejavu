@@ -202,9 +202,7 @@ body{background:var(--paper);font-family:Arial,Helvetica,sans-serif}
    <div style="display:flex;gap:8px;flex-wrap:wrap">
      <button id="shareCatalogBtn" class="btn btn-primary" type="button">Compartir todas mis fichas ahora</button>
      <a class="btn btn-outline" href="./formulario/" target="_blank" rel="noopener noreferrer">Ver página del staff</a>
-     <button id="publicLogin" class="btn btn-outline" type="button">Conectar nube</button>
-     <button id="publicAll" class="btn btn-outline" type="button" disabled>Sincronizar automáticamente (pendiente)</button>
-     <button id="publicLogout" class="btn btn-outline" type="button" hidden>Desconectar</button>
+
    </div>
   </div>
   <div id="catalogShareResult" style="margin-top:14px;padding:14px;border:1px solid #ddcfb8;background:#f9f5ec;border-radius:10px" hidden>
@@ -217,8 +215,17 @@ body{background:var(--paper);font-family:Arial,Helvetica,sans-serif}
   </div>
   <p style="font-size:11px;margin:11px 0 0;color:#6f6659">Este enlace contiene las fichas que tienes guardadas ahora. Si agregas o modificas fichas, genera y comparte un nuevo enlace. No incluye fotografías ni datos de pago.</p>
 </div>
-<p style="font-size:12px;margin:12px 0 4px" id="publicStatus" role="status" aria-live="polite">Para compartir ahora usa «Compartir todas mis fichas ahora». La sincronización automática en la nube está pendiente de activación.</p>
-  <p style="font-size:11px;margin:0" id="publicCount">0 fichas visibles en el catálogo del personal</p>
+<details style="margin-top:14px;padding-top:12px;border-top:1px solid #e0d9ce">
+  <summary style="font-size:12px;font-weight:700;color:#826543;cursor:pointer">Sincronización automática en la nube (pendiente de activación)</summary>
+  <p style="font-size:11px;color:#726d65;line-height:1.6;margin:10px 0">La publicación automática en el enlace permanente necesita reglas activas de Firebase. No es necesaria para compartir tus fichas ahora.</p>
+  <div style="display:flex;flex-wrap:wrap;gap:8px">
+    <button id="publicLogin" class="btn btn-outline" type="button">Conectar nube</button>
+    <button id="publicAll" class="btn btn-outline" type="button" disabled>Sincronizar automáticamente</button>
+    <button id="publicLogout" class="btn btn-outline" type="button" hidden>Desconectar</button>
+  </div>
+  <p style="font-size:12px;margin:12px 0 4px" id="publicStatus" role="status" aria-live="polite">Sincronización permanente no activada.</p>
+  <p style="font-size:11px;margin:0" id="publicCount">0 fichas sincronizadas permanentemente</p>
+</details>
   <p style="font-size:11px;margin:8px 0 0;color:#8b7350"><strong>Importante:</strong> las fichas publicadas serán visibles para cualquiera con el enlace. Se comparten campaña, responsable, fecha y ubicación; no correos privados ni fotografías.</p>
 </div>
       <div class="toolbar"><input class="searchbox" id="filterInput" aria-label="Buscar fichas" type="search" placeholder="Buscar por campaña, persona o lugar..."><input id="filterMonth" type="month" aria-label="Filtrar por mes" title="Filtrar por mes" style="min-height:42px;border:1px solid #d9d6cf;border-radius:8px;padding:0 9px;background:white;color:#252525"><button id="backupBtn" class="btn btn-outline" type="button">Respaldar mis fichas</button><button id="importBackupBtn" class="btn btn-outline" type="button">Importar fichas anteriores</button></div>
