@@ -167,7 +167,7 @@ body{background:var(--paper);font-family:Arial,Helvetica,sans-serif}
             <div class="form-grid">
               <div class="field"><label for="campaign">Campaña <span class="required">*</span></label><input required maxlength="95" id="campaign" name="campaign" autocomplete="off" placeholder="Ej. Desayunos KFC · Sampling"></div>
               <div class="field"><label for="responsible">Solicitado por / Quién asigna <span class="required">*</span></label><input required maxlength="95" id="responsible" name="responsible" autocomplete="name" placeholder="Nombre de quien solicita al personal"></div>
-              <div class="field"><label for="staffEmail">Correo del trabajador (para su historial privado)</label><input type="email" maxlength="240" id="staffEmail" name="staffEmail" autocomplete="email" placeholder="correo@ejemplo.com"><small>Opcional para fichas locales. Necesario para asignar una ficha en la nube.</small></div>
+              <input type="hidden" id="staffEmail" name="staffEmail" value="">
               <div class="field"><label for="activityDate">Fecha de la actividad <span class="required">*</span></label><input required type="date" id="activityDate" name="activityDate"></div>
               <div class="field"><label for="location">Ubicación <span class="required">*</span></label><textarea required id="location" maxlength="240" rows="2" name="location" placeholder="Sucursal, punto de encuentro o dirección"></textarea></div>
               <div class="evidence-upload"><div class="evidence-upload-title"><span class="circle-num">✦</span><div><strong>Foto de evidencia</strong><small>Opcional · Tú la subes, el staff puede verla y descargarla.</small></div></div>
@@ -196,10 +196,18 @@ body{background:var(--paper);font-family:Arial,Helvetica,sans-serif}
     </div>
     <div class="content" id="savedScreen" hidden>
       <div class="page-intro"><div><div class="eyebrow"><span class="tiny-gold-square"></span> ARCHIVO LOCAL</div><h1>Fichas anteriores</h1><p class="intro-note">Aquí aparecen las fichas guardadas en este navegador. Puedes buscarlas, editarlas, compartirlas o descargar su respaldo, sin subir nada a GitHub.</p></div><div class="count-card"><div class="count-number" id="savedCount">00</div><div class="count-label">registros locales</div></div></div>
-      <div class="panel" id="dejavuCloudPanel" style="padding:17px 20px;margin-bottom:18px">
-  <div style="display:flex;align-items:center;flex-wrap:wrap;gap:9px;justify-content:space-between"><strong style="font-size:13px">Archivo privado de Dejavú · Firebase</strong><div style="display:flex;gap:7px;flex-wrap:wrap"><button id="dejavuCloudLogin" class="btn btn-outline" type="button">Conectar con Google</button><button id="dejavuCloudSync" class="btn btn-outline" type="button" hidden>Sincronizar fichas</button><button id="dejavuCloudLogout" class="btn btn-quiet" type="button" hidden>Cerrar sesión</button></div></div>
-  <p id="dejavuCloudStatus" role="status" aria-live="polite" style="font-size:12px;margin:9px 0 0">Preparando conexión. Tus fichas locales permanecen guardadas.</p>
-  <p style="font-size:11px;color:#77716b;margin:6px 0 0">Las fichas con correo asignado se pueden sincronizar una vez autorizadas las reglas de Firebase. Las fotos siguen guardándose en el dispositivo.</p>
+      <div class="panel" id="publicPublishPanel" style="padding:18px 21px;margin-bottom:18px">
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:space-between">
+   <div><strong style="font-size:15px">Publicar fichas para todo el staff</strong><p style="margin:6px 0 0;font-size:12px">Tus fichas guardadas pueden aparecer automáticamente en la página “Información para formulario de pagos”.</p></div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap">
+     <button id="publicLogin" class="btn btn-outline" type="button">Conectar cuenta Dejavú</button>
+     <button id="publicAll" class="btn btn-primary" type="button" disabled>Publicar mis fichas</button>
+     <button id="publicLogout" class="btn btn-outline" type="button" hidden>Desconectar</button>
+   </div>
+  </div>
+  <p style="font-size:12px;margin:12px 0 4px" id="publicStatus" role="status" aria-live="polite">Las fichas siguen guardadas localmente hasta que las publiques.</p>
+  <p style="font-size:11px;margin:0" id="publicCount">0 fichas visibles en el catálogo del personal</p>
+  <p style="font-size:11px;margin:8px 0 0;color:#8b7350"><strong>Importante:</strong> las fichas publicadas serán visibles para cualquiera con el enlace. Se comparten campaña, responsable, fecha y ubicación; no correos privados ni fotografías.</p>
 </div>
       <div class="toolbar"><input class="searchbox" id="filterInput" aria-label="Buscar fichas" type="search" placeholder="Buscar por campaña, persona o lugar..."><input id="filterMonth" type="month" aria-label="Filtrar por mes" title="Filtrar por mes" style="min-height:42px;border:1px solid #d9d6cf;border-radius:8px;padding:0 9px;background:white;color:#252525"><button id="backupBtn" class="btn btn-outline" type="button">Respaldar mis fichas</button><button id="importBackupBtn" class="btn btn-outline" type="button">Importar fichas anteriores</button></div>
       <div id="savedList" class="record-list"></div><p style="font-size:12px;color:#77736b;margin:16px 0 0">Las fichas y fotos se conservan en este navegador. Utiliza «Respaldar mis fichas» antes de cambiar de equipo o borrar datos del navegador.</p>
@@ -1558,7 +1566,7 @@ async function storeCurrent(){const data=getForm();if(!valid(data)||!$('staffEma
 function activeData(){const data=getForm();if(!valid(data)){$('fichaForm').reportValidity();toast('Completa primero los cuatro datos.');return null;}if(dirty||!activeId){toast('Primero selecciona “Generar y guardar ficha”.');return null;}return {...data,id:activeId,evidenceDataUrl:evidenceData,evidenceName};}
 function encode(data){const minimal=clean(data);const bytes=new TextEncoder().encode(JSON.stringify([minimal.campaign,minimal.responsible,minimal.activityDate,minimal.location]));let bin='';bytes.forEach(b=>bin+=String.fromCharCode(b));return btoa(bin).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');}
 function decode(fragment){try{let raw=fragment.replaceAll('-','+').replaceAll('_','/');raw+='='.repeat((4-raw.length%4)%4);const binary=atob(raw);const obj=JSON.parse(new TextDecoder().decode(Uint8Array.from(binary,c=>c.charCodeAt(0))));const d=Array.isArray(obj)?clean({campaign:obj[0],responsible:obj[1],activityDate:obj[2],location:obj[3]}):clean(obj);return valid(d)?d:null;}catch(e){return null}}
-function shareLink(data){const u=new URL('./formulario/',location.href);u.hash='f='+encode(data);u.search='';return u.toString();}
+function shareLink(data){const u=new URL('./formulario/',location.href);u.hash=window.DEJAVU_STAFF_PUBLIC_READY&&data.id?'ficha='+encodeURIComponent(data.id):'f='+encode(data);u.search='';return u.toString();}
 function summary(data,withLink){return `*DEJAVÚ MARKETING*\n*FICHA DE ACTIVIDAD*\n\n*Campaña:* ${data.campaign}\n*Solicitado por:* ${data.responsible}\n*Fecha:* ${formatDate(data.activityDate)}\n*Ubicación:* ${data.location}\n\n*Información de pago:* El pago se realizará en un plazo de 3 semanas.\n\n*Formulario de pago:*\n${FORM_URL}`+(withLink?`\n\n*Ver ficha:*\n${shareLink(data)}`:'');}
 async function copyText(text){if(navigator.clipboard&&window.isSecureContext){try{await navigator.clipboard.writeText(text);toast('Copiado al portapapeles.');return;}catch(e){}}
  const elem=document.createElement('textarea');elem.value=text;elem.style.position='fixed';elem.style.opacity='0';document.body.appendChild(elem);elem.select();try{document.execCommand('copy');toast('Copiado al portapapeles.')}catch(e){toast('No se pudo copiar automáticamente.')}elem.remove();}
@@ -1675,5 +1683,5 @@ window.DEJAVU_STAFF_BRIDGE=Object.freeze({
 records=loadStorage();$('activityDate').value=today();updatePreview();renderList();routeHash();
 })();
 </script>
-<script type="module" src="./cloud-admin.js"></script>
+<script type="module" src="./public-admin.js"></script>
 </body></html>
