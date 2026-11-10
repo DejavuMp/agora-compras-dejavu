@@ -56,7 +56,7 @@ h2{font-size:23px;letter-spacing:-.5px;margin:0 0 7px}.section-note{font-size:12
      </dl>
      <div class="actions">
       <button class="button" id="pdf" type="button">Imprimir / Guardar PDF</button>
-      <button class="button outline" id="png" type="button">Descargar imagen</button>
+      <button class="button outline" id="png" type="button">Descargar ficha en imagen</button>
       <button class="button outline" id="copy" type="button">Copiar enlace</button>
      </div>
     </div>
@@ -139,36 +139,133 @@ function notFound(){selected=null;$('detail').hidden=true;$('cards-list').hidden
 function pdf(){if(selected)window.print()}
 async function downloadImage(){
  if(!selected)return;
- const c=document.createElement('canvas');c.width=1080;c.height=1450;
- const ctx=c.getContext('2d');ctx.fillStyle='#f6f4ef';ctx.fillRect(0,0,c.width,c.height);
- ctx.fillStyle='#fff';ctx.fillRect(50,50,980,1350);
- ctx.fillStyle='#171818';ctx.fillRect(50,50,980,290);
- ctx.fillStyle='#bb975e';ctx.fillRect(50,339,980,5);
- const branding=new Image();branding.src=$('detail').querySelector('img.logo').src;
- try{await branding.decode();ctx.drawImage(branding,100,86,260,94)}
- catch(e){ctx.font='bold 24px Arial';ctx.fillStyle='#d9bd8a';ctx.fillText('DEJAVÚ MARKETING · STAFF',100,130)}
- ctx.font='bold 46px Arial';ctx.fillStyle='#fff';ctx.fillText('Información de actividad',100,230);
- let y=407;
- const wrap=(text,x,y,width,lh,max)=>{
-  const words=safe(text).split(/\s+/),lines=[];let line='';
-  words.forEach(w=>{const next=line?line+' '+w:w;
-   if(ctx.measureText(next).width>width&&line){lines.push(line);line=w}else line=next});
-  if(line)lines.push(line);
-  const out=lines.slice(0,max);out.forEach((line,i)=>ctx.fillText(line,x,y+i*lh));
-  return out.length*lh;
- };
- for(const [label,val] of [['CAMPAÑA',selected.campaign],['SOLICITADO POR',selected.responsible],['FECHA',niceDate(selected.activityDate)],['UBICACIÓN',selected.location]]){
-  ctx.fillStyle='#9a7945';ctx.font='bold 19px Arial';ctx.fillText(label,104,y);
-  ctx.fillStyle='#292824';ctx.font='bold 30px Arial';const h=wrap(val,104,y+44,835,40,4);y+=Math.max(135,h+84);
-  ctx.strokeStyle='#e6e1d8';ctx.beginPath();ctx.moveTo(104,y-19);ctx.lineTo(975,y-19);ctx.stroke();
+ const button=$('png');
+ button.disabled=true;
+ const originalLabel=button.textContent;
+ button.textContent='Preparando imagen…';
+ try{
+  const c=document.createElement('canvas');
+  c.width=1080;
+  let ctx=c.getContext('2d');
+  if(!ctx)throw Error('El dispositivo no permite exportar imágenes.');
+  const rowFont='700 31px Arial, Helvetica, sans-serif';
+  const labelFont='700 19px Arial, Helvetica, sans-serif';
+  const maxWidth=866;
+  function wrapText(value){
+   ctx.font=rowFont;
+   const output=[];
+   const paragraphs=String(value||'—').split(/\r?\n/);
+   for(const paragraph of paragraphs){
+    const words=paragraph.trim().split(/\s+/).filter(Boolean);
+    if(!words.length){output.push('');continue}
+    let line='';
+    for(const word of words){
+     if(ctx.measureText(word).width>maxWidth){
+      if(line){output.push(line);line=''}
+      let piece='';
+      for(const char of word){
+       if(piece&&ctx.measureText(piece+char).width>maxWidth){output.push(piece);piece=char}
+       else piece+=char;
+      }
+      line=piece;
+     }else if(!line){line=word}
+     else if(ctx.measureText(line+' '+word).width<=maxWidth){line+=' '+word}
+     else{output.push(line);line=word}
+    }
+    if(line)output.push(line);
+   }
+   return output.length?output:['—'];
+  }
+  const fields=[
+   ['CAMPAÑA',selected.campaign],
+   ['SOLICITADO POR',selected.responsible],
+   ['FECHA',niceDate(selected.activityDate)],
+   ['UBICACIÓN',selected.location]
+  ];
+  let cursor=374;
+  const rows=fields.map(([label,value])=>{
+   const lines=wrapText(value);
+   const height=Math.max(130,83+lines.length*45);
+   const row={label,lines,y:cursor,height};
+   cursor+=height;
+   return row;
+  });
+  const paymentY=cursor+26;
+  const paymentHeight=128;
+  const footerBaseline=paymentY+paymentHeight+76;
+  c.height=Math.max(1170,footerBaseline+75);
+  ctx=c.getContext('2d');
+  ctx.imageSmoothingEnabled=true;
+  ctx.imageSmoothingQuality='high';
+  const sheetBottom=c.height-37;
+  ctx.fillStyle='#f2f0ec';
+  ctx.fillRect(0,0,c.width,c.height);
+  ctx.fillStyle='#fff';
+  ctx.fillRect(38,38,1004,sheetBottom-38);
+  ctx.fillStyle='#191a18';
+  ctx.fillRect(38,38,1004,277);
+  ctx.fillStyle='#bb985e';
+  ctx.fillRect(38,315,1004,5);
+  const brand=$('detail').querySelector('img.logo');
+  const branding=new Image();
+  branding.src=brand.src;
+  try{
+   await branding.decode();
+   const ratio=branding.naturalWidth/branding.naturalHeight;
+   const logoWidth=Math.min(334,118*ratio);
+   const logoHeight=logoWidth/ratio;
+   ctx.drawImage(branding,100,77,logoWidth,logoHeight);
+  }catch(e){
+   ctx.font='700 25px Arial, Helvetica, sans-serif';
+   ctx.fillStyle='#fff';
+   ctx.fillText('DEJAVÚ MARKETING',101,133);
+  }
+  ctx.font='700 47px Arial, Helvetica, sans-serif';
+  ctx.fillStyle='#fff';
+  ctx.fillText('Información de actividad',101,271);
+  for(const row of rows){
+   ctx.fillStyle='#9b7842';
+   ctx.font=labelFont;
+   ctx.fillText(row.label,103,row.y+19);
+   ctx.font=rowFont;
+   ctx.fillStyle='#262624';
+   row.lines.forEach((line,i)=>ctx.fillText(line,103,row.y+68+i*45));
+   ctx.strokeStyle='#ece8e1';
+   ctx.lineWidth=2;
+   ctx.beginPath();
+   ctx.moveTo(103,row.y+row.height-10);
+   ctx.lineTo(979,row.y+row.height-10);
+   ctx.stroke();
+  }
+  ctx.fillStyle='#f2eadc';
+  ctx.fillRect(97,paymentY,885,paymentHeight);
+  ctx.fillStyle='#96723e';
+  ctx.font='700 19px Arial, Helvetica, sans-serif';
+  ctx.fillText('INFORMACIÓN DE PAGO',124,paymentY+43);
+  ctx.fillStyle='#272723';
+  ctx.font='700 25px Arial, Helvetica, sans-serif';
+  ctx.fillText('El pago se realizará en un plazo de 3 semanas.',124,paymentY+91);
+  ctx.fillStyle='#987747';
+  ctx.font='700 18px Arial, Helvetica, sans-serif';
+  ctx.fillText('DEJAVÚ MARKETING · INFORMACIÓN PARA PERSONAL',102,footerBaseline);
+  const filename='Ficha_Dejavu_'+(selected.id||selected.activityDate||'actividad')+'.png';
+  const blob=await new Promise((resolve,reject)=>c.toBlob(x=>x?resolve(x):reject(Error('No se pudo generar el archivo PNG.')),'image/png'));
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+ }catch(e){
+  console.error('Dejavú: exportación PNG',e);
+  window.alert('No se pudo guardar la ficha como imagen. Intenta nuevamente o usa «Imprimir / Guardar PDF».');
+ }finally{
+  button.disabled=false;
+  button.textContent=originalLabel;
  }
- ctx.fillStyle='#f4ebdc';ctx.fillRect(100,1140,880,115);
- ctx.font='bold 20px Arial';ctx.fillStyle='#947044';ctx.fillText('INFORMACIÓN DE PAGO',126,1183);
- ctx.font='bold 25px Arial';ctx.fillStyle='#28241e';ctx.fillText('El pago se realizará en un plazo de 3 semanas.',126,1223);
- ctx.font='bold 19px Arial';ctx.fillStyle='#997847';ctx.fillText('DEJAVÚ MARKETING · INFORMACIÓN PARA PERSONAL',104,1334);
- c.toBlob(blob=>{if(!blob)return;const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='Ficha_Dejavu_'+(selected.id||selected.activityDate||'actividad')+'.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),12000)},'image/png');
 }
-
 async function readSharedCatalog(){
  const encoded=location.hash.slice('#catalog='.length),match=encoded.match(/^([gj])\.([A-Za-z0-9_-]{40,21000})$/);
  if(!match){setError('Este enlace de fichas no tiene un formato válido. Pide al coordinador que comparta uno nuevo.');return}
