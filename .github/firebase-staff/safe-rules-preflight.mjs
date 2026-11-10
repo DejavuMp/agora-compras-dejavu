@@ -23,8 +23,12 @@ function assertIndexOrder(text){
 const {a,b,c}=assertIndexOrder(candidate);
 const base=candidate.slice(0,a)+candidate.slice(c);
 const privateOnly=candidate.slice(0,b)+candidate.slice(c);
+const evidenceMarker='    // Fotos de evidencia compartidas: archivo JPEG optimizado, separado de los';
+const evidenceAt=candidate.indexOf(evidenceMarker);
+if(evidenceAt<=b||evidenceAt>=c)throw Error('No se encontró el bloque de evidencias en el área de Staff');
+const beforePhotos=candidate.slice(0,evidenceAt)+candidate.slice(c);
 function normalize(s){return String(s).replace(/\r\n?/g,'\n').trim()}
-const allowed=new Set([normalize(base),normalize(privateOnly),normalize(candidate)]);
+const allowed=new Set([normalize(base),normalize(privateOnly),normalize(beforePhotos),normalize(candidate)]);
 const headers={Authorization:'Bearer '+token,Accept:'application/json'};
 async function getJson(path){
  const url='https://firebaserules.googleapis.com/v1/'+path;
