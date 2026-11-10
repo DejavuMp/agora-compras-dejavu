@@ -363,6 +363,47 @@ service cloud.firestore {
       allow delete: if canEdit();
     }
 
+    // Fotos de evidencia compartidas: archivo JPEG optimizado, separado de los
+    // datos de la ficha. Lectura solo de documentos asociados a fichas publicadas.
+    // Nadie anónimo puede subir ni modificar imágenes. No requiere Cloud Storage.
+    function publicStaffPath(fichaId) {
+      return /databases/$(database)/documents/dejavu_staff_publicadas/$(fichaId);
+    }
+    function validPublishedEvidence(fichaId) {
+      return request.resource.data.keys().hasOnly([
+        'id','photoBytes','photoName','mime','sourceHash','updatedAt','uploadedBy'
+      ]) &&
+      request.resource.data.keys().hasAll([
+        'id','photoBytes','photoName','mime','sourceHash','updatedAt','uploadedBy'
+      ]) &&
+      request.resource.data.id == fichaId &&
+      request.resource.data.photoBytes is bytes &&
+      request.resource.data.photoBytes.size() > 0 &&
+      request.resource.data.photoBytes.size() <= 850000 &&
+      request.resource.data.photoName is string &&
+      request.resource.data.photoName.size() >= 5 &&
+      request.resource.data.photoName.size() <= 160 &&
+      request.resource.data.mime == 'image/jpeg' &&
+      request.resource.data.sourceHash is string &&
+      request.resource.data.sourceHash.matches('^[0-9a-f]{8}
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+) &&
+      request.resource.data.uploadedBy == request.auth.uid &&
+      request.resource.data.updatedAt == request.time;
+    }
+    match /dejavu_staff_evidencias/{fichaId} {
+      allow get: if exists(publicStaffPath(fichaId));
+      allow list: if false;
+      allow create, update: if canEdit() &&
+        exists(publicStaffPath(fichaId)) &&
+        validPublishedEvidence(fichaId);
+      allow delete: if canEdit();
+    }
+
     // Todas las demás colecciones permanecen cerradas.
     match /{document=**} {
       allow read, write: if false;
