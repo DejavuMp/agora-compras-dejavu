@@ -21,6 +21,7 @@
   <section class="tile"><strong>2 · Catálogo público del staff</strong><div id="catalog" class="status" role="status" aria-live="polite">Comprobando permisos de lectura…</div></section>
   <section class="tile"><strong>3 · Formulario de pagos</strong><div id="form" class="status" role="status" aria-live="polite">Buscando formulario vigente…</div></section>
   <section class="tile"><strong>4 · Cuenta de coordinación</strong><div id="access" class="status" role="status" aria-live="polite">Inicio de sesión opcional para comprobar permiso de publicación.</div></section>
+  <section class="tile"><strong>5 · Fotos de evidencia</strong><div id="photos" class="status" role="status" aria-live="polite">Consultando permisos de fotografías…</div></section>
  </div>
  <div class="row">
   <button type="button" id="retry">Revisar nuevamente</button>
@@ -38,15 +39,26 @@ import {GoogleAuthProvider,signInWithPopup,onAuthStateChanged,signOut} from "htt
 const fb=window.AGORA_FIREBASE,$=id=>document.getElementById(id);
 function set(id,txt,type=''){const el=$(id);el.textContent=txt;el.className='status '+type;}
 async function check(){
- if(!fb?.firestore){set('sdk','La configuración de Firebase no está disponible. Revisa la carga del SDK.','bad');set('catalog','Sin conexión de Firebase.','bad');return}
+ if(!fb?.firestore){set('sdk','La configuración de Firebase no está disponible. Revisa la carga del SDK.','bad');set('catalog','Sin conexión de Firebase.','bad');set('photos','Sin conexión de Firebase.','bad');return}
  set('sdk','Proyecto: '+fb.config.projectId+'\nSDK configurado.','good');
  set('catalog','Consultando permiso de lectura…');
  try{
   const snap=await getDocs(query(collection(fb.firestore,'dejavu_staff_publicadas'),limit(1)));
   set('catalog','Acceso correcto. El catálogo de fichas publicadas se puede consultar.'+(snap.empty?'\nTodavía no hay fichas en la primera consulta.':''),'good');
+  if(snap.empty){set('photos','No hay fichas publicadas para comprobar la descarga de una fotografía.');}
+  else{
+   const id=snap.docs[0].id;
+   try{
+    const evidence=await getDoc(doc(fb.firestore,'dejavu_staff_evidencias',id));
+    set('photos',evidence.exists()?'Lectura autorizada. La foto de la primera ficha se puede descargar.':'Permiso de lectura autorizado. La primera ficha todavía no tiene fotografía publicada.','good');
+   }catch(error){
+    set('photos',error?.code==='permission-denied'?'Permiso denegado. Faltan publicar las nuevas reglas de fotos de evidencia en Firestore.':'No se pudo consultar la fotografía: '+String(error?.code||error?.message).slice(0,110),'bad');
+   }
+  }
  }catch(e){
   const denied=e?.code==='permission-denied';
   set('catalog',denied?'Permiso denegado. Falta activar las reglas Firestore del catálogo.':'Error de conexión: '+String(e?.code||e?.message||e).slice(0,120),'bad');
+  set('photos','Primero debe funcionar la lectura del catálogo.','bad');
  }
 }
 async function checkForm(){
