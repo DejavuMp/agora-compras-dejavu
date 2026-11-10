@@ -385,13 +385,7 @@ service cloud.firestore {
       request.resource.data.photoName.size() <= 160 &&
       request.resource.data.mime == 'image/jpeg' &&
       request.resource.data.sourceHash is string &&
-      request.resource.data.sourceHash.matches('^[0-9a-f]{8}
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-) &&
+      request.resource.data.sourceHash.matches('^[0-9a-f]{8}$') &&
       request.resource.data.uploadedBy == request.auth.uid &&
       request.resource.data.updatedAt == request.time;
     }
