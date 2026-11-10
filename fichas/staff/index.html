@@ -220,13 +220,15 @@ body{background:var(--paper);font-family:Arial,Helvetica,sans-serif}
   <p style="font-size:11px;color:#726d65;line-height:1.6;margin:10px 0">La publicación automática en el enlace permanente necesita reglas activas de Firebase. No es necesaria para compartir tus fichas ahora.</p>
   <div style="display:flex;flex-wrap:wrap;gap:8px">
     <button id="publicLogin" class="btn btn-outline" type="button">Conectar nube</button>
-    <button id="publicAll" class="btn btn-outline" type="button" disabled>Sincronizar automáticamente</button>
+    <button id="publicAll" class="btn btn-outline" type="button" disabled>Sincronizar fichas</button>
+    <button id="publishPhotos" class="btn btn-primary" type="button" disabled>Publicar fotos de evidencia</button>
     <button id="publicLogout" class="btn btn-outline" type="button" hidden>Desconectar</button>
   </div>
   <p style="font-size:12px;margin:12px 0 4px" id="publicStatus" role="status" aria-live="polite">Sincronización permanente no activada.</p>
   <p style="font-size:11px;margin:0" id="publicCount">0 fichas sincronizadas permanentemente</p>
+  <p id="photoPublishStatus" role="status" aria-live="polite" style="font-size:12px;line-height:1.6;margin:10px 0 0">Las fotos originales continúan guardadas en este dispositivo. Para compartirlas, primero autoriza su publicación.</p>
 </details>
-  <p style="font-size:11px;margin:8px 0 0;color:#8b7350"><strong>Importante:</strong> las fichas publicadas serán visibles para cualquiera con el enlace. Se comparten campaña, responsable, fecha y ubicación; no correos privados ni fotografías.</p>
+  <p style="font-size:11px;margin:8px 0 0;color:#8b7350"><strong>Importante:</strong> las fichas publicadas serán visibles para cualquiera con el enlace. Se comparten campaña, responsable, fecha y ubicación. Las fotografías solo se compartirán después de autorizarlas; no se publican correos privados ni datos bancarios.</p>
 </div>
       <div class="toolbar"><input class="searchbox" id="filterInput" aria-label="Buscar fichas" type="search" placeholder="Buscar por campaña, persona o lugar..."><input id="filterMonth" type="month" aria-label="Filtrar por mes" title="Filtrar por mes" style="min-height:42px;border:1px solid #d9d6cf;border-radius:8px;padding:0 9px;background:white;color:#252525"><button id="backupBtn" class="btn btn-outline" type="button">Respaldar mis fichas</button><button id="importBackupBtn" class="btn btn-outline" type="button">Importar fichas anteriores</button></div>
       <div id="savedList" class="record-list"></div><p style="font-size:12px;color:#77736b;margin:16px 0 0">Las fichas originales y fotos siguen guardadas aquí. Para que el staff vea el historial compartido, utiliza «Publicar mis fichas» con tu cuenta autorizada. Conserva siempre tu respaldo.</p>
@@ -1723,6 +1725,7 @@ $('publicShareBtn').addEventListener('click',()=>lastPublic&&whatsapp(lastPublic
 window.addEventListener('hashchange',routeHash);
 window.DEJAVU_STAFF_BRIDGE=Object.freeze({
  list:()=>records.map(r=>({...r})),
+ photo:(id)=>photoGet(id),
  setRevision:(id,revision)=>{const rec=records.find(r=>r.id===id);if(!rec)return;rec.cloudRevision=Number(revision);saveStorage();},
  merge:(cloudRows)=>{
   let changed=false;
