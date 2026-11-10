@@ -16,6 +16,20 @@ En **Fichas anteriores** del generador, el botón **Compartir todas mis fichas a
 
 La publicación automática en el **enlace permanente sin fragmento** sigue pendiente hasta que se desplieguen y prueben las reglas de Firebase. El botón de publicación automática permanece separado y la interfaz no debe confundir ambos modos.
 
+## Fotografía de evidencia para el personal
+
+La página pública **Fichas e historial** está orientada a copiar la información de la actividad (campaña, solicitado por, fecha, ubicación) y a **descargar la fotografía de evidencia real**, no una imagen de la ficha.
+
+- Hay botones para copiar cada dato y **Copiar toda la información**, con los valores formateados para pegarlos en el formulario.
+- El apartado **Fotografía de evidencia** ofrece previsualización y **Descargar foto de evidencia (JPG)** cuando el documento fue publicado.
+- La fotografía original del administrador permanece en IndexedDB o respaldo local. El servidor usa una copia JPEG optimizada, de hasta 850 KB, guardada como campo binario en la colección separada **`dejavu_staff_evidencias`**. No se usa Cloud Storage ni se requiere pasar Firebase al plan Blaze para esto.
+- Al publicar las fichas, el coordinador puede abrir **Fichas anteriores → Sincronización automática en la nube → Publicar fotos de evidencia**. El botón pide una confirmación explícita antes de compartirlas. Las próximas ediciones sincronizan la fotografía si ya se autorizó esta publicación.
+- **Los documentos de fotografía no se publican solos**: el staff verá “fotografía todavía no publicada” mientras no se autorice la primera carga o no estén activadas las nuevas reglas Firestore.
+- Las fotografías se pueden consultar desde la web sin iniciar sesión **si la ficha correspondiente está publicada**. No subas fotografías que deban mantenerse privadas. Un trabajador no puede modificar, subir ni borrar fotos.
+- Las fichas antiguas recuperadas en otro navegador necesitan su **foto original local**, no solo los cuatro campos. El enlace de catálogo estático `#catalog=` nunca incluye fotos.
+
+**Activación adicional necesaria:** en `firestore.rules` se añadió `dejavu_staff_evidencias`. Las reglas se probaron con Firebase Emulator Suite (28 pruebas exitosas). Para usar la descarga en producción hay que volver a publicar la versión completa de reglas actualizadas en Firebase Firestore → Reglas. Usar el archivo completo del repositorio; **no reemplazar por un fragmento** ni borrar los permisos existentes de Ágora.
+
 ## Trabajo del coordinador
 
 1. Abrir el generador desde el mismo navegador donde están las fichas guardadas. Crear/editar fichas como siempre; guardado original local en localStorage y evidencia en IndexedDB.
