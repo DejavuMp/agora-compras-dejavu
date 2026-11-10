@@ -10,6 +10,20 @@ function normalized(x,id){
  return {id:String(id||x?.id||''),campaign:s('campaign'),responsible:s('responsible'),
  activityDate:s('activityDate').slice(0,10),location:s('location')};
 }
+// La fotografía vive en un documento separado para que la ficha siga
+// siendo un texto ligero. Se recupera únicamente al abrir una actividad.
+async function loadEvidence(id){
+ if(!fb?.firestore)throw Error('Firebase no está disponible');
+ if(!/^DJV-[0-9]{8}-[0-9]{3,}$/.test(String(id||'')))return null;
+ const found=await getDoc(doc(fb.firestore,'dejavu_staff_evidencias',id));
+ if(!found.exists())return null;
+ const data=found.data();
+ if(data?.mime!=='image/jpeg'||typeof data.photoBytes?.toUint8Array!=='function')return null;
+ const bytes=data.photoBytes.toUint8Array();
+ if(!bytes.length||bytes.length>850000)return null;
+ return {bytes,photoName:typeof data.photoName==='string'?data.photoName:'Evidencia_'+id+'.jpg'};
+}
+app.setPhotoLoader(loadEvidence);
 async function load(){
  if(!fb||!fb.firestore){app.setError('No se pudo iniciar el catálogo compartido. El formulario de pagos sigue disponible.');return}
  try{
