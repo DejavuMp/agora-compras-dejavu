@@ -38,6 +38,8 @@ jobs:
         run: npm install --no-save 'firebase@^12.0.0' '@firebase/rules-unit-testing@^5.0.0' firebase-tools
       - name: Probar accesos de visitantes, personal y coordinadores
         run: npx firebase emulators:exec --only firestore --project demo-dejavu-fichas-staff --non-interactive 'node .github/firebase-staff/test-rules.mjs'
+      - name: Probar Finanzas - crear solicitudes, roles, autorizar y pagar
+        run: npx firebase emulators:exec --only firestore --project demo-agora-finanzas --non-interactive 'node .github/firebase-staff/test-finance-rules.mjs'
 
   rules-deploy:
     name: "Activar únicamente reglas Firestore cuando la base actual coincida"

@@ -20,15 +20,33 @@ function assertIndexOrder(text){
  if(a<0||b<=a||c<=b)throw Error('El archivo local no contiene los bloques de Staff en el orden previsto');
  return {a,b,c};
 }
-const {a,b,c}=assertIndexOrder(candidate);
-const base=candidate.slice(0,a)+candidate.slice(c);
-const privateOnly=candidate.slice(0,b)+candidate.slice(c);
+// El bloque financiero es nuevo. Reconocer la versión anterior SIN Finanzas
+// permite aplicar la ampliación sin alterar ninguna regla ya publicada.
+const financeMarker='// ÁGORA · Recursos y Finanzas 2026';
+const financeAt=candidate.indexOf(financeMarker);
+if(financeAt<0||candidate.indexOf(financeMarker,financeAt+1)!==-1){
+ throw Error('No se identificó un único bloque de Recursos y Finanzas; cancelar.');
+}
+const markerEnd='    // Todas las demás colecciones permanecen cerradas.';
+const financeEnd=candidate.indexOf(markerEnd,financeAt);
+if(financeEnd<financeAt)throw Error('Marcador final de Finanzas no encontrado');
+const legacy=candidate.slice(0,financeAt)+candidate.slice(financeEnd);
 const evidenceMarker='    // Fotos de evidencia compartidas: archivo JPEG optimizado, separado de los';
-const evidenceAt=candidate.indexOf(evidenceMarker);
-if(evidenceAt<=b||evidenceAt>=c)throw Error('No se encontró el bloque de evidencias en el área de Staff');
-const beforePhotos=candidate.slice(0,evidenceAt)+candidate.slice(c);
 function normalize(s){return String(s).replace(/\r\n?/g,'\n').trim()}
-const allowed=new Set([normalize(base),normalize(privateOnly),normalize(beforePhotos),normalize(candidate)]);
+function safeVariants(text){
+ const {a,b,c}=assertIndexOrder(text);
+ const evidenceAt=text.indexOf(evidenceMarker);
+ if(evidenceAt<=b||evidenceAt>=c)throw Error('No se encontró el bloque de evidencias en el área de Staff');
+ return [
+  text,
+  text.slice(0,a)+text.slice(c),
+  text.slice(0,b)+text.slice(c),
+  text.slice(0,evidenceAt)+text.slice(c)
+ ];
+}
+// Solo admitir reglas idénticas a versiones conocidas de Staff (con o sin el
+// NUEVO bloque financiero). Cualquier edición ajena cancela el despliegue.
+const allowed=new Set([...safeVariants(candidate),...safeVariants(legacy)].map(normalize));
 const headers={Authorization:'Bearer '+token,Accept:'application/json'};
 async function getJson(path){
  const url='https://firebaserules.googleapis.com/v1/'+path;
@@ -53,8 +71,8 @@ if(!allowed.has(normalize(live))){
  throw Error('REGLAS DISTINTAS EN PRODUCCIÓN. Se guardó respaldo. Se detiene para NO modificar permisos de Ágora Compras, Archivos u otros módulos.');
 }
 if(normalize(live)===normalize(candidate)){
- console.log('Las reglas de Staff ya coinciden con el repositorio. No se requiere cambiar contenido.');
+ console.log('Las reglas de ÁGORA coinciden con el repositorio. No se requiere cambiar contenido.');
 }else{
- console.log('La base activa de Ágora coincide con una versión conocida. Es seguro añadir los bloques de Staff sin cambiar los demás permisos.');
+ console.log('Las reglas activas de ÁGORA coinciden con una versión conocida; es seguro añadir permisos de Finanzas sin modificar los demás módulos.');
 }
 console.log('Verificación previa de reglas completada. Proyecto: '+project);
