@@ -45,7 +45,7 @@
   <div class="form-heading"><span class="step">01</span><div><h3>Información general</h3><p>Ubicación del gasto y motivo de la solicitud.</p></div></div>
   <div class="fields">
    <label>Tipo de solicitud <select name="category" required><option value="materiales">Compra de materiales e insumos</option><option value="productos">Productos para cliente o reventa</option><option value="proveedor">Pago o anticipo a proveedor</option><option value="nomina">Nómina, staff u honorarios</option><option value="otro">Otro pago operativo</option></select></label>
-   <label>Proyecto / campaña <input name="project" maxlength="130" required placeholder="Ej. KFC · Desayunos"></label>
+   <label>Proyecto / campaña <input name="project" list="agora-projects" maxlength="130" required placeholder="Ej. KFC · Desayunos"></label>
    <label>Cliente <input name="client" maxlength="100" placeholder="Ej. KFC México"></label>
    <label>Fecha en que se necesita <input name="dateNeeded" type="date" required></label>
    <label>Prioridad <select name="priority"><option value="normal">Normal</option><option value="urgente">Urgente</option></select></label>
@@ -63,7 +63,7 @@
   <div class="form-heading"><span class="step">03</span><div><h3>Datos para entrega o transferencia</h3><p>Indica si el dinero se entrega a un responsable o si se paga directamente.</p></div></div>
   <div class="fields">
    <label>Modalidad <select name="paymentType"><option value="entrega">Entrega de recursos al responsable</option><option value="directo">Pago directo al proveedor / beneficiario</option></select></label>
-   <label>Beneficiario <input name="beneficiary" maxlength="120" required placeholder="Nombre o razón social"></label>
+   <label>Beneficiario <input name="beneficiary" list="agora-beneficiaries" maxlength="120" required placeholder="Nombre o razón social"></label>
    <label>Forma de entrega <select name="paymentMethod"><option value="transferencia">Transferencia</option><option value="efectivo">Efectivo</option><option value="otro">Otro</option></select></label>
    <label>Correo de contacto <input name="beneficiaryEmail" type="email" maxlength="180" placeholder="opcional@ejemplo.com"></label>
    <label>Banco <input name="bank" maxlength="100" placeholder="Opcional"></label>
@@ -75,6 +75,7 @@
  </div>
  <div class="form-actions"><button type="reset" class="btn btn-outline">Limpiar</button><button type="submit" class="btn btn-gold large" id="submit-request">Guardar solicitud →</button></div>
  </form>
+ <datalist id="agora-projects"></datalist><datalist id="agora-beneficiaries"></datalist>
 </section>
 <section id="history" class="view" hidden>
  <div class="section-intro"><div><h2>Historial de solicitudes</h2><p>Revisa estados, montos autorizados, pagos y documentos generados.</p></div><button class="btn btn-outline" id="import-btn">↑ Importar respaldo</button><input id="import-file" type="file" accept=".json,application/json" hidden></div>
