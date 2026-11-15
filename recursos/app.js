@@ -11,6 +11,7 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const money=v=>new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(Number(v)||0);
 const round=v=>Math.round((Number(v)||0)*100)/100;
 const iso=()=>new Date().toISOString();
+const localDate=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);};
 const dateOnly=v=>v?String(v).slice(0,10):'';
 const asDate=v=>v?.toDate?.()?.toLocaleString('es-MX')||String(v||'');
 const el=(tag,cls='',txt='')=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt)e.textContent=txt;return e;};
@@ -197,7 +198,7 @@ function detailHtml(r){
   result+='<form id="decision-form" class="decision"><h4>Registrar decisión'+(!state.cloud?' (manual / local)':'')+'</h4><select name="decision"><option value="aprobada">Autorizar importe completo</option><option value="aprobada_parcial">Autorizar parcialmente</option><option value="ajustes">Solicitar cambios</option><option value="rechazada">Rechazar</option></select><input name="approved" type="number" step="0.01" min="0" max="'+esc(r.total)+'" placeholder="Monto autorizado para autorización parcial"><textarea name="comment" rows="2" maxlength="1000" placeholder="Comentarios / motivo de la decisión"></textarea><button class="btn btn-gold" type="submit">Registrar decisión</button><p>Las decisiones tomadas en modo local son registros manuales, no autorizaciones emitidas por terceros.</p></form>';
  }
  if(canManage()&&available(r)){
-  result+='<form id="payment-form" class="decision"><h4>Registrar entrega o pago</h4><input name="amount" type="number" step=".01" min=".01" max="'+esc(outstanding)+'" placeholder="Importe entregado (máximo '+money(outstanding)+')" required><input name="date" type="date" required value="'+dateOnly(iso())+'"><select name="method"><option value="transferencia">Transferencia</option><option value="efectivo">Efectivo</option><option value="otro">Otro</option></select><input name="reference" maxlength="120" placeholder="Referencia bancaria o comprobante"><button class="btn btn-gold" type="submit">Guardar pago</button></form>';
+  result+='<form id="payment-form" class="decision"><h4>Registrar entrega o pago</h4><input name="amount" type="number" step=".01" min=".01" max="'+esc(outstanding)+'" placeholder="Importe entregado (máximo '+money(outstanding)+')" required><input name="date" type="date" required value="'+localDate()+'"><select name="method"><option value="transferencia">Transferencia</option><option value="efectivo">Efectivo</option><option value="otro">Otro</option></select><input name="reference" maxlength="120" placeholder="Referencia bancaria o comprobante"><button class="btn btn-gold" type="submit">Guardar pago</button></form>';
  }
  const link=visibleLink(r);
  result+='<p class="small-note" style="margin-top:17px;font-size:11px;color:#837664">'+(link?'Enlace privado: solo usuarios de ÁGORA autorizados pueden consultar o aprobar.':'Modo local: PDF y PNG sí funcionan; un enlace por sí solo no puede registrar autorizaciones externas.')+'</p>';
@@ -232,7 +233,7 @@ async function pay(e){
  try{
   const amount=round(f.get('amount')),left=round(r.approvedAmount-r.paidAmount);
   if(!(amount>0&&amount<=left))throw Error('El pago debe ser mayor a cero y no exceder el saldo autorizado.');
-  const payment={id:crypto.randomUUID?.()||String(Date.now()),amount,date:String(f.get('date')||dateOnly(iso())),method:String(f.get('method')||''),reference:String(f.get('reference')||'').trim().slice(0,120)};
+  const payment={id:crypto.randomUUID?.()||String(Date.now()),amount,date:String(f.get('date')||localDate()),method:String(f.get('method')||''),reference:String(f.get('reference')||'').trim().slice(0,120)};
   const paidAmount=round(Number(r.paidAmount||0)+amount);
   const status=paidAmount>=r.approvedAmount?'pagada':'pago_parcial';
   await updateRecord(r,{payments:[...(r.payments||[]),payment],paidAmount,status},'Pago registrado: '+money(amount)+' · '+payment.method);
@@ -300,7 +301,7 @@ async function exportBackup(){
  try{
   const data={format:'agora-recursos-local-v1',exportedAt:iso(),records:state.cloud?[]:await dbAll()};
   if(state.cloud){showToast('Los registros de Firebase no se exportan desde esta opción. Desconecta Google para respaldar los registros locales.');return;}
-  downloadBlob(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),'AGORA_RECURSOS_RESPALDO_'+dateOnly(iso())+'.json');showToast('Respaldo local descargado.');
+  downloadBlob(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),'AGORA_RECURSOS_RESPALDO_'+localDate()+'.json');showToast('Respaldo local descargado.');
  }catch(error){showToast(readable(error));}
 }
 async function importBackup(file){
@@ -353,7 +354,7 @@ async function loadExistingCatalog(){
 
 function setup(){
  $('#footer-date').textContent=new Date().getFullYear();
- $('#request-form').querySelector('[name="dateNeeded"]').value=dateOnly(iso());
+ $('#request-form').querySelector('[name="dateNeeded"]').value=localDate();
  addLine();
  $$('#line-items').length;
  document.addEventListener('click',async e=>{
@@ -379,7 +380,7 @@ function setup(){
   }catch(error){showToast(readable(error));}
  });
  $('#request-form').addEventListener('submit',saveRequest);
- $('#request-form').addEventListener('reset',()=>setTimeout(()=>{$('#line-items').innerHTML='';addLine();$('#request-form').querySelector('[name="dateNeeded"]').value=dateOnly(iso());},0));
+ $('#request-form').addEventListener('reset',()=>setTimeout(()=>{$('#line-items').innerHTML='';addLine();$('#request-form').querySelector('[name="dateNeeded"]').value=localDate();},0));
  $('#line-items').addEventListener('input',calc);
  $('#search').addEventListener('input',render);
  $('#status-filter').addEventListener('change',render);
