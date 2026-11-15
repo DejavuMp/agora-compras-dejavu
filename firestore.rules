@@ -362,10 +362,7 @@ service cloud.firestore {
         request.resource.data.updatedAt == request.time;
       allow delete: if canEdit();
     }
-
-    // Fotos de evidencia compartidas: archivo JPEG optimizado, separado de los
-    // datos de la ficha. Lectura solo de documentos asociados a fichas publicadas.
-    // Nadie anónimo puede subir ni modificar imágenes. No requiere Cloud Storage.
+        // Fotos de evidencia compartidas: acceso a fichas publicadas.
     function publicStaffPath(fichaId) {
       return /databases/$(database)/documents/dejavu_staff_publicadas/$(fichaId);
     }
@@ -397,12 +394,6 @@ service cloud.firestore {
         validPublishedEvidence(fichaId);
       allow delete: if canEdit();
     }
-
-// ÁGORA · Recursos y Finanzas 2026
-// PEGAR DENTRO de match /databases/{database}/documents,
-// justo ANTES del match /{document=**} final.
-// Reutiliza signedIn(), activeStaff(), canEdit(), isAdmin() de firestore.rules.
-// Nunca abre lectura ni aprobación anónimas de datos bancarios o nóminas.
 
 // ÁGORA · Recursos y Finanzas 2026
 // PEGAR DENTRO de match /databases/{database}/documents,
