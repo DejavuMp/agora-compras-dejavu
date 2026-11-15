@@ -1,5 +1,21 @@
-import * as authSdk from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
-import * as dbSdk from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
+// Arranque independiente de Firebase: el módulo local funciona incluso sin CDN.
+// Los SDK se importan únicamente cuando la conexión Firebase está disponible.
+let authSdk=null, dbSdk=null, firebaseSdkLoading=null;
+async function ensureFirebaseSdk(){
+ if(authSdk&&dbSdk)return true;
+ if(!firebaseSdkLoading){
+  firebaseSdkLoading=Promise.all([
+   import('https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js'),
+   import('https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js')
+  ]).then(([auth,db])=>{authSdk=auth;dbSdk=db;return true;}).catch(error=>{
+   firebaseSdkLoading=null;
+   console.warn('ÁGORA Recursos: Firebase no disponible, se conserva el modo local.',error);
+   showToast('Firebase no respondió. Puedes continuar creando solicitudes en modo local.');
+   return false;
+  });
+ }
+ return firebaseSdkLoading;
+}
 
 const COLLECTION='agora_finance_requests';
 const LOGO_URL=new URL('../archivos/dejavu-logo-oficial.png',import.meta.url).href;
@@ -62,6 +78,8 @@ async function loadRecords(){
 }
 async function activateFirebase(){
  const fb=window.AGORA_FIREBASE;if(!fb?.initialized)return;
+ const ready=await ensureFirebaseSdk();
+ if(!ready)return; // Ningún error de Firebase debe bloquear la interfaz local.
  state.fb=fb;
  authSdk.onAuthStateChanged(fb.auth,async user=>{
   state.user=user;state.role='';state.cloud=false;
@@ -78,10 +96,18 @@ async function activateFirebase(){
  });
 }
 async function connect(){
- if(state.user){await authSdk.signOut(state.fb.auth);return;}
- if(!state.fb){showToast('Firebase no está disponible en esta página.');return;}
- try{await authSdk.signInWithPopup(state.fb.auth,new authSdk.GoogleAuthProvider());}
- catch(error){showToast('No se pudo iniciar sesión: '+readable(error));}
+ try{
+  if(!state.fb){
+   if(!window.AGORA_FIREBASE?.initialized){
+    showToast('Firebase no está disponible. El formulario local continúa funcionando.');
+    return;
+   }
+   await activateFirebase();
+  }
+  if(!state.fb || !await ensureFirebaseSdk())return;
+  if(state.user){await authSdk.signOut(state.fb.auth);return;}
+  await authSdk.signInWithPopup(state.fb.auth,new authSdk.GoogleAuthProvider());
+ }catch(error){showToast('No se pudo conectar a Google: '+readable(error));}
 }
 function badge(s){return '<span class="chip '+esc(s)+'">'+esc(STATUS[s]||s)+'</span>';}
 function view(name){
@@ -429,9 +455,14 @@ function setup(){
   if(e.target.id==='payment-form')pay(e);
  });
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#modal').hidden)modalClose();});
- if(window.AGORA_FIREBASE)activateFirebase();
- else window.addEventListener('agora:firebase-ready',activateFirebase,{once:true});
+ // Los botones y formularios se activan primero; Firebase es opcional.
  loadRecords();
  loadExistingCatalog();
+ if(window.AGORA_FIREBASE)activateFirebase();
+ else window.addEventListener('agora:firebase-ready',activateFirebase,{once:true});
+ // Mensaje explícito cuando falla la inicialización externa.
+ window.addEventListener('agora:firebase-error',()=>{
+  showToast('No se pudo conectar Firebase. Tus formularios locales siguen disponibles.');
+ });
 }
 setup();
