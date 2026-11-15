@@ -31,7 +31,7 @@ const localDate=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezon
 const dateOnly=v=>v?String(v).slice(0,10):'';
 const asDate=v=>v?.toDate?.()?.toLocaleString('es-MX')||String(v||'');
 const el=(tag,cls='',txt='')=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt)e.textContent=txt;return e;};
-const state={view:'dashboard',records:[],selected:'',user:null,role:'',fb:null,cloud:false,loading:false,mode:'local',editingId:''};
+const state={view:'dashboard',records:[],selected:'',user:null,role:'',fb:null,cloud:false,loading:false,mode:'local',editingId:'',forceLocal:false};
 let idbPromise;
 function dbOpen(){
  if(idbPromise)return idbPromise;
@@ -76,24 +76,41 @@ async function loadRecords(){
   else banner('No se pudo cargar la información local: '+readable(error),'error');
  }finally{state.loading=false;render();}
 }
+async function refreshCloudUser(user){
+ state.user=user;state.role='';state.cloud=false;
+ if(user&&!state.forceLocal){
+  try{
+   const staff=await dbSdk.getDoc(dbSdk.doc(state.fb.firestore,'agora_users',user.uid));
+   const profile=staff.data();
+   if(profile?.active===true&&['admin','coordinador','consulta'].includes(profile.role)){
+    state.role=profile.role;state.cloud=true;
+   }else{
+    showToast('Tu cuenta no tiene un perfil activo en ÁGORA. Puedes trabajar localmente.');
+   }
+  }catch(error){showToast('Nube no disponible: '+readable(error));}
+ }
+ await loadRecords();
+ if(location.search.includes('id='))openQueryDetail();
+}
 async function activateFirebase(){
  const fb=window.AGORA_FIREBASE;if(!fb?.initialized)return;
  const ready=await ensureFirebaseSdk();
  if(!ready)return; // Ningún error de Firebase debe bloquear la interfaz local.
+ if(state.fb===fb)return;
  state.fb=fb;
- authSdk.onAuthStateChanged(fb.auth,async user=>{
-  state.user=user;state.role='';state.cloud=false;
-  if(user){
-   try{
-    const staff=await dbSdk.getDoc(dbSdk.doc(fb.firestore,'agora_users',user.uid));
-    const profile=staff.data();
-    if(profile?.active===true&&['admin','coordinador','consulta'].includes(profile.role)){state.role=profile.role;state.cloud=true;}
-    else banner('Tu cuenta Google inició sesión, pero no tiene un perfil activo en agora_users. Seguimos en modo local.','error');
-   }catch(error){banner('No se validó tu perfil de Firebase: '+readable(error),'error');}
-  }
+ authSdk.onAuthStateChanged(fb.auth,user=>refreshCloudUser(user));
+}
+async function toggleLocalMode(){
+ state.forceLocal=!state.forceLocal;
+ if(state.forceLocal){
+  state.cloud=false;
   await loadRecords();
-  if(location.search.includes('id='))openQueryDetail();
- });
+  showToast('Modo local activado. Puedes crear solicitudes, imprimir y respaldar.');
+ }else{
+  if(state.fb&&authSdk&&dbSdk)await refreshCloudUser(state.fb.auth.currentUser);
+  else if(window.AGORA_FIREBASE?.initialized)await activateFirebase();
+  else {await loadRecords();showToast('Firebase no está disponible. Continúa en modo local.');}
+ }
 }
 async function connect(){
  try{
@@ -136,6 +153,7 @@ function render(){
  $('#mode-pill').textContent=state.cloud?'Nube · '+state.role:'Solo local';
  $('#mode-pill').style.background=state.cloud?'#e9f7ed':'#fcf7ec';
  $('#login-btn').textContent=state.user?'Salir de Google':'Conectar Google';
+ $('#work-local-btn').textContent=state.forceLocal?'Reintentar nube':'Trabajar localmente';
  $('#submit-request').disabled=state.cloud&&state.role==='consulta';
 }
 function addLine(description='',quantity=1,unitPrice=''){
@@ -426,6 +444,7 @@ function setup(){
   const target=e.target.closest('[data-open]');if(target){openDetail(target.dataset.open);return;}
   if(e.target.closest('#menu-toggle')){$('#sidebar').classList.toggle('open');return;}
   if(e.target.closest('#login-btn')){await connect();return;}
+  if(e.target.closest('#work-local-btn')){await toggleLocalMode();return;}
   if(e.target.closest('#modal-close')||e.target.matches('[data-close]')){modalClose();return;}
   if(e.target.closest('#add-item')){addLine();return;}
   if(e.target.closest('.delete-line')){if($$('.line-row').length>1){e.target.closest('.line-row').remove();calc();}return;}
