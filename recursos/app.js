@@ -1,5 +1,21 @@
-import * as authSdk from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
-import * as dbSdk from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
+// Arranque independiente de Firebase: el módulo local funciona incluso sin CDN.
+// Los SDK se importan únicamente cuando la conexión Firebase está disponible.
+let authSdk=null, dbSdk=null, firebaseSdkLoading=null;
+async function ensureFirebaseSdk(){
+ if(authSdk&&dbSdk)return true;
+ if(!firebaseSdkLoading){
+  firebaseSdkLoading=Promise.all([
+   import('https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js'),
+   import('https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js')
+  ]).then(([auth,db])=>{authSdk=auth;dbSdk=db;return true;}).catch(error=>{
+   firebaseSdkLoading=null;
+   console.warn('ÁGORA Recursos: Firebase no disponible, se conserva el modo local.',error);
+   showToast('Firebase no respondió. Puedes continuar creando solicitudes en modo local.');
+   return false;
+  });
+ }
+ return firebaseSdkLoading;
+}
 
 const COLLECTION='agora_finance_requests';
 const LOGO_URL=new URL('../archivos/dejavu-logo-oficial.png',import.meta.url).href;
@@ -15,7 +31,7 @@ const localDate=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezon
 const dateOnly=v=>v?String(v).slice(0,10):'';
 const asDate=v=>v?.toDate?.()?.toLocaleString('es-MX')||String(v||'');
 const el=(tag,cls='',txt='')=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt)e.textContent=txt;return e;};
-const state={view:'dashboard',records:[],selected:'',user:null,role:'',fb:null,cloud:false,loading:false,mode:'local',editingId:''};
+const state={view:'dashboard',records:[],selected:'',user:null,role:'',fb:null,cloud:false,loading:false,mode:'local',editingId:'',forceLocal:false};
 let idbPromise;
 function dbOpen(){
  if(idbPromise)return idbPromise;
@@ -60,28 +76,56 @@ async function loadRecords(){
   else banner('No se pudo cargar la información local: '+readable(error),'error');
  }finally{state.loading=false;render();}
 }
+async function refreshCloudUser(user){
+ state.user=user;state.role='';state.cloud=false;
+ if(user&&!state.forceLocal){
+  try{
+   const staff=await dbSdk.getDoc(dbSdk.doc(state.fb.firestore,'agora_users',user.uid));
+   const profile=staff.data();
+   if(profile?.active===true&&['admin','coordinador','consulta'].includes(profile.role)){
+    state.role=profile.role;state.cloud=true;
+   }else{
+    showToast('Tu cuenta no tiene un perfil activo en ÁGORA. Puedes trabajar localmente.');
+   }
+  }catch(error){showToast('Nube no disponible: '+readable(error));}
+ }
+ await loadRecords();
+ if(location.search.includes('id='))openQueryDetail();
+}
 async function activateFirebase(){
  const fb=window.AGORA_FIREBASE;if(!fb?.initialized)return;
+ const ready=await ensureFirebaseSdk();
+ if(!ready)return; // Ningún error de Firebase debe bloquear la interfaz local.
+ if(state.fb===fb)return;
  state.fb=fb;
- authSdk.onAuthStateChanged(fb.auth,async user=>{
-  state.user=user;state.role='';state.cloud=false;
-  if(user){
-   try{
-    const staff=await dbSdk.getDoc(dbSdk.doc(fb.firestore,'agora_users',user.uid));
-    const profile=staff.data();
-    if(profile?.active===true&&['admin','coordinador','consulta'].includes(profile.role)){state.role=profile.role;state.cloud=true;}
-    else banner('Tu cuenta Google inició sesión, pero no tiene un perfil activo en agora_users. Seguimos en modo local.','error');
-   }catch(error){banner('No se validó tu perfil de Firebase: '+readable(error),'error');}
-  }
+ authSdk.onAuthStateChanged(fb.auth,user=>refreshCloudUser(user));
+}
+async function toggleLocalMode(){
+ state.forceLocal=!state.forceLocal;
+ if(state.forceLocal){
+  state.cloud=false;
   await loadRecords();
-  if(location.search.includes('id='))openQueryDetail();
- });
+  if(!state.editingId)view('new');
+  showToast('Modo local activado. Ya puedes llenar y guardar una solicitud.');
+ }else{
+  if(state.fb&&authSdk&&dbSdk)await refreshCloudUser(state.fb.auth.currentUser);
+  else if(window.AGORA_FIREBASE?.initialized)await activateFirebase();
+  else {await loadRecords();showToast('Firebase no está disponible. Continúa en modo local.');}
+ }
 }
 async function connect(){
- if(state.user){await authSdk.signOut(state.fb.auth);return;}
- if(!state.fb){showToast('Firebase no está disponible en esta página.');return;}
- try{await authSdk.signInWithPopup(state.fb.auth,new authSdk.GoogleAuthProvider());}
- catch(error){showToast('No se pudo iniciar sesión: '+readable(error));}
+ try{
+  if(!state.fb){
+   if(!window.AGORA_FIREBASE?.initialized){
+    showToast('Firebase no está disponible. El formulario local continúa funcionando.');
+    return;
+   }
+   await activateFirebase();
+  }
+  if(!state.fb || !await ensureFirebaseSdk())return;
+  if(state.user){await authSdk.signOut(state.fb.auth);return;}
+  await authSdk.signInWithPopup(state.fb.auth,new authSdk.GoogleAuthProvider());
+ }catch(error){showToast('No se pudo conectar a Google: '+readable(error));}
 }
 function badge(s){return '<span class="chip '+esc(s)+'">'+esc(STATUS[s]||s)+'</span>';}
 function view(name){
@@ -110,6 +154,7 @@ function render(){
  $('#mode-pill').textContent=state.cloud?'Nube · '+state.role:'Solo local';
  $('#mode-pill').style.background=state.cloud?'#e9f7ed':'#fcf7ec';
  $('#login-btn').textContent=state.user?'Salir de Google':'Conectar Google';
+ $('#work-local-btn').textContent=state.forceLocal?'Reintentar nube':'Trabajar localmente';
  $('#submit-request').disabled=state.cloud&&state.role==='consulta';
 }
 function addLine(description='',quantity=1,unitPrice=''){
@@ -400,6 +445,7 @@ function setup(){
   const target=e.target.closest('[data-open]');if(target){openDetail(target.dataset.open);return;}
   if(e.target.closest('#menu-toggle')){$('#sidebar').classList.toggle('open');return;}
   if(e.target.closest('#login-btn')){await connect();return;}
+  if(e.target.closest('#work-local-btn')){await toggleLocalMode();return;}
   if(e.target.closest('#modal-close')||e.target.matches('[data-close]')){modalClose();return;}
   if(e.target.closest('#add-item')){addLine();return;}
   if(e.target.closest('.delete-line')){if($$('.line-row').length>1){e.target.closest('.line-row').remove();calc();}return;}
@@ -429,9 +475,14 @@ function setup(){
   if(e.target.id==='payment-form')pay(e);
  });
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#modal').hidden)modalClose();});
- if(window.AGORA_FIREBASE)activateFirebase();
- else window.addEventListener('agora:firebase-ready',activateFirebase,{once:true});
+ // Los botones y formularios se activan primero; Firebase es opcional.
  loadRecords();
  loadExistingCatalog();
+ if(window.AGORA_FIREBASE)activateFirebase();
+ else window.addEventListener('agora:firebase-ready',activateFirebase,{once:true});
+ // Mensaje explícito cuando falla la inicialización externa.
+ window.addEventListener('agora:firebase-error',()=>{
+  showToast('No se pudo conectar Firebase. Tus formularios locales siguen disponibles.');
+ });
 }
 setup();
