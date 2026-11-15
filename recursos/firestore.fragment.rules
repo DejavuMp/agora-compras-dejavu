@@ -90,6 +90,20 @@ function financePay() {
        request.resource.data.paidAmount < resource.data.approvedAmount)
     );
 }
+function financeCorrection() {
+  return resource.data.createdBy == request.auth.uid &&
+    resource.data.status in ['pendiente','ajustes'] &&
+    request.resource.data.status == 'pendiente' &&
+    request.resource.data.approvedAmount == 0 &&
+    request.resource.data.paidAmount == 0 &&
+    request.resource.data.payments.size() == 0 &&
+    request.resource.data.history.size() == resource.data.history.size() + 1 &&
+    request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+      'category','project','client','requester','dateNeeded','priority','reason',
+      'paymentType','paymentMethod','beneficiary','beneficiaryEmail','bank','account',
+      'notes','attachments','items','total','status','history','updatedBy','updatedAt'
+    ]);
+}
 match /agora_finance_requests/{requestId} {
   // Las cuentas autorizadas acceden solo a sus propias solicitudes.
   // Los administradores pueden revisar, decidir y registrar pagos.
@@ -108,11 +122,12 @@ match /agora_finance_requests/{requestId} {
     request.resource.data.payments.size() == 0 &&
     request.resource.data.history.size() == 1 &&
     request.resource.data.history[0].kind == 'solicitud';
-  allow update: if isAdmin() && financeBaseValid() &&
+  allow update: if financeBaseValid() &&
     request.resource.data.id == resource.data.id &&
     request.resource.data.folio == resource.data.folio &&
     request.resource.data.createdBy == resource.data.createdBy &&
     request.resource.data.createdAt == resource.data.createdAt &&
-    (financeDecision() || financePay());
+    ((isAdmin() && (financeDecision() || financePay())) ||
+     (canEdit() && financeCorrection()));
   allow delete: if false;
 }
