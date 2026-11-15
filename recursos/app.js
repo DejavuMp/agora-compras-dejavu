@@ -105,7 +105,8 @@ async function toggleLocalMode(){
  if(state.forceLocal){
   state.cloud=false;
   await loadRecords();
-  showToast('Modo local activado. Puedes crear solicitudes, imprimir y respaldar.');
+  if(!state.editingId)view('new');
+  showToast('Modo local activado. Ya puedes llenar y guardar una solicitud.');
  }else{
   if(state.fb&&authSdk&&dbSdk)await refreshCloudUser(state.fb.auth.currentUser);
   else if(window.AGORA_FIREBASE?.initialized)await activateFirebase();
