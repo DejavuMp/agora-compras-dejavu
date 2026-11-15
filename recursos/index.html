@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#171613">
+<title>ÁGORA | Recursos y Finanzas · Dejavú Marketing</title>
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="stylesheet" href="./style.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" integrity="sha512-BNa5wG+WjzP6tBj0SH7jB6D2zr9eByrz25AM7nc6LqH0SEk7hiTLDedjR1vDYMPVGsHkxrLKLCD7E3NdLArCW2A==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script type="module" src="../firebase-init.js"></script>
+<script type="module" src="./app.js"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar" id="sidebar">
+  <div class="brand"><div class="brand-mark">Á</div><div><strong>ÁGORA</strong><small>DEJAVÚ MARKETING</small></div></div>
+  <div class="brand-line"></div>
+  <div class="nav-caption">GESTIÓN FINANCIERA</div>
+  <nav aria-label="Navegación principal">
+    <button class="nav-item active" data-view="dashboard"><span>▦</span> Resumen</button>
+    <button class="nav-item" data-view="new"><span>＋</span> Nueva solicitud</button>
+    <button class="nav-item" data-view="history"><span>▤</span> Solicitudes e historial</button>
+    <button class="nav-item" data-view="gastos"><span>◫</span> Comprobación de gastos</button>
+  </nav>
+  <div class="sidebar-foot"><a href="../">← Regresar a ÁGORA</a><span>Recursos y Finanzas · 2026</span></div>
+</aside>
+<div class="main-wrap">
+<header class="topbar">
+ <div class="top-left"><button class="hamburger" id="menu-toggle" aria-label="Abrir o cerrar menú">☰</button><div><div class="crumb">ÁGORA / FINANZAS</div><h1 id="page-title">Resumen de recursos</h1></div></div>
+ <div class="top-actions"><span id="mode-pill" class="mode-pill">Modo local</span><button class="btn btn-outline small" id="login-btn">Conectar Google</button><button class="btn btn-gold small" data-view="new">+ Solicitud</button></div>
+</header>
+<main class="main-content">
+<div id="notice" class="notice" role="status"></div>
+<section id="dashboard" class="view">
+ <div class="section-intro"><div><h2>Control de solicitudes</h2><p>Centraliza lo que necesitas solicitar, autorizar y pagar, sin duplicar tu comprobación de gastos.</p></div><button class="btn btn-outline" id="backup-btn">↓ Respaldo JSON</button></div>
+ <div class="stats"><div class="stat"><span>Solicitudes</span><strong id="stat-total">0</strong><small>Registradas</small></div><div class="stat"><span>Por autorizar</span><strong id="stat-pending">0</strong><small>En revisión</small></div><div class="stat"><span>Monto solicitado</span><strong id="stat-amount">$0</strong><small>Pesos mexicanos</small></div><div class="stat"><span>Pendiente de pago</span><strong id="stat-outstanding">$0</strong><small>Sobre importes aprobados</small></div></div>
+ <div class="panel"><div class="panel-heading"><div><h3>Solicitudes recientes</h3><p>Consulta los detalles y genera tus documentos.</p></div><button class="link-btn" data-view="history">Ver todas →</button></div><div id="recent-list"></div></div>
+</section>
+<section id="new" class="view" hidden>
+ <div class="section-intro"><div><h2>Nueva solicitud</h2><p>Completa la información necesaria para que dirección pueda autorizar o realizar el pago.</p></div></div>
+ <form id="request-form" class="form-grid">
+ <div class="panel form-section">
+  <div class="form-heading"><span class="step">01</span><div><h3>Información general</h3><p>Ubicación del gasto y motivo de la solicitud.</p></div></div>
+  <div class="fields">
+   <label>Tipo de solicitud <select name="category" required><option value="materiales">Compra de materiales e insumos</option><option value="productos">Productos para cliente o reventa</option><option value="proveedor">Pago o anticipo a proveedor</option><option value="nomina">Nómina, staff u honorarios</option><option value="otro">Otro pago operativo</option></select></label>
+   <label>Proyecto / campaña <input name="project" maxlength="130" required placeholder="Ej. KFC · Desayunos"></label>
+   <label>Cliente <input name="client" maxlength="100" placeholder="Ej. KFC México"></label>
+   <label>Fecha en que se necesita <input name="dateNeeded" type="date" required></label>
+   <label>Prioridad <select name="priority"><option value="normal">Normal</option><option value="urgente">Urgente</option></select></label>
+   <label>Solicitante <input name="requester" maxlength="100" required placeholder="Tu nombre"></label>
+   <label class="wide">Justificación / uso del recurso <textarea name="reason" rows="3" maxlength="2000" required placeholder="Explica para qué se solicita el dinero y qué se realizará con él."></textarea></label>
+  </div>
+ </div>
+ <div class="panel form-section">
+  <div class="form-heading"><span class="step">02</span><div><h3>Desglose de conceptos</h3><p>Puedes incluir varios artículos, servicios o pagos en la misma solicitud.</p></div></div>
+  <div class="line-items-head"><span>Concepto / detalle</span><span>Cantidad</span><span>Precio unitario</span><span>Subtotal</span><span></span></div>
+  <div id="line-items"></div>
+  <div class="item-footer"><button class="btn btn-outline" id="add-item" type="button">+ Agregar concepto</button><div class="grand-total"><span>Total solicitado</span><strong id="form-total">$0.00</strong></div></div>
+ </div>
+ <div class="panel form-section">
+  <div class="form-heading"><span class="step">03</span><div><h3>Datos para entrega o transferencia</h3><p>Indica si el dinero se entrega a un responsable o si se paga directamente.</p></div></div>
+  <div class="fields">
+   <label>Modalidad <select name="paymentType"><option value="entrega">Entrega de recursos al responsable</option><option value="directo">Pago directo al proveedor / beneficiario</option></select></label>
+   <label>Beneficiario <input name="beneficiary" maxlength="120" required placeholder="Nombre o razón social"></label>
+   <label>Forma de entrega <select name="paymentMethod"><option value="transferencia">Transferencia</option><option value="efectivo">Efectivo</option><option value="otro">Otro</option></select></label>
+   <label>Correo de contacto <input name="beneficiaryEmail" type="email" maxlength="180" placeholder="opcional@ejemplo.com"></label>
+   <label>Banco <input name="bank" maxlength="100" placeholder="Opcional"></label>
+   <label>CLABE / cuenta <input name="account" inputmode="numeric" maxlength="32" placeholder="Solo si se realizará transferencia"></label>
+   <label class="wide">Enlaces de cotizaciones, facturas o soporte <textarea name="attachments" rows="2" maxlength="2000" placeholder="Un enlace HTTPS por línea (Drive u otra ubicación autorizada)"></textarea></label>
+   <label class="wide">Indicaciones adicionales <textarea name="notes" rows="2" maxlength="2000" placeholder="Por ejemplo: pago en dos exhibiciones o fecha de entrega"></textarea></label>
+  </div>
+  <div class="privacy-tip">Los datos bancarios son sensibles. En modo local quedan guardados únicamente en este navegador. No distribuyas documentos financieros fuera del personal autorizado.</div>
+ </div>
+ <div class="form-actions"><button type="reset" class="btn btn-outline">Limpiar</button><button type="submit" class="btn btn-gold large" id="submit-request">Guardar solicitud →</button></div>
+ </form>
+</section>
+<section id="history" class="view" hidden>
+ <div class="section-intro"><div><h2>Historial de solicitudes</h2><p>Revisa estados, montos autorizados, pagos y documentos generados.</p></div><button class="btn btn-outline" id="import-btn">↑ Importar respaldo</button><input id="import-file" type="file" accept=".json,application/json" hidden></div>
+ <div class="panel"><div class="filters"><input id="search" type="search" placeholder="Buscar por folio, proyecto, beneficiario…"><select id="status-filter"><option value="">Todos los estados</option><option value="pendiente">Pendiente</option><option value="ajustes">Solicita cambios</option><option value="aprobada">Aprobada</option><option value="aprobada_parcial">Aprobada parcialmente</option><option value="pago_parcial">Pago parcial</option><option value="pagada">Pagada</option><option value="rechazada">Rechazada</option></select></div><div id="all-list"></div></div>
+</section>
+<section id="gastos" class="view" hidden>
+ <div class="section-intro"><div><h2>Comprobación de gastos</h2><p>Conservamos tu herramienta original. No se han movido ni modificado sus datos locales.</p></div></div>
+ <div class="panel gastos-panel"><div class="big-icon">◫</div><h3>Dejavú · Comprobación de Gastos</h3><p>Una vez entregado un anticipo para comprar, conserva el folio de la solicitud y registra los tickets y evidencias en la aplicación que ya utilizas. Los pagos directos a proveedores no necesitan duplicarse como gastos de caja.</p><a class="btn btn-gold" href="https://gastosdvm.netlify.app/" target="_blank" rel="noopener noreferrer">Abrir herramienta existente ↗</a><p class="small-note">La sincronización automática de comprobaciones se realizará en una etapa posterior, después de respaldar y validar los registros actuales.</p></div>
+</section>
+</main>
+<footer class="footer">ÁGORA · Dejavú Marketing <span id="footer-date"></span> · Sin envío automático de correo</footer>
+</div>
+</div>
+<div id="modal" class="modal" hidden><div class="backdrop" data-close="true"></div><div class="modal-card"><div class="modal-head"><h2 id="modal-title">Detalle de solicitud</h2><button class="icon-btn" id="modal-close" aria-label="Cerrar">×</button></div><div id="modal-body" class="modal-body"></div></div></div>
+<div id="toast" class="toast" role="status"></div>
+</body></html>
