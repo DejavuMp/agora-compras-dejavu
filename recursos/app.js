@@ -180,7 +180,8 @@ function openDetail(id){
 }
 function detailHtml(r){
  const outstanding=Math.max(0,round(Number(r.approvedAmount||0)-Number(r.paidAmount||0)));
- const links=r.attachments?.length?'<div class="detail-card detail-full"><b>Documentos de soporte</b>'+r.attachments.map(u=>'<div><a target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">'+esc(u)+'</a></div>').join('')+'</div>':'';
+ const safeLinks=(r.attachments||[]).filter(u=>typeof u==='string'&&/^https:\/\//i.test(u));
+ const links=safeLinks.length?'<div class="detail-card detail-full"><b>Documentos de soporte</b>'+safeLinks.map(u=>'<div><a target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">'+esc(u)+'</a></div>').join('')+'</div>':'';
  let result='<div class="detail-head"><div><small>'+esc(r.folio)+'</small><h3>'+esc(r.project)+'</h3><span>'+esc(CATEGORIES[r.category]||r.category)+'</span></div>'+badge(r.status)+'</div>';
  result+='<div class="action-bar"><button class="btn btn-gold" data-action="pdf">↓ PDF</button><button class="btn btn-outline" data-action="png">↓ Imagen PNG</button><button class="btn btn-outline" data-action="print">⎙ Imprimir</button><button class="btn btn-outline" data-action="preview">Vista previa</button><button class="btn btn-outline" data-action="share">Compartir referencia</button></div>';
  result+='<div class="detail-grid">'+[
@@ -284,7 +285,7 @@ function printDoc(r){
  if(pop)pop.opener=null;
  if(!pop){showToast('El navegador bloqueó la ventana de impresión.');return;}
  pop.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>'+esc(r.folio)+'</title><link rel="stylesheet" href="'+new URL('./style.css',location.href).href+'"><style>body{background:#fff;margin:0}.document-sheet{margin:auto;border:0;min-height:0;width:190mm;padding:11mm;font-size:12px}@page{size:A4;margin:8mm}</style></head><body>'+htmlDoc(r)+'</body></html>');
- pop.document.close();pop.onload=()=>{pop.focus();pop.print();};
+ pop.document.close();let printed=false;const startPrint=()=>{if(printed)return;printed=true;pop.focus();pop.print();};pop.addEventListener('load',startPrint,{once:true});setTimeout(startPrint,800);
 }
 function previewDoc(r){
  const host=docHost(r);$('#modal-body').innerHTML='<div class="action-bar"><button class="btn btn-outline" data-action="back">← Volver al expediente</button><button class="btn btn-gold" data-action="pdf">↓ PDF</button><button class="btn btn-outline" data-action="png">↓ PNG</button></div><div class="doc-preview">'+host.innerHTML+'</div>';removeDoc(host);
@@ -318,6 +319,38 @@ async function importBackup(file){
   await loadRecords();showToast('Importación terminada: '+added+' registros nuevos; no se reemplazaron existentes.');
  }catch(error){showToast('Importación cancelada: '+readable(error));}
 }
+async function loadExistingCatalog(){
+ // Lectura voluntaria de la BD local de Compras existente en el mismo origen;
+ // nunca se modifica, ni se copian expedientes financieros a otro sistema.
+ if(typeof indexedDB.databases!=='function')return;
+ try{
+  const names=await indexedDB.databases();
+  if(!names.some(x=>x.name==='AGORA_COMPRAS_LOCAL'))return;
+  const data=await new Promise((resolve,reject)=>{
+   const req=indexedDB.open('AGORA_COMPRAS_LOCAL',1);
+   req.onsuccess=()=>{
+    const db=req.result;
+    if(!db.objectStoreNames.contains('app')){db.close();return resolve(null);}
+    const tx=db.transaction('app','readonly'),q=tx.objectStore('app').get('data');
+    q.onsuccess=()=>{const v=q.result;db.close();resolve(v);};
+    q.onerror=()=>{db.close();reject(q.error);};
+   };
+   req.onerror=()=>reject(req.error);
+  });
+  if(!data)return;
+  const projects=new Set();
+  for(const name of ['rfqs','orders','samples'])for(const item of data[name]||[]){if(typeof item?.project==='string'&&item.project.trim())projects.add(item.project.trim());}
+  const suppliers=new Set((data.suppliers||[]).map(x=>String(x.name||'').trim()).filter(Boolean));
+  const add=(id,values)=>{
+   const target=$(id);if(!target)return;
+   for(const value of [...values].sort((a,b)=>a.localeCompare(b,'es')).slice(0,150)){
+    const opt=document.createElement('option');opt.value=value;target.appendChild(opt);
+   }
+  };
+  add('#agora-projects',projects);add('#agora-beneficiaries',suppliers);
+ }catch(error){console.info('ÁGORA Recursos: el catálogo de Compras no está disponible en este navegador.');}
+}
+
 function setup(){
  $('#footer-date').textContent=new Date().getFullYear();
  $('#request-form').querySelector('[name="dateNeeded"]').value=dateOnly(iso());
@@ -359,5 +392,6 @@ function setup(){
  if(window.AGORA_FIREBASE)activateFirebase();
  else window.addEventListener('agora:firebase-ready',activateFirebase,{once:true});
  loadRecords();
+ loadExistingCatalog();
 }
 setup();
