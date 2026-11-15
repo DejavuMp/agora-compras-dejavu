@@ -15,7 +15,7 @@ const localDate=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezon
 const dateOnly=v=>v?String(v).slice(0,10):'';
 const asDate=v=>v?.toDate?.()?.toLocaleString('es-MX')||String(v||'');
 const el=(tag,cls='',txt='')=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt)e.textContent=txt;return e;};
-const state={view:'dashboard',records:[],selected:'',user:null,role:'',fb:null,cloud:false,loading:false,mode:'local'};
+const state={view:'dashboard',records:[],selected:'',user:null,role:'',fb:null,cloud:false,loading:false,mode:'local',editingId:''};
 let idbPromise;
 function dbOpen(){
  if(idbPromise)return idbPromise;
@@ -153,14 +153,31 @@ async function saveRequest(e){
  if(state.cloud&&state.role==='consulta')return showToast('Tu perfil no puede crear solicitudes.');
  try{
   const row=getFormData();$('#submit-request').disabled=true;
-  if(state.cloud)await dbSdk.setDoc(dbSdk.doc(state.fb.firestore,COLLECTION,row.id),row);
-  else await dbPut(row);
+  let savedId=row.id,folio=row.folio;
+  if(state.editingId){
+   const existing=state.records.find(x=>x.id===state.editingId);
+   if(!existing||!canEditRequest(existing))throw Error('Esta solicitud ya no admite cambios o no es tuya.');
+   savedId=existing.id;folio=existing.folio;
+   const editableFields=['category','project','client','requester','dateNeeded','priority','reason','paymentType','paymentMethod','beneficiary','beneficiaryEmail','bank','account','notes','attachments','items','total'];
+   const patch=Object.fromEntries(editableFields.map(key=>[key,row[key]]));
+   patch.status='pendiente';
+   patch.updatedBy=state.cloud?state.user.uid:'local';
+   patch.updatedAt=state.cloud?dbSdk.serverTimestamp():iso();
+   patch.history=[...(existing.history||[]),{kind:'revision',by:state.user?.email||'Operador local',at:iso(),note:'Solicitud corregida y reenviada a revisión'}].slice(-60);
+   if(state.cloud)await dbSdk.updateDoc(dbSdk.doc(state.fb.firestore,COLLECTION,savedId),patch);
+   else await dbPut({...existing,...patch});
+  }else{
+   if(state.cloud)await dbSdk.setDoc(dbSdk.doc(state.fb.firestore,COLLECTION,row.id),row);
+   else await dbPut(row);
+  }
+  state.editingId='';$('#submit-request').textContent='Guardar solicitud →';
   $('#request-form').reset();$('#line-items').innerHTML='';addLine();
-  await loadRecords();view('history');showToast('Solicitud '+row.folio+' guardada '+(state.cloud?'en Firebase.':'en este navegador.'));
-  openDetail(row.id);
+  await loadRecords();view('history');showToast('Solicitud '+folio+' guardada '+(state.cloud?'en Firebase.':'en este navegador.'));
+  openDetail(savedId);
  }catch(err){showToast('No se guardó: '+readable(err));}
  finally{$('#submit-request').disabled=false;}
 }
+function canEditRequest(r){return ['pendiente','ajustes'].includes(r.status)&&(!state.cloud||(state.role!=='consulta'&&r.createdBy===state.user?.uid));}
 function available(r){return ['aprobada','aprobada_parcial','pago_parcial'].includes(r.status)&&round(r.approvedAmount-r.paidAmount)>0;}
 function canManage(){return !state.cloud||state.role==='admin';}
 function visibleLink(r){if(!state.cloud||r.createdBy==='local')return '';const u=new URL(location.href);u.search='';u.hash='';u.searchParams.set('id',r.id);return u.href;}
@@ -184,7 +201,7 @@ function detailHtml(r){
  const safeLinks=(r.attachments||[]).filter(u=>typeof u==='string'&&/^https:\/\//i.test(u));
  const links=safeLinks.length?'<div class="detail-card detail-full"><b>Documentos de soporte</b>'+safeLinks.map(u=>'<div><a target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">'+esc(u)+'</a></div>').join('')+'</div>':'';
  let result='<div class="detail-head"><div><small>'+esc(r.folio)+'</small><h3>'+esc(r.project)+'</h3><span>'+esc(CATEGORIES[r.category]||r.category)+'</span></div>'+badge(r.status)+'</div>';
- result+='<div class="action-bar"><button class="btn btn-gold" data-action="pdf">↓ PDF</button><button class="btn btn-outline" data-action="png">↓ Imagen PNG</button><button class="btn btn-outline" data-action="print">⎙ Imprimir</button><button class="btn btn-outline" data-action="preview">Vista previa</button><button class="btn btn-outline" data-action="share">Compartir referencia</button></div>';
+ result+='<div class="action-bar">'+(canEditRequest(r)?'<button class="btn btn-outline" data-action="edit">✎ Editar solicitud</button>':'')+'<button class="btn btn-gold" data-action="pdf">↓ PDF</button><button class="btn btn-outline" data-action="png">↓ Imagen PNG</button><button class="btn btn-outline" data-action="print">⎙ Imprimir</button><button class="btn btn-outline" data-action="preview">Vista previa</button><button class="btn btn-outline" data-action="share">Compartir referencia</button></div>';
  result+='<div class="detail-grid">'+[
  ['Solicitado',money(r.total)],['Autorizado',money(r.approvedAmount)],['Pagado',money(r.paidAmount)],['Por pagar',money(outstanding)],
  ['Solicitante',r.requester||'—'],['Beneficiario',r.beneficiary||'—'],['Fecha requerida',r.dateNeeded||'—'],['Modalidad',r.paymentType==='directo'?'Pago directo':'Entrega de recursos'],
@@ -291,6 +308,27 @@ function printDoc(r){
 function previewDoc(r){
  const host=docHost(r);$('#modal-body').innerHTML='<div class="action-bar"><button class="btn btn-outline" data-action="back">← Volver al expediente</button><button class="btn btn-gold" data-action="pdf">↓ PDF</button><button class="btn btn-outline" data-action="png">↓ PNG</button></div><div class="doc-preview">'+host.innerHTML+'</div>';removeDoc(host);
 }
+function clearRequestForm(){
+ state.editingId='';$('#submit-request').textContent='Guardar solicitud →';
+ const form=$('#request-form');
+ for(const e of $('input,textarea',form)){if(!e.closest('#line-items'))e.value='';}
+ for(const e of $('select',form))e.selectedIndex=0;
+ form.elements.namedItem('dateNeeded').value=localDate();
+ $('#line-items').innerHTML='';addLine();
+}
+function editRequest(r){
+ if(!canEditRequest(r))return showToast('Solo el creador puede corregir una solicitud pendiente.');
+ modalClose();view('new');
+ state.editingId=r.id;
+ const form=$('#request-form');
+ const keys=['category','project','client','requester','dateNeeded','priority','reason','paymentType','paymentMethod','beneficiary','beneficiaryEmail','bank','account','notes'];
+ for(const name of keys){const field=form.elements.namedItem(name);if(field)field.value=r[name]||'';}
+ form.elements.namedItem('attachments').value=(r.attachments||[]).join('\n');
+ $('#line-items').innerHTML='';for(const i of r.items||[])addLine(i.description,i.quantity,i.unitPrice);
+ $('#submit-request').textContent='Guardar cambios →';
+ $('#page-title').textContent='Editar '+r.folio;
+}
+
 async function shareReference(r){
  const link=visibleLink(r);
  const message='DEJAVÚ MARKETING · '+r.folio+'\nProyecto: '+r.project+'\nConcepto: '+(CATEGORIES[r.category]||r.category)+'\nImporte solicitado: '+money(r.total)+'\nEstado: '+(STATUS[r.status]||r.status)+(link?'\nConsultar y responder (requiere acceso ÁGORA): '+link:'\nAdjunto PDF o PNG de esta solicitud.');
@@ -358,7 +396,7 @@ function setup(){
  addLine();
  $$('#line-items').length;
  document.addEventListener('click',async e=>{
-  const v=e.target.closest('[data-view]');if(v){view(v.dataset.view);return;}
+  const v=e.target.closest('[data-view]');if(v){if(v.dataset.view==='new')clearRequestForm();view(v.dataset.view);return;}
   const target=e.target.closest('[data-open]');if(target){openDetail(target.dataset.open);return;}
   if(e.target.closest('#menu-toggle')){$('#sidebar').classList.toggle('open');return;}
   if(e.target.closest('#login-btn')){await connect();return;}
@@ -371,6 +409,7 @@ function setup(){
   if(!action)return;
   const r=state.records.find(x=>x.id===state.selected);if(!r)return;
   try{
+   if(action==='edit')editRequest(r);
    if(action==='pdf')await downloadPDF(r);
    if(action==='png')await downloadPNG(r);
    if(action==='print')printDoc(r);
@@ -380,7 +419,7 @@ function setup(){
   }catch(error){showToast(readable(error));}
  });
  $('#request-form').addEventListener('submit',saveRequest);
- $('#request-form').addEventListener('reset',()=>setTimeout(()=>{$('#line-items').innerHTML='';addLine();$('#request-form').querySelector('[name="dateNeeded"]').value=localDate();},0));
+ $('#request-form').addEventListener('reset',()=>setTimeout(()=>{state.editingId='';$('#submit-request').textContent='Guardar solicitud →';$('#line-items').innerHTML='';addLine();$('#request-form').querySelector('[name="dateNeeded"]').value=localDate();},0));
  $('#line-items').addEventListener('input',calc);
  $('#search').addEventListener('input',render);
  $('#status-filter').addEventListener('change',render);
