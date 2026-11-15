@@ -2,6 +2,7 @@ import * as authSdk from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-aut
 import * as dbSdk from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 
 const COLLECTION='agora_finance_requests';
+const LOGO_URL=new URL('../archivos/dejavu-logo-oficial.png',import.meta.url).href;
 const DB_NAME='AGORA_RECURSOS_LOCAL_V1';
 const STATUS={pendiente:'Por autorizar',ajustes:'Solicita cambios',aprobada:'Aprobada',aprobada_parcial:'Aprobada parcial',pago_parcial:'Pago parcial',pagada:'Pagada',rechazada:'Rechazada'};
 const CATEGORIES={materiales:'Compra de materiales e insumos',productos:'Productos para cliente o reventa',proveedor:'Pago o anticipo a proveedor',nomina:'Nómina, staff u honorarios',otro:'Otro pago operativo'};
@@ -243,7 +244,7 @@ function htmlDoc(r){
  if(link)code='<div class="doc-qr" id="document-qr"></div>';
  const list=r.items.map(i=>'<tr><td>'+esc(i.description)+'</td><td>'+esc(i.quantity)+'</td><td>'+money(i.unitPrice)+'</td><td>'+money(i.unitPrice*i.quantity)+'</td></tr>').join('');
  const payment=r.payments?.length?'<div class="doc-desc"><b>Pagos registrados:</b> '+r.payments.map(p=>esc(p.date)+' · '+money(p.amount)+' ('+esc(p.method)+')').join('; ')+'</div>':'';
- return '<article class="document-sheet" id="document-sheet"><div class="doc-brand"><div><strong>DEJAVÚ</strong><br><em>MARKETING · ÁGORA</em></div><div style="text-align:right"><b>'+esc(r.folio)+'</b><br><span style="font-size:11px;color:#8b8174">'+esc(STATUS[r.status]||r.status)+'</span></div></div><h2>SOLICITUD DE RECURSOS Y PAGOS</h2><p class="doc-desc">'+esc(CATEGORIES[r.category]||r.category)+'</p><div class="doc-meta">'+[
+ return '<article class="document-sheet" id="document-sheet"><div class="doc-brand"><div><img src="' + esc(LOGO_URL) + '" style="width:165px;height:65px;object-fit:contain;object-position:left center" alt="Dejavú Marketing"><br><em>MARKETING · ÁGORA</em></div><div style="text-align:right"><b>'+esc(r.folio)+'</b><br><span style="font-size:11px;color:#8b8174">'+esc(STATUS[r.status]||r.status)+'</span></div></div><h2>SOLICITUD DE RECURSOS Y PAGOS</h2><p class="doc-desc">'+esc(CATEGORIES[r.category]||r.category)+'</p><div class="doc-meta">'+[
  ['Proyecto / campaña',r.project],['Cliente',r.client||'—'],['Solicitante',r.requester],['Fecha requerida',r.dateNeeded],['Beneficiario',r.beneficiary],['Entrega / pago',r.paymentType==='directo'?'Pago directo':'Recursos al responsable'],['Forma de pago',r.paymentMethod],['Banco y cuenta',(r.bank||'—')+' · '+(r.account||'Sin registrar')]
  ].map(x=>'<div><span>'+esc(x[0])+'</span>'+esc(x[1]||'—')+'</div>').join('')+'</div><div class="doc-desc"><b>Justificación:</b> '+esc(r.reason)+'</div><table><thead><tr><th>Concepto</th><th>Cantidad</th><th>Precio unit.</th><th>Subtotal</th></tr></thead><tbody>'+list+'</tbody></table><div class="doc-total">TOTAL SOLICITADO: '+money(r.total)+'</div><p class="doc-desc"><b>Autorizado:</b> '+money(r.approvedAmount)+' &nbsp; <b>Pagado:</b> '+money(r.paidAmount)+'</p><p class="doc-desc"><b>Observaciones:</b> '+esc(r.notes||'Sin observaciones')+'</p>'+payment+'<div class="doc-foot"><div><b>DEJAVÚ MARKETING</b><br>Expediente '+esc(r.folio)+'<br>Generado el '+new Date().toLocaleString('es-MX')+'<br>'+(link?'<span class="doc-url">'+esc(link)+'</span>':'<span>Documento generado desde registro local. Sin enlace remoto.</span>')+'<br><span>La autorización requiere verificación de identidad en ÁGORA.</span></div>'+code+'</div></article>';
 }
@@ -256,6 +257,7 @@ function docHost(r){
 function removeDoc(host){host?.remove();}
 async function makeCanvas(host){
  if(!window.html2canvas)throw Error('No se cargó la biblioteca para generar imagen. Revisa la conexión a internet y vuelve a intentar.');
+ await Promise.all($('img',host).map(i=>i.complete?Promise.resolve():new Promise(resolve=>{i.onload=resolve;i.onerror=resolve;})));
  return await window.html2canvas($('.document-sheet',host),{scale:2,backgroundColor:'#fff',useCORS:false,logging:false,windowWidth:850});
 }
 function downloadBlob(blob,name){const url=URL.createObjectURL(blob),a=el('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);}
@@ -278,7 +280,8 @@ async function downloadPDF(r){
  }finally{removeDoc(host);}
 }
 function printDoc(r){
- const pop=window.open('','_blank','noopener');
+ const pop=window.open('','_blank');
+ if(pop)pop.opener=null;
  if(!pop){showToast('El navegador bloqueó la ventana de impresión.');return;}
  pop.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>'+esc(r.folio)+'</title><link rel="stylesheet" href="'+new URL('./style.css',location.href).href+'"><style>body{background:#fff;margin:0}.document-sheet{margin:auto;border:0;min-height:0;width:190mm;padding:11mm;font-size:12px}@page{size:A4;margin:8mm}</style></head><body>'+htmlDoc(r)+'</body></html>');
  pop.document.close();pop.onload=()=>{pop.focus();pop.print();};
