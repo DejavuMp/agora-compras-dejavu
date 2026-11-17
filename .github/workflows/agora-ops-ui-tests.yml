@@ -7,6 +7,10 @@ on:
       - "operaciones/visor.html"
       - "operaciones/tests/**"
       - ".github/workflows/agora-ops-ui-tests.yml"
+  pull_request:
+    paths:
+      - "operaciones/**"
+      - ".github/workflows/agora-ops-ui-tests.yml"
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,6 +23,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Verificar proyecciones de seguridad sin Firebase de producción
+        run: node operaciones/tests/qa-safe-view.mjs
+      - name: Verificar que el visor de producción no use almacenamiento local
+        run: |
+          node -e "const fs=require('fs');const h=fs.readFileSync('operaciones/visor.html','utf8');const js=fs.readFileSync('operaciones/visor-live.js','utf8');if(h.includes('localStorage')||js.includes('localStorage'))process.exit(1);if(!js.includes('onSnapshot')||!js.includes('getDocFromServer'))process.exit(1)"
       - name: Instalar navegador de pruebas en runner
         run: |
           npm install --no-save playwright
