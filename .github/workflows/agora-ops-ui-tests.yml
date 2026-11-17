@@ -39,6 +39,8 @@ jobs:
           sleep 2
       - name: Probar volanteo por jornada, horarios, empalmes y visor
         run: node operaciones/tests/qa-visor-dia.mjs
+      - name: Simular visor con dos navegadores separados (no Firebase real)
+        run: node operaciones/tests/qa-visor-live-mock.mjs
       - name: Guardar vista de prueba
         if: always()
         uses: actions/upload-artifact@v4
