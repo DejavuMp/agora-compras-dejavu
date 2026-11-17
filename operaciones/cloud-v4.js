@@ -90,7 +90,7 @@ function emit(){
   app?.apply?.({db:data,role:role==="coordinador"?"coordinador":"personal",personId});
 }
 function listen(s,ok){
-  const off=onSnapshot(s,ok,error=>fail(err(error)));
+  const off=onSnapshot(s,{includeMetadataChanges:true},ok,error=>fail(err(error)));
   unwatches.push(off);
 }
 function loadCoordinator(){
