@@ -529,6 +529,203 @@ match /agora_finance_requests/{requestId} {
   allow delete: if false;
 }
 
+
+    // ÁGORA · Centro de Operaciones V4 (aislado de Compras y Finanzas).
+    // Agenda con tarifas sólo para coordinación; el staff recibe una copia
+    // reducida de sus propios turnos. Ningún documento es público.
+    function opsMemberPath(uid) {
+      return /databases/$(database)/documents/agora_ops_members/$(uid);
+    }
+    function opsStaff() {
+      return signedIn() && exists(opsMemberPath(request.auth.uid)) &&
+        get(opsMemberPath(request.auth.uid)).data.active == true &&
+        get(opsMemberPath(request.auth.uid)).data.role == 'staff';
+    }
+    function opsPersonId() {
+      return get(opsMemberPath(request.auth.uid)).data.personId;
+    }
+    function opsDocumentMeta() {
+      return request.resource.data.keys().hasAll(['revision','updatedAt']) &&
+        request.resource.data.revision is int &&
+        request.resource.data.revision > 0 &&
+        request.resource.data.updatedAt == request.time;
+    }
+    function opsValidSchedule() {
+      return request.resource.data.keys().hasOnly(['revision','payload','updatedAt','updatedBy']) &&
+        request.resource.data.keys().hasAll(['revision','payload','updatedAt','updatedBy']) &&
+        opsDocumentMeta() &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        request.resource.data.payload is map &&
+        request.resource.data.payload.keys().hasAll([
+          'people','vehicles','events','blocks','sites','campaigns','settings','audit'
+        ]) &&
+        request.resource.data.payload.people is list &&
+        request.resource.data.payload.vehicles is list &&
+        request.resource.data.payload.events is list &&
+        request.resource.data.payload.blocks is list &&
+        request.resource.data.payload.sites is list &&
+        request.resource.data.payload.campaigns is list &&
+        request.resource.data.payload.settings is map &&
+        request.resource.data.payload.audit is list &&
+        request.resource.data.payload.people.size() <= 200 &&
+        request.resource.data.payload.events.size() <= 1000 &&
+        request.resource.data.payload.audit.size() <= 300;
+    }
+    match /agora_ops_control/{documentId} {
+      allow get: if canEdit() && documentId == 'schedule';
+      allow list: if false;
+      allow create: if canEdit() && documentId == 'schedule' &&
+        opsValidSchedule() && request.resource.data.revision == 1;
+      allow update: if canEdit() && documentId == 'schedule' &&
+        opsValidSchedule() &&
+        request.resource.data.revision == resource.data.revision + 1;
+      allow delete: if false;
+    }
+    match /agora_ops_access_requests/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid || canEdit();
+      allow list: if canEdit();
+      allow create: if signedIn() && request.auth.uid == uid &&
+        request.resource.data.keys().hasOnly(['uid','name','email','status','createdAt']) &&
+        request.resource.data.keys().hasAll(['uid','name','email','status','createdAt']) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.email is string &&
+        request.resource.data.email.size() <= 240 &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() <= 140 &&
+        request.resource.data.status == 'pendiente' &&
+        request.resource.data.createdAt == request.time;
+      allow update: if canEdit() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status','approvedAt','approvedBy'
+        ]) && resource.data.status == 'pendiente' &&
+        request.resource.data.status == 'aprobada' &&
+        request.resource.data.approvedBy == request.auth.uid &&
+        request.resource.data.approvedAt == request.time;
+      allow delete: if false;
+    }
+    match /agora_ops_members/{uid} {
+      allow get: if canEdit() || (signedIn() && request.auth.uid == uid);
+      allow list: if canEdit();
+      allow create, update: if canEdit() &&
+        request.resource.data.keys().hasOnly([
+          'uid','email','role','personId','active','updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'uid','email','role','personId','active','updatedAt'
+        ]) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.role == 'staff' &&
+        request.resource.data.active is bool &&
+        request.resource.data.personId is string &&
+        request.resource.data.personId.size() > 0 &&
+        request.resource.data.email is string &&
+        request.resource.data.email.size() <= 240 &&
+        request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+    match /agora_ops_staff/{uid} {
+      allow get: if canEdit() || (opsStaff() && request.auth.uid == uid);
+      allow list: if canEdit();
+      allow create, update: if canEdit() &&
+        request.resource.data.keys().hasOnly([
+          'uid','personId','person','events','vehicles','sites','campaigns','settings','updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'uid','personId','person','events','vehicles','sites','campaigns','settings','updatedAt'
+        ]) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.personId is string &&
+        request.resource.data.person is map &&
+        request.resource.data.events is list &&
+        request.resource.data.vehicles is list &&
+        request.resource.data.sites is list &&
+        request.resource.data.campaigns is list &&
+        request.resource.data.settings is map &&
+        request.resource.data.updatedAt == request.time;
+      allow delete: if canEdit();
+    }
+    function opsValidReport() {
+      return request.resource.data.keys().hasOnly([
+        'id','personId','ownerUid','eventId','start','end','breakMins',
+        'activity','place','notes','paymentBasis','paymentStatus','requestedRate',
+        'requestedAmount','requestedHours','approvedHours','approvedAmount',
+        'returnNote','revision','updatedAt','type','status'
+      ]) &&
+      request.resource.data.keys().hasAll([
+        'id','personId','ownerUid','eventId','revision','updatedAt'
+      ]) &&
+      opsDocumentMeta() &&
+      request.resource.data.id is string &&
+      request.resource.data.id.size() > 0 &&
+      request.resource.data.id.size() <= 100 &&
+      request.resource.data.personId is string &&
+      request.resource.data.personId.size() > 0 &&
+      request.resource.data.ownerUid is string &&
+      request.resource.data.eventId is string &&
+      request.resource.data.eventId.size() <= 100;
+    }
+    function opsOwnReport() {
+      return opsStaff() &&
+        request.resource.data.ownerUid == request.auth.uid &&
+        request.resource.data.personId == opsPersonId();
+    }
+    match /agora_ops_logs/{id} {
+      allow get, list: if canEdit() ||
+        (opsStaff() && resource.data.ownerUid == request.auth.uid);
+      allow create: if opsValidReport() && request.resource.data.id == id &&
+        request.resource.data.revision == 1 && (
+        canEdit() ||
+        (opsOwnReport() &&
+         request.resource.data.paymentStatus == 'capturado' &&
+         !request.resource.data.keys().hasAny([
+           'approvedAmount','approvedHours','requestedAmount','requestedRate','returnNote'
+         ]))
+      );
+      allow update: if opsValidReport() && request.resource.data.id == resource.data.id &&
+        request.resource.data.ownerUid == resource.data.ownerUid &&
+        request.resource.data.personId == resource.data.personId &&
+        request.resource.data.revision == resource.data.revision + 1 && (
+          canEdit() ||
+          (opsOwnReport() &&
+           resource.data.paymentStatus in ['capturado','revision'] &&
+           request.resource.data.paymentStatus in ['capturado','solicitado'] &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+             'start','end','breakMins','activity','place','notes','eventId',
+             'paymentBasis','paymentStatus','requestedHours','requestedRate',
+             'requestedAmount','updatedAt','revision'
+           ]) &&
+           (!request.resource.data.keys().hasAny(['approvedAmount','approvedHours'])) &&
+           (!request.resource.data.keys().hasAny(['requestedRate']) ||
+             request.resource.data.requestedRate == null) &&
+           (!request.resource.data.keys().hasAny(['requestedAmount']) ||
+             request.resource.data.requestedAmount == null))
+        );
+      allow delete: if canEdit() &&
+        resource.data.paymentStatus in ['capturado','revision'];
+    }
+    match /agora_ops_incidents/{id} {
+      allow get, list: if canEdit() ||
+        (opsStaff() && resource.data.ownerUid == request.auth.uid);
+      allow create: if opsValidReport() && request.resource.data.id == id &&
+        request.resource.data.revision == 1 && (
+          canEdit() ||
+          (opsOwnReport() && request.resource.data.status == 'pendiente')
+        );
+      allow update: if opsValidReport() && request.resource.data.id == resource.data.id &&
+        request.resource.data.ownerUid == resource.data.ownerUid &&
+        request.resource.data.personId == resource.data.personId &&
+        request.resource.data.revision == resource.data.revision + 1 && (
+          canEdit() ||
+          (opsOwnReport() && resource.data.status == 'pendiente' &&
+            request.resource.data.status == 'pendiente' &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'notes','type','updatedAt','revision'
+            ]))
+        );
+      allow delete: if false;
+    }
+
     // Todas las demás colecciones permanecen cerradas.
     match /{document=**} {
       allow read, write: if false;
