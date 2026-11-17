@@ -83,6 +83,21 @@ try {
  await save('#event-form');
  assert.ok((await page.locator('#event-validation').innerText()).includes('empalmes'),'Bloqueo de horarios duplicados');
  assert.equal((await page.evaluate(()=>window.AGORA_TEST.getState())).events.length,3,'Empalme no se guarda');
+ await page.locator('#event-form').evaluate(form=>form.querySelector('[data-action="close-modal"]').click());
+ await action('new-event');
+ await page.locator('#ev-title').fill('Traslado demasiado corto QA');
+ await page.locator('#ev-location').fill('Segunda sede ficticia QA');
+ await page.locator('#ev-travel').fill('40');
+ await page.locator('#ev-route-margin').fill('15');
+ const nextStart=shift(end,80),nextEnd=shift(nextStart,120);
+ await page.locator('#ev-start').fill(nextStart);
+ await page.locator('#ev-end').fill(nextEnd);
+ await page.locator('[data-person-choose="'+person.id+'"]').check();
+ await page.locator('#ev-status').selectOption('confirmado');
+ await save('#event-form');
+ assert.ok((await page.locator('#event-validation').innerText()).toLowerCase().includes('tiempo insuficiente'),'Evitar traslado entre sedes sin minutos suficientes');
+ assert.equal((await page.evaluate(()=>window.AGORA_TEST.getState())).events.length,3,'Ruta imposible no se guarda');
+
  await page.goto(origin+'visor.html',{waitUntil:'domcontentloaded'});
  await page.locator('#local').click();
  await page.locator('#focusdate').fill(start.slice(0,10));
