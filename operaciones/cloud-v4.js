@@ -250,10 +250,15 @@ function hasClash(board){
  const active=(board.events||[]).filter(e=>!["borrador","cancelado"].includes(e.status));
  const time=x=>new Date(x).getTime();
  const overlap=(a,b,c,d)=>time(a)<time(d)&&time(c)<time(b);
- const span=(e)=>[
-   new Date(time(e.start)-(Number(e.before||0)+Number(e.travelMin||0)+Number(e.routeBufferMin||0))*60000),
-   new Date(time(e.end)+(Number(e.after||0)+Number(e.travelMin||0))*60000)
- ];
+ const span=(e)=>{
+   const staff=e.staff||[];
+   const first=Math.min(time(e.start)-Number(e.before||0)*60000,...staff.map(a=>time(a.start)).filter(Number.isFinite));
+   const last=Math.max(time(e.end)+Number(e.after||0)*60000,...staff.map(a=>time(a.end)).filter(Number.isFinite));
+   return [
+     new Date(first-(Number(e.travelMin||0)+Number(e.routeBufferMin||0))*60000),
+     new Date(last+Number(e.travelMin||0)*60000)
+   ];
+ };
  for(let i=0;i<active.length;i++)for(let j=i+1;j<active.length;j++){
    const a=active[i],b=active[j];
    for(const p of a.staff||[])for(const q of b.staff||[]){
