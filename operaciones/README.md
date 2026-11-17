@@ -3,6 +3,25 @@
 **Sitio V4**: https://dejavump.github.io/agora-compras-dejavu/operaciones/  
 **Demostración V3, aislada**: https://dejavump.github.io/agora-compras-dejavu/operaciones/demo.html
 
+
+## Agenda diaria y rutas (actualización)
+
+- Visor de solo lectura: https://dejavump.github.io/agora-compras-dejavu/operaciones/visor.html
+- Editor local: https://dejavump.github.io/agora-compras-dejavu/operaciones/demo.html
+- Respaldos: demo-v3-original.html y visor-semanal-v1.html.
+
+**Jornadas por fecha:** cada evento puede crearse con 1 a 31 días consecutivos. Cada fecha se guarda como registro independiente, con identificador de campaña, número de jornada y total de días. Una vez creado, se edita un día sin modificar automáticamente los demás.
+
+**Actividades:** volanteo, perifoneo, apertura, reapertura, activación, en vivo, sampling, promotoría, canje y entrega de cupones, photo opportunity, silent party, iluminación, develación, montaje, desmontaje, producción, scouting y otros.
+
+**Turnos:** al seleccionar personal, entrada 30 minutos antes y salida 30 minutos después de la actividad. Los turnos individuales pueden ajustarse. Las horas reales para pagos se capturan y validan por separado.
+
+**Rutas:** se guarda origen, sucursal, paradas, minutos estimados según Google Maps y margen adicional. La salida propuesta se calcula usando el primer turno del personal menos los minutos de recorrido y el margen. La unidad se reserva hasta el retorno estimado. Se alertan traslados insuficientes según minutos capturados manualmente. No hay ETA automático ni consulta de tráfico en tiempo real.
+
+**Datos de ejemplo:** el editor incluye volanteo ficticio de dos jornadas y el visor permite mostrar ejemplos si no hay datos guardados. El visor actualiza su lectura local cada cinco segundos, pero NO sincroniza distintos dispositivos ni consulta información real de Firebase.
+
+**Pruebas automatizadas:** GitHub Actions ejecuta Playwright con registros ficticios para verificar días consecutivos, turnos +/-30, empalmes de personal y camionetas, tiempos de ruta insuficientes y el visor.
+
 ## Estado comprobado
 
 - V4 publicada en GitHub Pages: HTML de operaciones y módulo \`cloud-v4.js\`.
