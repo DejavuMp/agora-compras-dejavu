@@ -247,29 +247,41 @@ async function approve(uid){
   finally{saving=false;await refreshFromServer();}
 }
 function hasClash(board){
-  const active=board.events.filter(e=>!["borrador","cancelado"].includes(e.status));
-  const ms=x=>new Date(x).getTime();
-  const overlap=(a,b,c,d)=>ms(a)<ms(d)&&ms(c)<ms(b);
-  for(let i=0;i<active.length;i++)for(let j=i+1;j<active.length;j++){
-    const a=active[i],b=active[j];
-    const beforeA=Number(a.before||0),afterA=Number(a.after||0),beforeB=Number(b.before||0),afterB=Number(b.after||0);
-    const spanA=(s,e)=>[new Date(ms(s)-beforeA*60000),new Date(ms(e)+afterA*60000)];
-    const spanB=(s,e)=>[new Date(ms(s)-beforeB*60000),new Date(ms(e)+afterB*60000)];
-    for(const p of a.staff||[])for(const q of b.staff||[]){
-      if(p.personId!==q.personId)continue;
-      const [s,t]=spanA(p.start,p.end),[u,v]=spanB(q.start,q.end);
-      if(overlap(s,t,u,v))return "Empalme de personal en "+a.title+" y "+b.title;
-    }
-    if((a.vehicles||[]).some(id=>(b.vehicles||[]).includes(id))){
-      const [s,t]=spanA(a.start,a.end),[u,v]=spanB(b.start,b.end);
-      if(overlap(s,t,u,v))return "Empalme de vehículo en "+a.title+" y "+b.title;
-    }
-  }
-  for(const e of active)for(const block of board.blocks||[]){
-    if(block.resourceType==="personal"&&(e.staff||[]).some(a=>a.personId===block.resourceId&&overlap(a.start,a.end,block.start,block.end)))return "Personal bloqueado en "+e.title;
-    if(block.resourceType==="vehiculo"&&(e.vehicles||[]).includes(block.resourceId)&&overlap(e.start,e.end,block.start,block.end))return "Vehículo bloqueado en "+e.title;
-  }
-  return "";
+ const active=(board.events||[]).filter(e=>!["borrador","cancelado"].includes(e.status));
+ const time=x=>new Date(x).getTime();
+ const overlap=(a,b,c,d)=>time(a)<time(d)&&time(c)<time(b);
+ const span=(e)=>[
+   new Date(time(e.start)-(Number(e.before||0)+Number(e.travelMin||0)+Number(e.routeBufferMin||0))*60000),
+   new Date(time(e.end)+(Number(e.after||0)+Number(e.travelMin||0))*60000)
+ ];
+ for(let i=0;i<active.length;i++)for(let j=i+1;j<active.length;j++){
+   const a=active[i],b=active[j];
+   for(const p of a.staff||[])for(const q of b.staff||[]){
+     if(p.personId!==q.personId)continue;
+     if(overlap(p.start,p.end,q.start,q.end))
+       return "Empalme de personal: "+a.title+" y "+b.title;
+     if(!a.siteId||a.siteId!==b.siteId){
+       let gap=time(q.start)-time(p.end),need=Number(b.travelMin||0)+Number(b.routeBufferMin||0);
+       if(gap<0){gap=time(p.start)-time(q.end);need=Number(a.travelMin||0)+Number(a.routeBufferMin||0);}
+       if(gap>=0&&need>0&&gap/60000<need)
+         return "Traslado insuficiente de personal entre "+a.title+" y "+b.title;
+     }
+   }
+   if((a.vehicles||[]).some(id=>(b.vehicles||[]).includes(id))){
+     const [startA,endA]=span(a),[startB,endB]=span(b);
+     if(overlap(startA,endA,startB,endB))
+       return "Camioneta reservada en jornadas incompatibles, incluyendo salida y regreso: "+a.title+" y "+b.title;
+   }
+ }
+ for(const e of active)for(const block of board.blocks||[]){
+   if(block.resourceType==="personal"&&(e.staff||[]).some(a=>a.personId===block.resourceId&&overlap(a.start,a.end,block.start,block.end)))
+     return "Personal bloqueado en "+e.title;
+   if(block.resourceType==="vehiculo"&&(e.vehicles||[]).includes(block.resourceId)){
+     const [s,t]=span(e);
+     if(overlap(s,t,block.start,block.end))return "Vehículo bloqueado en "+e.title;
+   }
+ }
+ return "";
 }
 async function writeRecord(col,id,desired,existing){
   const ref=doc(fs,col,id);
