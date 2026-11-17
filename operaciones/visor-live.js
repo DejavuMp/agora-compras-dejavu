@@ -1,5 +1,5 @@
 /* ÁGORA visor colaborativo · solo cuentas admin/coordinador autorizadas.
- * No utiliza localStorage ni lee fichas individuales, Finanzas o nómina.
+ * No usa almacenamiento local ni lee fichas individuales, Finanzas o nómina.
  */
 import "../firebase-init.js";
 import {GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signInWithRedirect,signOut}
@@ -44,7 +44,7 @@ function routes(e){
 }
 function card(e){
   const trip=Number(e.travelMin||0)+Number(e.routeBufferMin||0);
-  const departure=validDate(e.start)?time(new Date(instant(e.start)-(Number(e.before||30)+trip)*60000).toISOString()):"--:--";
+  const departure=validDate(e.start)?time(new Date(instant(e.start)-(Number(e.before ?? 30)+trip)*60000).toISOString()):"--:--";
   const route=routes(e);
   const series=e.dayCount>1?'<span class="series">Día '+e.dayIndex+' de '+e.dayCount+'</span>':"";
   return '<article class="event'+(e.conflict?' conflict':'')+'">'+
