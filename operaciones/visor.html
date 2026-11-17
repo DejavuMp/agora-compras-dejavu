@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ÁGORA · Visor de Operación · Dejavú Marketing</title>
+<meta name="theme-color" content="#151719">
+<style>
+:root{--ink:#1c1e20;--dark:#151719;--gold:#bc9a5d;--muted:#727983;--border:#e7e8e8;--bg:#f5f5f3;--red:#a94745}
+*{box-sizing:border-box}body{font-family:Arial,sans-serif;background:var(--bg);color:var(--ink);margin:0}button,a{font:inherit}a{text-decoration:none}
+header{background:var(--dark);color:white;padding:17px clamp(18px,3vw,48px);display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.monogram{width:48px;height:48px;border:1px solid #816c49;color:#dec48c;border-radius:11px;display:grid;place-items:center;font-size:27px;font-weight:900}
+.identity{flex:1;min-width:220px}.identity small{display:block;color:var(--gold);letter-spacing:1.2px;font-weight:700;font-size:10px;margin-bottom:5px}.identity strong{font-size:19px}
+.clock{text-align:right;font-size:20px;font-weight:700}.clock small{display:block;font-size:11px;font-weight:400;color:#ddd}
+.editlink{border:1px solid #76694f;border-radius:10px;color:#f4e6c8;padding:11px 14px;font-size:12px;font-weight:700}
+main{max-width:1660px;margin:auto;padding:28px clamp(16px,3vw,48px)}
+.hero{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.overline{font-size:10px;letter-spacing:1.3px;font-weight:800;color:#9a7b49}
+h1{font-size:clamp(24px,3vw,35px);margin:7px 0}.desc{margin:0;color:var(--muted);font-size:13px;line-height:1.5}
+.controls{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.controls button,.weektools button{background:white;border:1px solid #dedfdf;border-radius:9px;padding:10px 13px;font-size:12px;font-weight:700;cursor:pointer}
+.controls .active{background:#242525;border-color:#242525;color:white}
+.message{margin:20px 0 17px;background:#fffbf0;border:1px solid #e8ddc7;color:#645537;border-radius:11px;padding:13px 16px;font-size:12px;line-height:1.6}
+.cards{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:17px}.card{background:white;border:1px solid var(--border);padding:18px;border-radius:14px;min-height:115px}.card small{display:block;color:#6e7478;font-weight:700;font-size:11px}.card strong{display:block;font-size:34px;margin:7px 0}.card span{color:#8b8f96;font-size:11px}
+.layout{display:grid;grid-template-columns:minmax(0,2.1fr) minmax(280px,.9fr);gap:16px}.panel{background:white;border:1px solid var(--border);border-radius:15px;overflow:hidden}
+.panelhead{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;padding:18px 20px;border-bottom:1px solid var(--border)}
+h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);font-size:11px;margin-top:6px}
+.weektools{display:flex;gap:6px;align-items:center}.weektools span{font-size:11px;white-space:nowrap;margin:0 4px;font-weight:700}
+.week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));min-height:330px}
+.day{min-width:0;border-right:1px solid var(--border)}.day:last-child{border:0}.daytitle{text-align:center;background:#fafaf9;padding:12px 6px;border-bottom:1px solid var(--border)}.daytitle small{font-size:10px;color:var(--muted);display:block}.daytitle b{font-size:19px}
+.day.today .daytitle{box-shadow:inset 0 3px var(--gold)}
+.dayevents{display:grid;gap:8px;align-content:start;padding:8px}.event{border:1px solid #e4e4e4;border-left:3px solid var(--gold);background:#fff;border-radius:9px;padding:10px 8px;overflow-wrap:anywhere}.event.conflict{border-left-color:var(--red);background:#fff9f8}
+.event .time{color:#8f6f35;font-weight:800;font-size:11px;margin-bottom:7px}.type{display:inline-block;font-size:9px;background:#f8f0e2;color:#7c653e;padding:4px 6px;border-radius:5px;font-weight:700;text-transform:uppercase;margin-bottom:8px}
+.event b{display:block;font-size:12px;line-height:1.3}.event p{font-size:10px;line-height:1.45;color:#6e7478;margin:7px 0 0}.event .person{color:#303336}
+.none{font-size:11px;color:#aaa;text-align:center;padding:20px 3px}
+.side{display:grid;gap:16px;align-content:start}.sidebody{padding:12px 18px}.upnext{padding:12px 0;border-bottom:1px solid #eee;font-size:11px}.upnext:last-child{border:0}.upnext b{font-size:12px;display:block;margin-bottom:5px}.upnext span{color:#72777d;line-height:1.5}.alert{padding:10px 12px;border:1px solid #f1dfdb;border-radius:9px;background:#fff7f5;color:#884c42;font-size:11px;line-height:1.5;margin-bottom:8px}
+.muted{color:#86888a;font-size:12px;line-height:1.6}footer{font-size:11px;line-height:1.6;color:#858b8b;margin-top:20px}
+@media(max-width:1180px){.layout{grid-template-columns:1fr}.cards{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:760px){.cards{grid-template-columns:repeat(2,1fr)}.card:last-child{grid-column:span 2}.week{display:flex;overflow-x:auto;max-width:calc(100vw - 36px)}.day{min-width:180px;flex:1}.clock{font-size:16px}main{padding-top:20px}}
+@media print{.controls,.editlink,.message,.weektools,footer{display:none!important}main{padding:14px}.layout{display:block}.side{margin-top:15px}.week{min-height:250px}}
+</style>
+</head>
+<body>
+<header><div class="monogram">D</div><div class="identity"><small>DEJAVÚ MARKETING · ÁGORA</small><strong>Centro de Operaciones / Visor</strong></div><div id="clock" class="clock">--:--</div><a class="editlink" href="./demo.html">Abrir editor de prueba</a></header>
+<main>
+<div class="hero"><div><div class="overline">CRONOGRAMA · SOLO LECTURA</div><h1>Operación de la agencia</h1><p class="desc">Eventos, campañas, sucursales, personal y vehículos en una sola vista.</p></div><div class="controls"><button id="local" class="active">Mis datos</button><button id="sample">Ver ejemplo</button><button id="refresh">Actualizar</button><button id="print">Imprimir</button></div></div>
+<div id="message" class="message"></div>
+<div id="metrics" class="cards"></div>
+<div class="layout"><section class="panel"><div class="panelhead"><div><h2>Cronograma semanal</h2><small>Calendario visual de actividades</small></div><div class="weektools"><button id="prev" aria-label="Anterior">‹</button><button id="today">Hoy</button><span id="weektitle">—</span><button id="next" aria-label="Siguiente">›</button></div></div><div id="week" class="week"></div></section><aside class="side"><section class="panel"><div class="panelhead"><h2>Próximas actividades</h2></div><div id="upcoming" class="sidebody"></div></section><section class="panel"><div class="panelhead"><h2>Alertas de empalmes</h2></div><div id="alerts" class="sidebody"></div></section></aside></div>
+<footer>Vista de consulta que se actualiza automáticamente cada 5 segundos. Durante la prueba, muestra exclusivamente los datos locales guardados en este navegador mediante la demostración V3. No sincroniza dispositivos ni lee datos del Firebase de producción. No muestra sueldos, montos o detalles bancarios.</footer>
+</main>
+<script>
+(function(){
+"use strict";
+var KEY="agora_planeacion_recursos_v3",PREV=["agora_planeacion_recursos_v2","agora_planeacion_recursos_v1"],mode="local",database=null,last="",week=monday(new Date());
+function $(id){return document.getElementById(id)}
+function escapeHtml(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+function day(d){return new Date(d.getFullYear(),d.getMonth(),d.getDate())}
+function add(d,n){return new Date(d.getFullYear(),d.getMonth(),d.getDate()+n)}
+function monday(d){return add(day(d),-(d.getDay()+6)%7)}
+function ymd(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function stamp(d,h){return ymd(d)+"T"+String(h).padStart(2,"0")+":00"}
+function num(s){return new Date(s).getTime()}
+function overlap(a,b,c,d){return num(a)<num(d)&&num(c)<num(b)}
+function fmt(s){return new Intl.DateTimeFormat("es-MX",{day:"numeric",month:"short"}).format(new Date(s))}
+function tim(s){return new Intl.DateTimeFormat("es-MX",{hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(s))}
+function read(){for(var keys=[KEY].concat(PREV),i=0;i<keys.length;i++){try{var raw=localStorage.getItem(keys[i]);if(!raw)continue;var db=JSON.parse(raw);if(Array.isArray(db.events)&&Array.isArray(db.people)&&Array.isArray(db.vehicles))return {db:db,raw:raw}}catch(e){}}return {raw:"",db:{events:[],people:[],vehicles:[],blocks:[],sites:[]}}}
+function demo(){var d=add(day(new Date()),1),at=function(offset,h){return stamp(add(d,offset),h)};
+ return {people:[{id:"p1",name:"Andrea (ejemplo)"},{id:"p2",name:"Luis (ejemplo)"},{id:"p3",name:"María (ejemplo)"}],vehicles:[{id:"v1",name:"Camioneta 01 (ejemplo)"},{id:"v2",name:"Camioneta 02 (ejemplo)"}],sites:[{id:"s1",name:"Sucursal ejemplo A"},{id:"s2",name:"Sucursal ejemplo B"}],blocks:[],events:[
+ {id:"e1",title:"Reapertura de restaurante",type:"Reapertura",campaign:"Campaña ficticia",siteId:"s1",start:at(0,8),end:at(0,16),staff:[{personId:"p1",start:at(0,8),end:at(0,16)},{personId:"p2",start:at(0,8),end:at(0,16)}],vehicles:["v1"],status:"confirmado"},
+ {id:"e2",title:"Activación de marca",type:"Activación",campaign:"Campaña ficticia",siteId:"s2",start:at(1,10),end:at(1,18),staff:[{personId:"p3",start:at(1,10),end:at(1,18)}],vehicles:["v2"],status:"programado"},
+ {id:"e3",title:"Montaje de producción",type:"Montaje",siteId:"s1",start:at(2,7),end:at(2,13),staff:[{personId:"p2",start:at(2,7),end:at(2,13)}],vehicles:["v1"],status:"confirmado"},
+ {id:"e4",title:"Evento en vivo",type:"En vivo",siteId:"s2",start:at(4,12),end:at(4,20),staff:[{personId:"p1",start:at(4,12),end:at(4,20)}],vehicles:["v2"],status:"programado"}
+ ]}}
+function named(list,id,fallback){return ((list||[]).find(function(x){return x.id===id})||{}).name||fallback}
+function problems(list){var arr=[];
+ for(var i=0;i<list.length;i++)for(var j=i+1;j<list.length;j++){var a=list[i],b=list[j];if(a.status==="cancelado"||b.status==="cancelado")continue;
+ for(var x of a.staff||[])for(var y of b.staff||[])if(x.personId===y.personId&&overlap(x.start,x.end,y.start,y.end))arr.push({ids:[a.id,b.id],text:named(database.people,x.personId,"Colaborador")+" está empalmado en "+a.title+" y "+b.title});
+ if((a.vehicles||[]).some(function(id){return (b.vehicles||[]).includes(id)})&&overlap(a.start,a.end,b.start,b.end))arr.push({ids:[a.id,b.id],text:"Camioneta empalmada en "+a.title+" y "+b.title});
+ }return arr}
+function paintEvent(e,bad){var people=(e.staff||[]).map(function(a){return named(database.people,a.personId,"Personal")});
+ var cars=(e.vehicles||[]).map(function(id){return named(database.vehicles,id,"Vehículo")});
+ var venue=named(database.sites,e.siteId,e.location||"Sede pendiente");
+ return '<article class="event'+(bad?' conflict':'')+'"><div class="time">'+escapeHtml(tim(e.start))+' – '+escapeHtml(tim(e.end))+'</div><span class="type">'+escapeHtml(e.type||"Evento")+'</span><b>'+escapeHtml(e.title||"Sin nombre")+'</b><p>'+escapeHtml(venue)+'</p>'+(e.campaign?'<p>'+escapeHtml(e.campaign)+'</p>':'')+(people.length?'<p class="person">◦ '+escapeHtml(people.join(", "))+'</p>':'')+(cars.length?'<p class="person">▸ '+escapeHtml(cars.join(", "))+'</p>':'')+'</article>'}
+function render(){var events=(database.events||[]).filter(function(e){return e.status!=="cancelado"}).sort(function(a,b){return num(a.start)-num(b.start)});
+ var issues=problems(events),bad=new Set(issues.flatMap(function(a){return a.ids})),td=day(new Date()),ws=monday(td),we=add(ws,7);
+ var todayEvents=events.filter(function(e){return overlap(e.start,e.end,stamp(td,0),stamp(add(td,1),0))});
+ var weekly=events.filter(function(e){return overlap(e.start,e.end,stamp(ws,0),stamp(we,0))});
+ var people=new Set(weekly.flatMap(function(e){return (e.staff||[]).map(function(a){return a.personId})}));
+ var cars=new Set(todayEvents.flatMap(function(e){return e.vehicles||[]}));
+ var stats=[["Eventos hoy",todayEvents.length,"Programados para el día"],["Esta semana",weekly.length,"De lunes a domingo"],["Personal asignado",people.size,"Programado esta semana"],["Camionetas hoy",cars.size,"Unidades programadas"],["Alertas",issues.length,"Posibles empalmes"]];
+ $("metrics").innerHTML=stats.map(function(a){return '<div class="card"><small>'+a[0]+'</small><strong>'+a[1]+'</strong><span>'+a[2]+'</span></div>'}).join("");
+ $("weektitle").textContent=fmt(week)+" – "+fmt(add(week,6));
+ $("week").innerHTML=Array.from({length:7},function(_,i){var d=add(week,i);var list=events.filter(function(e){return overlap(e.start,e.end,stamp(d,0),stamp(add(d,1),0))});
+ return '<div class="day '+(ymd(d)===ymd(td)?"today":"")+'"><div class="daytitle"><small>'+["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"][i]+'</small><b>'+d.getDate()+'</b></div><div class="dayevents">'+(list.length?list.map(function(e){return paintEvent(e,bad.has(e.id))}).join(""):'<div class="none">Sin actividades</div>')+'</div></div>'}).join("");
+ var upcoming=events.filter(function(e){return num(e.end)>=Date.now()}).slice(0,6);
+ $("upcoming").innerHTML=upcoming.length?upcoming.map(function(e){return '<div class="upnext"><b>'+escapeHtml(e.title)+'</b><span>'+escapeHtml(fmt(e.start))+' · '+escapeHtml(tim(e.start))+'–'+escapeHtml(tim(e.end))+'<br>'+escapeHtml(named(database.sites,e.siteId,e.location||"Sede pendiente"))+'</span></div>'}).join(""):'<p class="muted">No hay próximos eventos.</p>';
+ $("alerts").innerHTML=issues.length?issues.slice(0,12).map(function(a){return '<div class="alert">'+escapeHtml(a.text)+'</div>'}).join(""):'<p class="muted">Sin empalmes directos detectados.</p>';
+}
+function update(force){var result=read(),key=mode==="sample"?"SAMPLE":result.raw;if(!force&&key===last)return;last=key;database=mode==="sample"?demo():result.db;
+ $("message").innerHTML=mode==="sample"?'<b>Ejemplo ficticio:</b> Esta vista muestra eventos ilustrativos, no información real de Dejavú.':
+ (database.events||[]).length?'<b>Visualización local:</b> los cambios hechos en la demostración V3 desde este navegador aparecen aquí automáticamente. El enlace no sincroniza datos entre teléfonos.':
+ '<b>Sin eventos locales:</b> abre el editor de prueba para crear eventos o usa «Ver ejemplo» para conocer el tablero. Los datos son independientes en cada dispositivo.';
+ render()}
+function clock(){var d=new Date();$("clock").innerHTML=escapeHtml(d.toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit",hour12:false}))+'<small>'+escapeHtml(d.toLocaleDateString("es-MX",{weekday:"short",day:"numeric",month:"short"}))+'</small>'}
+$("sample").onclick=function(){mode="sample";$("sample").classList.add("active");$("local").classList.remove("active");update(true)};
+$("local").onclick=function(){mode="local";$("local").classList.add("active");$("sample").classList.remove("active");update(true)};
+$("refresh").onclick=function(){update(true)};
+$("prev").onclick=function(){week=add(week,-7);render()};
+$("next").onclick=function(){week=add(week,7);render()};
+$("today").onclick=function(){week=monday(new Date());render()};
+$("print").onclick=function(){window.print()};
+window.addEventListener("storage",function(e){if([KEY].concat(PREV).includes(e.key)&&mode==="local")update(true)});
+clock();update(true);
+setInterval(function(){clock();if(mode==="local")update(false)},5000);
+})();
+</script>
+</body></html>
