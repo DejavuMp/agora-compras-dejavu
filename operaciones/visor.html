@@ -53,22 +53,43 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
 .weektools{flex-wrap:wrap}.weektools span{max-width:150px;white-space:normal;text-align:center}
 @media(max-width:900px){.week{grid-template-columns:1fr}}
 @media(max-width:760px){.week{display:grid;overflow:visible;max-width:none;grid-template-columns:1fr;padding:10px}.event{min-height:0}.panelhead{padding:14px}}
+
+.viewer-toggle{display:inline-flex;gap:5px;background:#eeede9;padding:4px;border-radius:11px}
+.viewer-toggle button{background:transparent;border:0;border-radius:8px;padding:10px 15px;font-size:12px;font-weight:700;cursor:pointer;color:#56595d}
+.viewer-toggle button.active{background:#242525;color:white}
+#days-control{border:1px solid #dedfdf;border-radius:9px;padding:9px 10px;background:#fff;font-size:12px}
+#days-control[hidden]{display:none!important}
+.week.schedule-mode{display:block;padding:10px 17px;min-height:160px}
+.schedule-day{padding:15px 0;border-bottom:1px solid #e6e7e8}
+.schedule-day:last-child{border:0}
+.schedule-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.schedule-header b{font-size:13px}
+.schedule-header small{color:#7a8086;font-size:11px}
+.schedule-row{display:grid;grid-template-columns:100px minmax(125px,1.3fr) minmax(110px,1fr) minmax(130px,1.4fr) minmax(85px,.85fr);gap:10px;align-items:center;padding:11px 9px;border:1px solid #f0f0ef;border-left:3px solid var(--gold);border-radius:7px;margin:5px 0}
+.schedule-row.conflict{border-left-color:#b04e4d;background:#fffafa}
+.schedule-row .when{font-weight:800;font-size:12px}
+.schedule-row b{font-size:12px;line-height:1.4}
+.schedule-row p{font-size:10px;color:#6d747b;line-height:1.5;margin:4px 0}
+.schedule-row a{font-size:11px;font-weight:700;color:#806134;text-decoration:underline}
+@media(max-width:850px){.schedule-row{grid-template-columns:80px minmax(0,1fr) minmax(0,1fr)}.schedule-row .long{grid-column:2/4}}
+@media(max-width:610px){.week.schedule-mode{padding:8px}.schedule-row{grid-template-columns:75px 1fr}.schedule-row .long{grid-column:2}.schedule-row .links{grid-column:2}}
+@media print{.viewer-toggle,#days-control{display:none!important}.week.schedule-mode{display:block}}
 </style>
 </head>
 <body>
 <header><div class="monogram">D</div><div class="identity"><small>DEJAVÚ MARKETING · ÁGORA</small><strong>Centro de Operaciones / Visor</strong></div><div id="clock" class="clock">--:--</div><a class="editlink" href="./demo.html">Abrir editor de prueba</a></header>
 <main>
-<div class="hero"><div><div class="overline">AGENDA DIARIA · SOLO LECTURA</div><h1>Operación de la agencia</h1><p class="desc">Selecciona el día para ver volanteo, aperturas, activaciones, montajes y demás jornadas sin saturar el calendario.</p></div><div class="controls"><button id="local" class="active">Mis datos</button><button id="sample">Ver ejemplo</button><button id="refresh">Actualizar</button><button id="print">Imprimir</button></div></div>
-<div id="message" class="message"></div>
+<div class="hero"><div><div class="overline">AGENDA OPERATIVA · SOLO LECTURA</div><h1>Operación de la agencia</h1><p class="desc">Consulta las jornadas de una fecha o todo el cronograma en orden de operación.</p></div><div class="controls"><button id="local" class="active">Mis datos</button><button id="sample">Ver ejemplo</button><button id="refresh">Actualizar</button><button id="print">Imprimir</button></div></div>
+<div id="message" class="message"></div><div class="viewer-toggle" role="group" aria-label="Tipo de vista"><button type="button" id="show-day" class="active">Por día</button><button type="button" id="show-schedule">Cronograma</button></div><select id="days-control" aria-label="Días del cronograma" hidden><option value="7">Próximos 7 días</option><option value="14">Próximos 14 días</option><option value="30">Próximos 30 días</option></select>
 <div id="metrics" class="cards"></div>
-<div style="display:flex;justify-content:flex-end;margin:0 0 12px"><label style="font-size:12px;color:#555;display:flex;align-items:center;gap:8px">Tipo de actividad <select id="typefilter" style="border:1px solid #dedfdf;border-radius:9px;padding:10px;background:white"><option value="todos">Todas</option><option>Volanteo</option><option>Activación</option><option>Apertura</option><option>Reapertura</option><option>En vivo</option><option>Sampling</option><option>Promotoría</option><option>Montaje</option><option>Desmontaje</option><option>Otro</option></select></label></div><div class="layout"><section class="panel"><div class="panelhead"><div><h2>Actividades del día</h2><small>Una ficha por jornada: horario, personal y ruta</small></div><div class="weektools"><button id="prev" aria-label="Anterior">‹</button><button id="today">Hoy</button><span id="weektitle">—</span><input type="date" id="focusdate" aria-label="Elegir día" style="border:1px solid #dedfdf;border-radius:8px;padding:8px;max-width:140px"><button id="next" aria-label="Siguiente">›</button></div></div><div id="week" class="week"></div></section><aside class="side"><section class="panel"><div class="panelhead"><h2>Próximas actividades</h2></div><div id="upcoming" class="sidebody"></div></section><section class="panel"><div class="panelhead"><h2>Alertas de empalmes</h2></div><div id="alerts" class="sidebody"></div></section></aside></div>
+<div style="display:flex;justify-content:flex-end;margin:0 0 12px"><label style="font-size:12px;color:#555;display:flex;align-items:center;gap:8px">Tipo de actividad <select id="typefilter" style="border:1px solid #dedfdf;border-radius:9px;padding:10px;background:white"><option value="todos">Todas</option><option>Volanteo</option><option>Activación</option><option>Apertura</option><option>Reapertura</option><option>En vivo</option><option>Sampling</option><option>Promotoría</option><option>Montaje</option><option>Desmontaje</option><option>Otro</option></select></label></div><div class="layout"><section class="panel"><div class="panelhead"><div><h2 id="view-heading">Actividades del día</h2><small id="view-subheading">Una ficha por jornada: horario, personal y ruta</small></div><div class="weektools"><button id="prev" aria-label="Anterior">‹</button><button id="today">Hoy</button><span id="weektitle">—</span><input type="date" id="focusdate" aria-label="Elegir día" style="border:1px solid #dedfdf;border-radius:8px;padding:8px;max-width:140px"><button id="next" aria-label="Siguiente">›</button></div></div><div id="week" class="week"></div></section><aside class="side"><section class="panel"><div class="panelhead"><h2>Próximas actividades</h2></div><div id="upcoming" class="sidebody"></div></section><section class="panel"><div class="panelhead"><h2>Alertas de empalmes</h2></div><div id="alerts" class="sidebody"></div></section></aside></div>
 <footer>Vista de consulta que se actualiza automáticamente cada 5 segundos. Durante la prueba, muestra exclusivamente los datos locales guardados en este navegador mediante la demostración V3. No sincroniza dispositivos ni lee datos del Firebase de producción. No muestra sueldos, montos o detalles bancarios.</footer>
 </main>
 <script>
 (function(){
 "use strict";
 var KEY="agora_planeacion_recursos_v3",PREV=["agora_planeacion_recursos_v2","agora_planeacion_recursos_v1"];
-var mode="local",database=null,last="",focus=day(new Date()),typeFilter="todos";
+var mode="local",database=null,last="",focus=day(new Date()),typeFilter="todos",viewMode="dia",scheduleDays=7;
 function $(id){return document.getElementById(id)}
 function safe(x){return String(x==null?"":x).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function day(d){return new Date(d.getFullYear(),d.getMonth(),d.getDate())}
@@ -156,19 +177,51 @@ function eventCard(e,hasConflict){
  (maps?'<a href="'+safe(maps)+'" target="_blank" rel="noopener noreferrer">Revisar trayecto en Maps</a>':'<p>Completa origen y dirección de sede para abrir Maps.</p>')+
  '</div></article>';
 }
+
+function scheduleRows(events,flagged){
+ const output=[];
+ for(let i=0;i<scheduleDays;i++){
+  const date=plus(focus,i);
+  const dayStart=stamp(date,0),dayEnd=stamp(plus(date,1),0);
+  const list=events.filter(e=>duration(e.start,e.end,dayStart,dayEnd));
+  if(!list.length)continue;
+  output.push('<section class="schedule-day"><div class="schedule-header"><b>'+safe(formatDate(date))+'</b><small>'+list.length+' '+(list.length===1?'actividad':'actividades')+'</small></div>'+
+    list.map(e=>{
+      const people=(e.staff||[]).map(p=>name(database.people,p.personId,'Personal')+' '+formatTime(p.start)+'–'+formatTime(p.end));
+      const unit=(e.vehicles||[]).map(id=>name(database.vehicles,id,'Camioneta'));
+      const starts=ms(e.start)<ms(dayStart)?'00:00':formatTime(e.start);
+      const ends=ms(e.end)>ms(dayEnd)?'24:00':formatTime(e.end);
+      const series=Number(e.dayCount)>1?' · Día '+Number(e.dayIndex||1)+' de '+Number(e.dayCount):'';
+      const route=pathUrl(e);
+      return '<div class="schedule-row '+(flagged.has(e.id)?'conflict':'')+'"><span class="when">'+safe(starts)+'–'+safe(ends)+'</span>'+
+        '<div><b>'+safe(e.title||'Actividad')+'</b><p>'+safe(e.type||'Actividad')+safe(series)+'</p></div>'+
+        '<div><b>'+safe(site(e).name)+'</b><p>'+safe(e.campaign||e.project||'')+'</p></div>'+
+        '<div class="long"><p><strong>Personal:</strong> '+safe(people.join(', ')||'Pendiente')+'</p><p><strong>Unidad:</strong> '+safe(unit.join(', ')||'Sin camioneta')+'</p></div>'+
+        '<div class="links"><p>'+safe(Number(e.travelMin||0)>0?'Ruta '+Number(e.travelMin)+' min':'Traslado pendiente')+'</p>'+
+        (route?'<a href="'+safe(route)+'" target="_blank" rel="noopener noreferrer">Abrir ruta</a>':'')+'</div></div>';
+    }).join('')+'</section>');
+ }
+ return output.join('')||'<div class="empty-daily">Sin actividades en este período. Cambia la fecha o amplía el rango.</div>';
+}
 function paint(){
  var all=(database.events||[]).filter(function(e){return e.status!=="cancelado"}).sort(function(a,b){return ms(a.start)-ms(b.start)});
- var visible=all.filter(function(e){return relevant(e,focus)&&(typeFilter==="todos"||e.type===typeFilter)});
+ var days=viewMode==="cronograma"?scheduleDays:1;var end=plus(focus,days);var visible=all.filter(function(e){return duration(e.start,e.end,stamp(focus,0),stamp(end,0))&&(typeFilter==="todos"||e.type===typeFilter)});
  var warnings=errors(all),shown=warnings.filter(function(w){return w.ids.some(function(id){return visible.some(function(e){return e.id===id})})});
  var flagged=new Set(shown.flatMap(function(w){return w.ids}));
  var people=new Set(visible.flatMap(function(e){return (e.staff||[]).map(function(p){return p.personId})}));
  var cars=new Set(visible.flatMap(function(e){return e.vehicles||[]}));
  var multi=new Set(visible.filter(function(e){return Number(e.dayCount)>1}).map(function(e){return e.seriesId||e.id}));
- var counts=[["Jornadas del día",visible.length,"Para la fecha elegida"],["Personal asignado",people.size,"Turnos de ese día"],["Camionetas",cars.size,"Vehículos reservados"],["Campañas de varios días",multi.size,"Jornadas vinculadas"],["Alertas",shown.length,"Requieren revisión"]];
+ var counts=[[viewMode==="dia"?"Jornadas del día":"Jornadas del período",visible.length,viewMode==="dia"?"Para la fecha elegida":"En los próximos "+scheduleDays+" días"],["Personal asignado",people.size,"Turnos programados"],["Camionetas",cars.size,"Unidades programadas"],["Campañas de varios días",multi.size,"Jornadas vinculadas"],["Alertas",shown.length,"Requieren revisión"]];
  $("metrics").innerHTML=counts.map(function(x){return '<div class="card"><small>'+safe(x[0])+'</small><strong>'+x[1]+'</strong><span>'+safe(x[2])+'</span></div>'}).join("");
  $("focusdate").value=ymd(focus);
- $("weektitle").textContent=formatDate(focus);
- $("week").innerHTML=visible.length?visible.map(function(e){return eventCard(e,flagged.has(e.id))}).join(""):
+ $("weektitle").textContent=viewMode==="dia"?formatDate(focus):shortDate(focus)+" – "+shortDate(plus(focus,scheduleDays-1));
+ $("view-heading").textContent=viewMode==="dia"?"Actividades del día":"Cronograma operativo";
+ $("view-subheading").textContent=viewMode==="dia"?"Una ficha por jornada: horario, personal y ruta":"Actividades agrupadas por día, ordenadas por horario";
+ $("show-day").classList.toggle("active",viewMode==="dia");
+ $("show-schedule").classList.toggle("active",viewMode==="cronograma");
+ $("days-control").hidden=viewMode!=="cronograma";
+ $("week").classList.toggle("schedule-mode",viewMode==="cronograma");
+ $("week").innerHTML=viewMode==="cronograma"?scheduleRows(visible,flagged):visible.length?visible.map(function(e){return eventCard(e,flagged.has(e.id))}).join(""):
  '<div class="empty-daily"><b>Sin jornadas para este día.</b><br>Elige otra fecha o agrega una actividad desde el editor.</div>';
  var coming=all.filter(function(e){return ms(e.start)>=ms(stamp(focus,0))}).slice(0,6);
  $("upcoming").innerHTML=coming.length?coming.map(function(e){return '<div class="upnext"><b>'+safe(e.title||"Actividad")+'</b><span>'+safe(shortDate(e.start))+' · '+safe(formatTime(e.start))+'–'+safe(formatTime(e.end))+'<br>'+safe(site(e).name||"Sede")+(Number(e.dayCount)>1?' · Día '+Number(e.dayIndex||1)+'/'+Number(e.dayCount):'')+'</span></div>'}).join(""):'<p class="muted">Sin más jornadas programadas.</p>';
@@ -193,8 +246,11 @@ function clock(){var d=new Date();$("clock").innerHTML=safe(d.toLocaleTimeString
 $("sample").onclick=function(){mode="sample";focus=plus(day(new Date()),1);$("sample").classList.add("active");$("local").classList.remove("active");last="";refresh(true)};
 $("local").onclick=function(){mode="local";focus=day(new Date());$("local").classList.add("active");$("sample").classList.remove("active");last="";refresh(true)};
 $("refresh").onclick=function(){refresh(true)};
-$("prev").onclick=function(){focus=plus(focus,-1);paint()};
-$("next").onclick=function(){focus=plus(focus,1);paint()};
+$("show-day").onclick=function(){viewMode="dia";paint()};
+$("show-schedule").onclick=function(){viewMode="cronograma";paint()};
+$("days-control").onchange=function(){scheduleDays=Number(this.value)||7;paint()};
+$("prev").onclick=function(){focus=plus(focus,-(viewMode==="cronograma"?scheduleDays:1));paint()};
+$("next").onclick=function(){focus=plus(focus,viewMode==="cronograma"?scheduleDays:1);paint()};
 $("today").onclick=function(){focus=day(new Date());paint()};
 $("focusdate").onchange=function(){if(/^\d{4}-\d{2}-\d{2}$/.test(this.value)){focus=new Date(this.value+"T12:00:00");paint()}};
 $("typefilter").onchange=function(){typeFilter=this.value;paint()};
