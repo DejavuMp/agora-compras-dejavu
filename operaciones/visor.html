@@ -97,7 +97,7 @@ function sample(){
   ]};
 }
 function name(list,id,fallback){return ((list||[]).find(function(p){return p.id===id})||{}).name||fallback}
-function site(e){var s=(database.sites||[]).find(function(x){return x.id===e.siteId});return s||{name:e.location||"Sede sin definir",address:e.location||""}}
+function site(e){var s=(database.sites||[]).find(function(x){return x.id===e.siteId});return {name:e.venueName||s?.name||e.location||"Sede sin definir",address:e.venueAddress||s?.address||e.location||""}}
 function pathUrl(e){var origin=(e.origin||"").trim(),destination=(site(e).address||"").trim();
  if(!origin||!destination)return "";
  var p="https://www.google.com/maps/dir/?api=1&origin="+encodeURIComponent(origin)+"&destination="+encodeURIComponent(destination)+"&travelmode=driving";
