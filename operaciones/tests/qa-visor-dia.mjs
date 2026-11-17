@@ -78,6 +78,22 @@ try{
   assert.equal(first.staff[0].end,plus(end,30));
   assert.equal(first.venueAddress,'Coyoacán, Ciudad de México, México');
   assert.ok(await page.evaluate(e=>!!window.AGORA_TEST.routeUrl(e),first),'Ruta disponible');
+  // Editor: alternar día y cronograma sin alterar las mismas jornadas.
+  await page.locator('#board-date').fill(start.slice(0,10));
+  assert.equal(await page.locator('.ops-board .ops-card').count(),1,'Editor por día presenta una jornada');
+  await page.locator('[data-action="board-view-cronograma"]').click();
+  assert.equal(await page.locator('.ops-schedule-day').count(),3,'Cronograma reúne tres fechas con actividad');
+  assert.equal(await page.locator('.ops-schedule-row').count(),3,'Cada jornada aparece una vez');
+  assert.ok((await page.locator('.ops-schedule-row').first().innerText()).includes('Volanteo de prueba QA'));
+  await page.locator('#board-days').selectOption('14');
+  assert.equal(await page.locator('.ops-schedule-row').count(),3,'El período cambia sin duplicar');
+  await page.locator('[data-action="board-next-day"]').click();
+  assert.equal(await page.locator('.ops-schedule-row').count(),0,'Avanza al siguiente período');
+  await page.locator('[data-action="board-prev-day"]').click();
+  assert.equal(await page.locator('.ops-schedule-row').count(),3,'Regresa al período inicial');
+  await page.locator('[data-action="board-view-dia"]').click();
+  assert.equal(await page.locator('.ops-board .ops-card').count(),1,'Regresa a la vista diaria');
+  assert.equal((await state()).events.length,3,'Cambiar vista no modifica eventos');
   // Edición de una jornada no debe modificar otras ni duplicar recursos.
   await action('edit-event',first.id);
   assert.equal(await page.locator('#ev-site-name').inputValue(),'Sucursal ficticia Coyoacán');
@@ -132,6 +148,15 @@ try{
   assert.ok(await page.locator('a[href*="google.com/maps/dir"]').count(),'Maps vinculado');
   await page.locator('#next').click();
   assert.ok((await page.locator('#week').innerText()).includes('Día 2 de 3'),'Otro día disponible');
+  // Visor independiente: cronograma agrupado y selector de días.
+  await page.locator('#focusdate').fill(start.slice(0,10));
+  await page.locator('#show-schedule').click();
+  assert.equal(await page.locator('.schedule-day').count(),3,'Visor cronograma agrupa tres fechas');
+  assert.equal(await page.locator('.schedule-row').count(),3,'Visor presenta cada jornada una vez');
+  await page.locator('#days-control').selectOption('14');
+  assert.equal(await page.locator('.schedule-day').count(),3,'Rango de 14 días activo');
+  await page.locator('#show-day').click();
+  assert.ok((await page.locator('#week').innerText()).includes('Día 1 de 3'),'Cambio a visor por día');
   await page.screenshot({path:'/tmp/agora-visor-qa.png',fullPage:true});
   assert.equal(failures.length,0,'Sin errores JS: '+failures.join(' | '));
   console.log('ÉXITO: captura libre sin catálogos, turnos, jornadas, rutas, empalmes y visor.');
