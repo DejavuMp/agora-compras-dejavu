@@ -109,6 +109,7 @@ $("next").onclick=function(){week=add(week,7);render()};
 $("today").onclick=function(){week=monday(new Date());render()};
 $("print").onclick=function(){window.print()};
 window.addEventListener("storage",function(e){if([KEY].concat(PREV).includes(e.key)&&mode==="local")update(true)});
+if(!(read().db.events||[]).length){mode="sample";$("sample").classList.add("active");$("local").classList.remove("active")}
 clock();update(true);
 setInterval(function(){clock();if(mode==="local")update(false)},5000);
 })();
