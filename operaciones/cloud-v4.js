@@ -9,7 +9,7 @@ import {
   GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
 import {
-  collection, doc, getDoc, onSnapshot, query, where,
+  collection, doc, getDoc, getDocFromServer, onSnapshot, query, where,
   runTransaction, setDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 
@@ -102,6 +102,7 @@ function loadCoordinator(){
     const d=snap.data()||{};
     baseBoard={revision:snap.exists()?Number(d.revision||0):0,payload:snap.exists()?d.payload:boardOnly(blank())};
     initialized=true;
+    if(snap.metadata.fromCache){notice("Firebase · esperando confirmación del servidor","pending");return;}
     if(!ready){show();notice("Firebase · sincronizado","ok");}
     emit();
   });
@@ -123,6 +124,7 @@ function loadStaff(uid,id){
     if(!snap.exists()){loading("Falta publicar tu ficha","Tu cuenta está autorizada, pero coordinación aún debe asignarte al cronograma.");return}
     view=snap.data();
     if(view.personId!==personId){fail("Vinculación de personal incorrecta");return}
+    if(snap.metadata.fromCache){notice("Firebase · esperando confirmación del servidor","pending");return;}
     if(!ready){show();notice("Firebase · sincronizado","ok")}
     emit();
   });
@@ -154,8 +156,8 @@ async function session(u){
   if(!u.emailVerified){loading("Verifica tu correo","La cuenta debe tener su correo verificado.",'<button class="ops-plain" id="ops-logout">Cerrar sesión</button>');return;}
   try{
     const [user,member]=await Promise.all([
-      getDoc(doc(fs,"agora_users",u.uid)),
-      getDoc(doc(fs,"agora_ops_members",u.uid))
+      getDocFromServer(doc(fs,"agora_users",u.uid)),
+      getDocFromServer(doc(fs,"agora_ops_members",u.uid))
     ]);
     if(epoch!==authVersion)return;
     const info=user.exists()?user.data():{};
@@ -242,7 +244,7 @@ async function approve(uid){
     });
     notice("Firebase · acceso autorizado","ok");
   }catch(e){alert("No se vinculó: "+err(e));notice("Firebase · "+err(e),"error")}
-  finally{saving=false;}
+  finally{saving=false;await refreshFromServer();}
 }
 function hasClash(board){
   const active=board.events.filter(e=>!["borrador","cancelado"].includes(e.status));
@@ -288,6 +290,7 @@ async function writeRecord(col,id,desired,existing){
   });
 }
 async function store(next){
+  if(!navigator.onLine){notice("Sin conexión. No se envió ningún cambio.","error");return;}
   if(!ready||saving){notice("Cambios no aceptados: sesión no lista o guardado en proceso.","error");emit();return;}
   saving=true;document.body.classList.add("ops-saving");
   notice("Firebase · guardando cambios","pending");
@@ -356,10 +359,10 @@ async function refreshFromServer(){
   // estado ante conflictos o errores de permisos.
   try{
     if(role==="coordinador"){
-      const snap=await getDoc(SCHEDULE);const d=snap.data();
+      const snap=await getDocFromServer(SCHEDULE);const d=snap.data();
       baseBoard={revision:d?.revision||0,payload:d?.payload||boardOnly(blank())};
     }else if(role==="personal"){
-      const snap=await getDoc(doc(fs,"agora_ops_staff",account.uid));
+      const snap=await getDocFromServer(doc(fs,"agora_ops_staff",account.uid));
       if(snap.exists())view=snap.data();
     }
   }catch(e){notice("Error leyendo versión confirmada · "+err(e),"error")}
@@ -377,6 +380,7 @@ window.AGORA_OPS_BRIDGE={
     if(role==="personal"){
       const allowed=new Set(["new-log","edit-log","request-pay","new-incident","edit-incident",
       "close-modal","event-ics","export-ics","notify-setup","stamp-entry","stamp-exit",
+      "cal-prev","cal-next","cal-today","go-attendance",
       "export-attendance","edit-event","print","export-json"]);
       if(!allowed.has(action))return false;
     }
