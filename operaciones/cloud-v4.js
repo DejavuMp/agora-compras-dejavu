@@ -290,7 +290,7 @@ async function writeRecord(col,id,desired,existing){
   });
 }
 async function store(next){
-  if(!navigator.onLine){notice("Sin conexión. No se envió ningún cambio.","error");return;}
+  if(!navigator.onLine){notice("Sin conexión. No se envió ningún cambio.","error");emit();return;}
   if(!ready||saving){notice("Cambios no aceptados: sesión no lista o guardado en proceso.","error");emit();return;}
   saving=true;document.body.classList.add("ops-saving");
   notice("Firebase · guardando cambios","pending");
