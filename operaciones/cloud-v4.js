@@ -331,10 +331,10 @@ async function store(next){
           for(const uid of uids){
             const person=newByUid.get(uid),ref=doc(fs,"agora_ops_staff",uid);
             if(!person){tx.delete(ref);continue}
-            const newView=viewFor(person,nextBoard),oldPerson=oldByUid.get(uid);
-            const oldView=oldPerson?viewFor(oldPerson,previous.payload):null;
-            if(!oldView||canon(oldView)!==canon(newView))
-              tx.set(ref,{...newView,uid,updatedAt:serverTimestamp()});
+            const newView=viewFor(person,nextBoard);
+            // Reescribir también fichas aparentemente iguales: versiones anteriores
+            // podían conservar campos privados que la proyección nueva elimina.
+            tx.set(ref,{...newView,uid,updatedAt:serverTimestamp()});
           }
         });
       }
