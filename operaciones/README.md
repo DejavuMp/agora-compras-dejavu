@@ -6,9 +6,10 @@
 
 ## Agenda diaria y rutas (actualización)
 
-- Visor de solo lectura: https://dejavump.github.io/agora-compras-dejavu/operaciones/visor.html
-- Editor local: https://dejavump.github.io/agora-compras-dejavu/operaciones/demo.html
-- Respaldos: demo-v3-original.html y visor-semanal-v1.html.
+- Visor conectado (solo admin y coordinador con Google): https://dejavump.github.io/agora-compras-dejavu/operaciones/visor.html
+- Editor conectado: https://dejavump.github.io/agora-compras-dejavu/operaciones/
+- Demostración aislada, solo almacenamiento local: https://dejavump.github.io/agora-compras-dejavu/operaciones/demo.html
+- Visor local heredado para QA: operaciones/visor-demo.html. Respaldos previos: demo-v3-original.html y visor-semanal-v1.html.
 
 **Jornadas por fecha:** cada evento puede crearse con 1 a 31 días consecutivos. Cada fecha se guarda como registro independiente, con identificador de campaña, número de jornada y total de días. Una vez creado, se edita un día sin modificar automáticamente los demás.
 
@@ -18,7 +19,7 @@
 
 **Rutas:** se guarda origen, sucursal, paradas, minutos estimados según Google Maps y margen adicional. La salida propuesta se calcula usando el primer turno del personal menos los minutos de recorrido y el margen. La unidad se reserva hasta el retorno estimado. Se alertan traslados insuficientes según minutos capturados manualmente. No hay ETA automático ni consulta de tráfico en tiempo real.
 
-**Datos de ejemplo:** el editor incluye volanteo ficticio de dos jornadas y el visor permite mostrar ejemplos si no hay datos guardados. El visor actualiza su lectura local cada cinco segundos, pero NO sincroniza distintos dispositivos ni consulta información real de Firebase.
+**Datos de ejemplo:** el editor incluye volanteo ficticio de dos jornadas y el visor permite mostrar ejemplos si no hay datos guardados. El visor de producción usa `onSnapshot` para consultar la misma agenda de Firebase, exclusivamente después de autenticar y comprobar que la cuenta tiene rol admin o coordinador. Los nombres del personal, salarios y registros de pago se excluyen de la visualización. La demostración local y `visor-demo.html` permanecen aislados.
 
 **Pruebas automatizadas:** GitHub Actions ejecuta Playwright con registros ficticios para verificar días consecutivos, turnos +/-30, empalmes de personal y camionetas, tiempos de ruta insuficientes y el visor.
 
@@ -27,7 +28,7 @@
 - V4 publicada en GitHub Pages: HTML de operaciones y módulo \`cloud-v4.js\`.
 - Firebase Web SDK conectado con el proyecto público ya utilizado por ÁGORA: \`agora-dejavu-38b8c\`.
 - Reglas específicas añadidas a \`firestore.rules\`, con pruebas de seguridad en emulador.
-- **Pendiente activar las reglas en Firebase de producción**. GitHub Pages por sí solo no crea los permisos del backend. Hasta entonces el acceso a datos compartidos permanece cerrado.
+- **Pendiente activar las reglas en Firebase de producción**. El visor conectado no será funcional hasta confirmar permisos y el despliegue seguro. Un PR o GitHub Pages exitoso NO demuestra sincronización entre dos sesiones.
 - No se sobrescriben las operaciones de Compras, Archivos, Finanzas ni el sitio principal.
 - No se ha migrado ningún respaldo local ni datos reales al nuevo módulo.
 
@@ -82,3 +83,11 @@ Comando en entorno configurado para emulador:
 npx firebase emulators:exec --only firestore --project demo-agora-ops --non-interactive \
   'node .github/firebase-staff/test-ops-rules.mjs'
 \`\`\`
+
+## Cambios preparados el 17 de noviembre de 2026 (rama aislada, sin activación)
+
+- `visor.html` ahora exige Google Auth y valida `agora_users/{uid}` desde el servidor antes de escuchar `agora_ops_control/schedule` mediante `onSnapshot`. La lectura de la agenda administrativa continúa restringida por las reglas de Firestore a admin y coordinador. No hay acceso público al documento.
+- `ops-safe-view.mjs` genera una copia minimizada de cada evento para el visor y una ficha personal con lista blanca de campos para staff. No muestra nombres individuales en el visor global; solo cantidades y alertas sin identidad.
+- `visor-demo.html` conserva la versión local anterior para las pruebas históricas; `demo.html` se conserva como simulador no colaborativo. No confundirlas con el editor y visor reales.
+- El archivo de pruebas `operaciones/tests/qa-safe-view.mjs` comprueba que no salen campos de salarios, cuentas bancarias, placas, datos de colegas ni aprobaciones.
+- **No se han comprobado todavía los datos de reglas vigentes en Firebase ni una sincronización real de dos usuarios**. No se debe fusionar o publicar la rama hasta resolver la federación WIF, obtener respaldo real y comprobar compatibilidad.
