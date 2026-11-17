@@ -21,6 +21,20 @@
 
 .kpi-six{grid-template-columns:repeat(6,minmax(0,1fr))}.kpi-six .metric{padding:16px;min-height:128px}.kpi-six .metric-value{font-size:30px}
 @media(max-width:1450px){.kpi-six{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:750px){.kpi-six{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi-six .metric{padding:13px}.kpi-six .metric-value{font-size:25px}}@media(max-width:390px){.kpi-six{grid-template-columns:1fr 1fr}}
+
+/* 2026-11-17 · Modal accesible y desplazable. El form intermedio DEBE
+   limitar altura para que .modal-content sea la superficie de scroll. */
+.modal-mask{overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;align-items:safe center}
+.modal{max-height:calc(100vh - 28px);max-height:calc(100dvh - 28px);min-height:0}
+.modal > form{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:hidden}
+.modal-content{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.modal-head,.modal-foot{flex:0 0 auto}
+@media(max-width:750px){
+ .modal-mask{padding:8px}
+ .modal{max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px)}
+ .modal-foot{flex-wrap:wrap;gap:8px}
+ .modal-foot>.inline-actions{margin-left:auto;justify-content:flex-end}
+}
 </style>
 </head>
 <body><div id="agora-public-demo" role="status" aria-label="Aviso de versión de prueba" style="position:relative;z-index:15;box-sizing:border-box;min-height:43px;display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap;padding:8px 15px;background:#302718;color:#fff0d2;border-bottom:2px solid #bd9754;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.45;text-align:center"><strong>ÁGORA · PRUEBAS</strong><span>Esta vista es pública y NO colaborativa. Los cambios sólo se guardan en TU navegador; roles y acceso simulados.</span><strong>No captures datos reales de personal, pagos ni sueldos.</strong></div><div id="app"></div><div id="modal-root"></div><div class="toast-wrap" id="toast-wrap" aria-live="polite"></div>
