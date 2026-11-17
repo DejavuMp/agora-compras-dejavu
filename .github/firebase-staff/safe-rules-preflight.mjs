@@ -31,6 +31,14 @@ const markerEnd='    // Todas las demás colecciones permanecen cerradas.';
 const financeEnd=candidate.indexOf(markerEnd,financeAt);
 if(financeEnd<financeAt)throw Error('Marcador final de Finanzas no encontrado');
 const legacy=candidate.slice(0,financeAt)+candidate.slice(financeEnd);
+// V4 agrega permisos de Operaciones después de Finanzas. La producción puede
+// seguir en la versión anterior (con Finanzas, pero sin Operaciones).
+const opsMarker='    // ÁGORA · Centro de Operaciones V4 (aislado de Compras y Finanzas).';
+const opsAt=candidate.indexOf(opsMarker);
+if(opsAt<0||candidate.indexOf(opsMarker,opsAt+1)!==-1||opsAt<=financeAt||opsAt>=financeEnd){
+  throw Error('No se identificó un único bloque de Operaciones en la posición segura; cancelar.');
+}
+const withoutOps=candidate.slice(0,opsAt)+candidate.slice(financeEnd);
 const evidenceMarker='    // Fotos de evidencia compartidas: archivo JPEG optimizado, separado de los';
 function normalize(s){return String(s).replace(/\r\n?/g,'\n').trim()}
 function safeVariants(text){
@@ -46,7 +54,7 @@ function safeVariants(text){
 }
 // Solo admitir reglas idénticas a versiones conocidas de Staff (con o sin el
 // NUEVO bloque financiero). Cualquier edición ajena cancela el despliegue.
-const allowed=new Set([...safeVariants(candidate),...safeVariants(legacy)].map(normalize));
+const allowed=new Set([...safeVariants(candidate),...safeVariants(withoutOps),...safeVariants(legacy)].map(normalize));
 const headers={Authorization:'Bearer '+token,Accept:'application/json'};
 async function getJson(path){
  const url='https://firebaserules.googleapis.com/v1/'+path;
@@ -73,6 +81,6 @@ if(!allowed.has(normalize(live))){
 if(normalize(live)===normalize(candidate)){
  console.log('Las reglas de ÁGORA coinciden con el repositorio. No se requiere cambiar contenido.');
 }else{
- console.log('Las reglas activas de ÁGORA coinciden con una versión conocida; es seguro añadir permisos de Finanzas sin modificar los demás módulos.');
+ console.log('Las reglas activas de ÁGORA coinciden con una versión conocida; es seguro añadir permisos de Operaciones sin modificar los demás módulos.');
 }
 console.log('Verificación previa de reglas completada. Proyecto: '+project);
