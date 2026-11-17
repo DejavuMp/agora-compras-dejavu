@@ -48,6 +48,24 @@ try {
  const start=local(next),end=shift(start,6*60);
  await action('new-event');
  assert.ok(await page.locator('#ev-days').count(),'Número de días en la ficha');
+ // Reproduce el fallo reportado: formulario largo en pantalla pequeña.
+ await page.setViewportSize({width:390,height:640});
+ const scrollInfo=await page.locator('#event-form .modal-content').evaluate(el=>({
+   scrollHeight:el.scrollHeight,clientHeight:el.clientHeight,
+   overflow:getComputedStyle(el).overflowY
+ }));
+ assert.ok(scrollInfo.scrollHeight>scrollInfo.clientHeight+40,
+   'El contenido largo debe poder desplazarse en el formulario móvil');
+ assert.equal(scrollInfo.overflow,'auto','Modal con desplazamiento propio');
+ await page.locator('#ev-stops').scrollIntoViewIfNeeded();
+ const routeBox=await page.locator('#ev-stops').boundingBox();
+ assert.ok(routeBox&&routeBox.y>=-1&&routeBox.y+routeBox.height<=640,
+   'Se puede acceder a la sección inferior de rutas');
+ const footBox=await page.locator('#event-form .modal-foot').boundingBox();
+ assert.ok(footBox&&footBox.y>=0&&footBox.y+footBox.height<=640,
+   'Los botones Guardar / Cancelar permanecen visibles');
+ await page.setViewportSize({width:1440,height:960});
+
  await page.locator('#ev-title').fill('Volanteo de prueba QA');
  await page.locator('#ev-type').selectOption({label:'Volanteo'});
  await page.locator('#ev-days').fill('3');
