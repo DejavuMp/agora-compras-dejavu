@@ -119,11 +119,11 @@ function errors(events){
   }
   var shared=(a.vehicles||[]).filter(function(id){return (b.vehicles||[]).includes(id)});
   if(shared.length){
-   var beforeA=Number(a.before||30)+Number(a.travelMin||0)+Number(a.routeBufferMin||0);
-   var afterA=Number(a.after||30)+Number(a.travelMin||0);
-   var beforeB=Number(b.before||30)+Number(b.travelMin||0)+Number(b.routeBufferMin||0);
-   var afterB=Number(b.after||30)+Number(b.travelMin||0);
-   if(ms(mins(a.start,-beforeA))<ms(mins(b.end,afterB))&&ms(mins(b.start,-beforeB))<ms(mins(a.end,afterA)))
+   var firstA=Math.min(ms(a.start)-Number(a.before??30)*60000,...(a.staff||[]).map(function(p){return ms(p.start)}).filter(Number.isFinite));
+   var lastA=Math.max(ms(a.end)+Number(a.after??30)*60000,...(a.staff||[]).map(function(p){return ms(p.end)}).filter(Number.isFinite));
+   var firstB=Math.min(ms(b.start)-Number(b.before??30)*60000,...(b.staff||[]).map(function(p){return ms(p.start)}).filter(Number.isFinite));
+   var lastB=Math.max(ms(b.end)+Number(b.after??30)*60000,...(b.staff||[]).map(function(p){return ms(p.end)}).filter(Number.isFinite));
+   if(firstA-(Number(a.travelMin||0)+Number(a.routeBufferMin||0))*60000<lastB+Number(b.travelMin||0)*60000&&firstB-(Number(b.travelMin||0)+Number(b.routeBufferMin||0))*60000<lastA+Number(a.travelMin||0)*60000)
     arr.push({ids:[a.id,b.id],text:name(database.vehicles,shared[0],"Camioneta")+" aparece reservada en ambas jornadas, incluyendo traslado."});
   }
  }
@@ -139,7 +139,8 @@ function eventCard(e,hasConflict){
  var cars=(e.vehicles||[]).map(function(id){return name(database.vehicles,id,"Vehículo")}).join(", ");
  var loc=site(e),place=loc.name||e.location||"Sede pendiente";
  var travel=Number(e.travelMin||0),buffer=Number(e.routeBufferMin||0),before=30;
- var departure=mins(e.start,-before-travel-buffer);
+ var first=Math.min(ms(e.start)-Number(e.before??30)*60000,...(e.staff||[]).map(function(a){return ms(a.start)}).filter(Number.isFinite));
+ var departure=new Date(first-(travel+buffer)*60000);
  var maps=pathUrl(e);
  var routeText=travel>0?"Salida prevista: "+formatTime(departure)+" · "+travel+" min de camino + "+buffer+" min de margen":"Falta capturar el tiempo previsto del recorrido.";
  return '<article class="event'+(hasConflict?' conflict':'')+'">'+
