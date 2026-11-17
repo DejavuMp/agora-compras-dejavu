@@ -126,6 +126,33 @@ try {
  await page.locator('#next').click();
  assert.ok((await page.locator('#week').innerText()).includes('Día 2 de 3'),'Navegación diaria');
  await page.screenshot({path:'/tmp/agora-visor-qa.png',fullPage:true});
+ 
+ // Una actividad antigua que abarca varios días debe seguir siendo editable,
+ // no ser borrada ni convertida automáticamente al nuevo esquema diario.
+ await page.goto(origin+'demo.html',{waitUntil:'domcontentloaded'});
+ const legacyStart=shift(start,7*24*60),legacyEnd=shift(legacyStart,54*60);
+ await page.evaluate(({legacyStart,legacyEnd})=>{
+   const k='agora_planeacion_recursos_v3',db=JSON.parse(localStorage.getItem(k));
+   db.events.push({id:'legacy-multiday-qa',title:'Activación anterior QA',
+     project:'Prueba de compatibilidad',campaign:'',type:'Activación',
+     status:'pendiente',start:legacyStart,end:legacyEnd,
+     siteId:'',location:'',origin:'',travelMin:0,staff:[],vehicles:[]});
+   localStorage.setItem(k,JSON.stringify(db));
+ },{legacyStart,legacyEnd});
+ await page.reload({waitUntil:'domcontentloaded'});
+ await page.evaluate(()=>{
+   const b=document.createElement('button');
+   b.dataset.action='edit-event';b.dataset.id='legacy-multiday-qa';
+   document.body.append(b);b.click();b.remove();
+ });
+ assert.ok((await page.locator('#event-form').innerText()).includes('Actividad anterior de varios días'),
+   'Mostrar aviso para evento histórico de varios días');
+ await page.locator('#ev-title').fill('Activación anterior actualizada QA');
+ await save('#event-form');
+ assert.equal((await page.evaluate(()=>window.AGORA_TEST.getState()))
+  .events.find(x=>x.id==='legacy-multiday-qa')?.title,'Activación anterior actualizada QA',
+  'Editar actividad histórica sin pérdidas');
+
  assert.equal(errors.length,0,'Sin errores JS: '+errors.join(' | '));
  console.log('ÉXITO: edición diaria, 3 jornadas, volanteo, turnos +/- 30, reservas, ruta, bloqueo de empalmes y visor diario.');
 }finally{await browser.close()}
