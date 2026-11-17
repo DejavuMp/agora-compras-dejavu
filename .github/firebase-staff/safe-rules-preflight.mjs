@@ -38,7 +38,8 @@ const opsAt=candidate.indexOf(opsMarker);
 if(opsAt<0||candidate.indexOf(opsMarker,opsAt+1)!==-1||opsAt<=financeAt||opsAt>=financeEnd){
   throw Error('No se identificó un único bloque de Operaciones en la posición segura; cancelar.');
 }
-const withoutOps=candidate.slice(0,opsAt)+candidate.slice(financeEnd);
+if(candidate[opsAt-1]!=='\n')throw Error('Separador de reglas de Operaciones inesperado');
+const withoutOps=candidate.slice(0,opsAt-1)+candidate.slice(financeEnd);
 const evidenceMarker='    // Fotos de evidencia compartidas: archivo JPEG optimizado, separado de los';
 function normalize(s){return String(s).replace(/\r\n?/g,'\n').trim()}
 function safeVariants(text){
