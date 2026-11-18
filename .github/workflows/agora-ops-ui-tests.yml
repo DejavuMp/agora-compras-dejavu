@@ -18,6 +18,7 @@ on:
       - "operaciones/ops-monthly-receipt.mjs"
       - "operaciones/ops-breaks.mjs"
       - "operaciones/ops-reminders.mjs"
+      - "operaciones/ops-route-estimate.mjs"
       - "operaciones/control-jornadas*"
       - "operaciones/visor-live.js"
       - "operaciones/tests/**"
@@ -51,6 +52,10 @@ jobs:
         run: node operaciones/tests/qa-jornadas.mjs
       - name: Validar revisión de excedentes por coordinación
         run: node operaciones/tests/qa-extra-review.mjs
+      - name: Validar estimación gratuita de rutas y caché OSM
+        run: |
+          node --check operaciones/ops-route-estimate.mjs
+          node operaciones/tests/qa-route-estimate.mjs
       - name: Validar recordatorios personales sin push
         run: |
           node --check operaciones/ops-reminders.mjs
