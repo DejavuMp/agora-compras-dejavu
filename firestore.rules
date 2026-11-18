@@ -849,6 +849,56 @@ match /agora_finance_requests/{requestId} {
         );
       allow delete: if false;
     }
+    // Descansos certificados: cada inicio/reanudación usa hora del servidor.
+    // Hasta ocho descansos por persona y evento, sin montos, GPS ni fotos.
+    function shiftClockPath(uid,eventId) {
+      return /databases/$(database)/documents/agora_ops_clock/$(uid + '_' + eventId);
+    }
+    function breakOnOwnActiveClock(d) {
+      return shiftSelf(d) &&
+        exists(shiftClockPath(request.auth.uid,d.eventId)) &&
+        get(shiftClockPath(request.auth.uid,d.eventId)).data.status == 'en_curso' &&
+        get(shiftClockPath(request.auth.uid,d.eventId)).data.ownerUid == request.auth.uid &&
+        get(shiftClockPath(request.auth.uid,d.eventId)).data.personId == d.personId;
+    }
+    match /agora_ops_breaks/{id} {
+      allow get, list: if canEdit() ||
+        (opsStaff() && resource.data.ownerUid == request.auth.uid);
+      allow create: if breakOnOwnActiveClock(request.resource.data) &&
+        request.resource.data.keys().hasOnly([
+          'ownerUid','personId','eventId','slot','status','startedAt','updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'ownerUid','personId','eventId','slot','status','startedAt','updatedAt'
+        ]) &&
+        request.resource.data.slot in ['1','2','3','4','5','6','7','8'] &&
+        id == request.auth.uid + '_' + request.resource.data.eventId + '_' + request.resource.data.slot &&
+        request.resource.data.status == 'en_descanso' &&
+        request.resource.data.startedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.time > get(shiftClockPath(request.auth.uid,request.resource.data.eventId)).data.startedAt;
+      allow update: if breakOnOwnActiveClock(resource.data) &&
+        id == request.auth.uid + '_' + resource.data.eventId + '_' + resource.data.slot &&
+        resource.data.status == 'en_descanso' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status','endedAt','updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'ownerUid','personId','eventId','slot','status','startedAt',
+          'endedAt','updatedAt'
+        ]) &&
+        request.resource.data.ownerUid == resource.data.ownerUid &&
+        request.resource.data.personId == resource.data.personId &&
+        request.resource.data.eventId == resource.data.eventId &&
+        request.resource.data.slot == resource.data.slot &&
+        request.resource.data.startedAt == resource.data.startedAt &&
+        request.resource.data.status == 'reanudado' &&
+        request.resource.data.endedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.time > resource.data.startedAt;
+      allow delete: if false;
+    }
+
     match /agora_ops_trips/{id} {
       allow get, list: if canEdit() ||
         (opsStaff() && resource.data.ownerUid == request.auth.uid);
