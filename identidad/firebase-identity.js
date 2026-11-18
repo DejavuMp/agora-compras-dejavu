@@ -45,17 +45,25 @@ export async function loadAccount(uid){
   return record?.active===true?record:null;
 }
 
+function identifyReadError(error,collectionName){
+  if(error?.code==="permission-denied"){
+    const permissionError=new Error("Firestore rechazó la lectura de "+collectionName+".");
+    permissionError.code="permission-denied";
+    permissionError.collection=collectionName;
+    return permissionError;
+  }
+  if(error && typeof error==="object"){
+    error.collection=collectionName;
+  }
+  return error;
+}
 async function readOwnDocument(collectionName,uid){
   try { return await getDoc(doc(db,collectionName,uid)); }
-  catch(error){
-    if(error?.code==="permission-denied"){
-      const permissionError=new Error("Firestore rechazó la lectura de "+collectionName+".");
-      permissionError.code="permission-denied";
-      permissionError.collection=collectionName;
-      throw permissionError;
-    }
-    throw error;
-  }
+  catch(error){ throw identifyReadError(error,collectionName); }
+}
+async function readIdentityQuery(collectionName,queryRef){
+  try { return await getDocs(queryRef); }
+  catch(error){ throw identifyReadError(error,collectionName); }
 }
 
 export async function loadOwnIdentity(user){
@@ -71,7 +79,10 @@ export async function loadOwnIdentity(user){
   const account=data(accountSnap);
   const link=data(linkSnap);
   let registry=null;
-  if(link?.agoraId) registry=data(await getDoc(doc(db,"agora_identity_registry",link.agoraId)));
+  if(link?.agoraId){
+    try{ registry=data(await getDoc(doc(db,"agora_identity_registry",link.agoraId))); }
+    catch(error){ throw identifyReadError(error,"agora_identity_registry"); }
+  }
   return {
     account:account?.active===true?account:null,
     registration:data(registrationSnap),link,registry,
@@ -127,12 +138,12 @@ export async function saveFinancial(user,values){
 }
 
 export async function listPendingRegistrations(){
-  const snap=await getDocs(query(collection(db,"agora_identity_registrations"),where("status","==","pending"),limit(100)));
+  const snap=await readIdentityQuery("agora_identity_registrations",query(collection(db,"agora_identity_registrations"),where("status","==","pending"),limit(100)));
   return snap.docs.map(data);
 }
 
 export async function listActiveCoordinators(){
-  const snap=await getDocs(query(collection(db,"agora_users"),where("role","==","coordinador"),limit(200)));
+  const snap=await readIdentityQuery("agora_users",query(collection(db,"agora_users"),where("role","==","coordinador"),limit(200)));
   return snap.docs.map(data).filter(item=>item?.active===true).map(item=>({
     uid:item.id,name:normalizeText(item.name||item.email,140),email:cleanEmail(item.email)
   })).sort((a,b)=>a.name.localeCompare(b.name,"es"));
@@ -140,11 +151,11 @@ export async function listActiveCoordinators(){
 
 export async function listDirectory(account,userUid){
   if(account?.role==="admin"){
-    const snap=await getDocs(query(collection(db,"agora_identity_registry"),limit(200)));
+    const snap=await readIdentityQuery("agora_identity_registry",query(collection(db,"agora_identity_registry"),limit(200)));
     return snap.docs.map(data);
   }
   if(account?.role==="coordinador"){
-    const snap=await getDocs(query(collection(db,"agora_identity_registry"),where("coordinatorUids","array-contains",userUid),limit(200)));
+    const snap=await readIdentityQuery("agora_identity_registry",query(collection(db,"agora_identity_registry"),where("coordinatorUids","array-contains",userUid),limit(200)));
     return snap.docs.map(data);
   }
   return [];
