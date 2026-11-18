@@ -34,6 +34,8 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - name: Probar preflight con reglas simuladas, sin tocar producción
+        run: node .github/firebase-staff/test-preflight.mjs
       - name: Instalar dependencias temporales de test
         run: npm install --no-save 'firebase@^12.0.0' '@firebase/rules-unit-testing@^5.0.0' firebase-tools
       - name: Probar accesos de visitantes, personal y coordinadores
@@ -85,12 +87,13 @@ jobs:
           FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
         run: node .github/firebase-staff/safe-rules-preflight.mjs
       - name: Guardar respaldo de reglas de Ágora
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: respaldo-reglas-agora-antes-dejavu-staff
           path: .github/firebase-staff/.preflight/
           retention-days: 30
-          if-no-files-found: error
+          if-no-files-found: warn
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
