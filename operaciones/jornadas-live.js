@@ -40,7 +40,10 @@ function status(msg,kind=""){
 function clearSubscriptions(){
   for(const off of unsubs.splice(0))try{off()}catch(_){}
   stopTracking();
-  access.clear();records.clear();trips.clear();logs.clear();breaks.clear();breaksReady=false;logsLoaded=false;remindersSeen.clear();staff=null;selected="";personId="";
+  access.clear();records.clear();trips.clear();logs.clear();breaks.clear();breaksReady=false;logsLoaded=false;remindersSeen.clear();remindersEnabled=false;staff=null;selected="";personId="";
+  $("j-reminders-enable").disabled=false;
+  $("j-reminders-enable").textContent="Activar avisos";
+  $("j-reminders-status").textContent="Los avisos se muestran únicamente mientras tengas ÁGORA abierta.";
 }
 function stopTracking(){
   if(geoWatch!==null&&navigator.geolocation){navigator.geolocation.clearWatch(geoWatch);geoWatch=null}
