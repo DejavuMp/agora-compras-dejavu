@@ -7,7 +7,7 @@ const field = (object, allowed) => Object.fromEntries(allowed.filter(k => object
 const staffEventFields = [
   "id","seriesId","dayCount","dayIndex","title","project","campaign",
   "siteId","venueName","venueAddress","location","origin","stops",
-  "type","status","start","end","before","after","travelMin","routeBufferMin","notes"
+  "type","workMode","status","start","end","before","after","travelMin","routeBufferMin","notes"
 ];
 const staffSettings = ["dailyLimit","weeklyLimit","prepDefault","afterDefault","notificationMinutes","lateGraceMinutes","earlyGraceMinutes"];
 
