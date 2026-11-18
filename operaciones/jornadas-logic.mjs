@@ -2,6 +2,7 @@
 export const MINUTE=60000;
 export const clampMinutes=(v,limit=1440)=>Math.max(0,Math.min(limit,Math.floor(Number(v)||0)));
 export const instant=v=>{
+  if(v===undefined||v===null||v==="")return NaN;
   if(v?.toMillis)return v.toMillis();
   const n=typeof v==="number"?v:new Date(v).getTime();
   return Number.isFinite(n)?n:NaN;
