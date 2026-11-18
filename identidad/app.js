@@ -29,7 +29,7 @@ function setStatus(message,tone=""){
 }
 function errorMessage(error){
   const code=String(error?.code||"");
-  if(code.includes("permission-denied"))return "Firebase rechazó la operación por permisos. No se guardó ningún cambio.";
+  if(code.includes("permission-denied"))return "Firebase rechazó la operación por permisos. Comprueba que las reglas de Identidad estén activas y que tu cuenta esté autorizada.";
   if(code.includes("network"))return "No hay conexión. No se guardó ningún cambio.";
   return String(error?.message||error||"Ocurrió un error.");
 }
@@ -255,10 +255,34 @@ async function refresh(){
   setStatus("Sesión protegida activa.","ok");
 }
 
+function renderAccessFailure(error){
+  const denied=String(error?.code||"").includes("permission-denied");
+  const detail=denied
+    ? "La sesión de Google está abierta, pero Firestore no autorizó la lectura del expediente. Puede faltar la activación de las reglas de Identidad o el permiso de esta cuenta."
+    : "No se pudo consultar el expediente. Comprueba tu conexión e intenta nuevamente.";
+  const collection=denied&&error?.collection
+    ? `<p class="muted">Consulta rechazada: <code>${esc(error.collection)}</code>.</p>` : "";
+  app.innerHTML=`<section class="panel access-error" role="alert">
+    <p class="eyebrow">ÁGORA · Identidad Única</p>
+    <h1>${denied?"Acceso a datos pendiente de activación":"No fue posible cargar tu identidad"}</h1>
+    <p>${detail}</p>
+    ${collection}
+    <p class="notice">No se generó ningún ID ni se modificó tu expediente. No es necesario crear otra cuenta. Administración debe comprobar las reglas de Firestore del proyecto <b>agora-dejavu-38b8c</b> antes de registrar información personal.</p>
+    <div class="actions"><button class="button primary" id="retry-identity" type="button">Reintentar conexión</button>
+    <a class="button secondary" href="./">Recargar portal</a></div>
+  </section>`;
+  document.querySelector("#retry-identity")?.addEventListener("click",()=>run(safeRefresh));
+  setStatus(denied?"Firebase denegó una lectura. No se cambió ningún dato.":errorMessage(error),"error");
+}
+
+async function safeRefresh(){
+  try{await refresh()}catch(error){console.error(error);renderAccessFailure(error)}
+}
+
 loginButton.addEventListener("click",()=>run(login));
 logoutButton.addEventListener("click",()=>run(logout));
 watchSession(user=>{
   state.user=user;sessionLabel.textContent=user?.email||"Sin sesión";
   loginButton.hidden=!!user;logoutButton.hidden=!user;
-  run(refresh);
+  run(safeRefresh);
 });
