@@ -209,17 +209,19 @@ function renderAttendance(){
     (ended?'<p><b>Salida oficial:</b> '+esc(when(r.endedAt))+'<br>'+linkGeo(r.endGeo,"Ver punto de salida")+
       '</p><p>Actividad realizada: '+esc(r.endNote||"Sin descripción")+'</p>':"")+
     (r?.status==="en_curso"?'<p><b>En curso.</b> '+(remaining!==null?(remaining>0?remaining+" min autorizados restantes.":"Límite autorizado alcanzado; finaliza tu jornada."):"")+'</p>':"")+
-    (!r?'<label>Breve descripción de tu actividad<textarea id="start-activity" maxlength="240" placeholder="Ej. Volanteo de apertura en acceso principal"></textarea></label>'+
-      '<button class="primary" id="start-shift" '+(!canStart?"disabled":"")+'>Confirmar lugar y marcar entrada</button>':"")+
-    (r?.status==="en_curso"?'<label>Descripción al terminar<textarea id="end-note" maxlength="240" placeholder="Resultado breve e incidencias"></textarea></label>'+
-      '<button class="primary" id="end-shift" '+(busy?"disabled":"")+'>Marcar terminado y salida</button>':"")+
+    (!r?'<p><b>Actividad asignada:</b> '+esc(e.type||"Actividad")+' · '+esc(e.title||"Operación programada")+'</p>'+
+      (e.notes?'<p><b>Indicaciones:</b> '+esc(e.notes)+'</p>':"")+
+      '<button class="primary" id="start-shift" '+(!canStart?"disabled":"")+'>Confirmar GPS e iniciar jornada</button>':"")+
+    (r?.status==="en_curso"?'<details class="staff-incidents"><summary>¿Hubo alguna incidencia? Agrega un comentario (opcional)</summary>'+
+      '<label>Comentario de cierre<textarea id="end-note" maxlength="240" placeholder="Incidencia, resultado u observación"></textarea></label></details>'+
+      '<button class="primary" id="end-shift" '+(busy?"disabled":"")+'>Confirmar GPS y finalizar jornada</button>':"")+
     (!check.ok&&!r?'<p class="notice">'+esc(check.reason)+'</p>':"")+
     (ended?'<p><button type="button" class="staff-subtle" data-staff-tab="pagos">Ir a mis pagos y reportes</button></p>':"")+
     '</div>';
   if($("end-note")&&existingNote)$("end-note").value=existingNote;
   if($("start-activity")&&existingActivity)$("start-activity").value=existingActivity;
   $("j-punches").innerHTML="";
-  $("live-location").disabled=busy||r?.status!=="en_curso"||(remaining!==null&&remaining===0);
+  $("live-location").disabled=busy||(!r&&!check.ok)||r?.status==="finalizada"||(remaining!==null&&remaining===0);
   if($("live-location").disabled&&geoWatch!==null)stopTracking();
 }
 function renderTrips(){
@@ -298,7 +300,24 @@ function render(){
     const active=events.find(e=>records.get(key(user.uid,e.id))?.status==="en_curso");
     selected=(active||events.find(e=>instant(eventEnd(e,personId))>=Date.now())||events.at(-1))?.id||"";
   }
-  $("j-name").textContent=staff.person?.name||user.email||"Personal autorizado";
+  const displayName=staff.person?.name||user.displayName||user.email||"equipo";
+  $("j-name").textContent="¡Hola, "+displayName+"!";
+  const current=events.find(e=>records.get(key(user.uid,e.id))?.status==="en_curso");
+  const next=events.find(e=>instant(eventEnd(e,personId))>=Date.now());
+  const stateEl=$("j-operational-status");
+  if(current){
+    stateEl.textContent="En jornada · "+(current.title||"Actividad")+" · "+placeLabel(current);
+    stateEl.className="staff-current-state active";
+  }else if(next&&access.get(key(user.uid,next.id))?.enabled===true){
+    stateEl.textContent="Fuera de jornada · Próxima actividad: "+(next.title||"Actividad")+" · "+dateLabel(eventStart(next,personId));
+    stateEl.className="staff-current-state";
+  }else if(next){
+    stateEl.textContent="Fuera de jornada · Coordinación aún no ha habilitado la próxima actividad";
+    stateEl.className="staff-current-state blocked";
+  }else{
+    stateEl.textContent="Fuera de jornada · No tienes actividades próximas";
+    stateEl.className="staff-current-state";
+  }
   renderSummary(events);
   renderHome(events);
   renderChronogram(events);
@@ -374,8 +393,8 @@ async function markStart(){
   const e=currentEvent();if(!e||!user)return;
   const p=currentPolicy();
   if(!allowedByPolicy(p).ok){status("La jornada no está habilitada por coordinación.","error");return}
-  const activity=$("start-activity")?.value.trim()||"";
-  if(activity.length<4){status("Describe brevemente la actividad antes de marcar entrada.","error");return}
+  if(!$("live-location").checked){status("Acepta compartir ubicación durante esta jornada antes de marcar entrada.","error");return}
+  const activity=String((e.type||"Actividad")+" · "+(e.title||"Operación programada")).slice(0,240);
   await action(async()=>{
     const geo=await locSnapshot();
     await setDoc(clockRef(e.id),{
@@ -387,8 +406,7 @@ async function markStart(){
 }
 async function markEnd(){
   const r=currentClock();if(!r||r.status!=="en_curso")return;
-  const note=$("end-note")?.value.trim()||"";
-  if(note.length<4){status("Agrega una breve descripción de la actividad realizada.","error");return}
+  const note=$("end-note")?.value.trim()||"Actividad terminada según la programación.";
   await action(async()=>{
     const geo=await locSnapshot();
     await updateDoc(clockRef(selected),{
@@ -493,6 +511,7 @@ async function session(u){
     });
     watch(query(collection(fs,"agora_ops_clock"),where("ownerUid","==",u.uid)),snap=>{
       records=new Map(snap.docs.map(d=>[d.id,d.data()]));
+      if(currentClock()?.status==="en_curso"&&$("live-location").checked&&geoWatch===null)startTracking();
     });
     watch(query(collection(fs,"agora_ops_trips"),where("ownerUid","==",u.uid)),snap=>{
       trips=new Map(snap.docs.map(d=>[d.id,d.data()]));
@@ -567,6 +586,32 @@ function changeCalendar(direction){
 $("j-prev").onclick=()=>changeCalendar(-1);
 $("j-next").onclick=()=>changeCalendar(1);
 $("j-now").onclick=()=>{calendarDay=localDay(Date.now());render()};
+$("j-download-calendar").onclick=()=>{
+  if(!user||!staff)return;
+  const stamp=value=>{
+    const n=instant(value);
+    return Number.isFinite(n)?new Date(n).toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,""):"";
+  };
+  const clean=value=>String(value||"").replace(/\\/g,"\\\\").replace(/\r?\n/g,"\\n").replace(/[;,]/g," ");
+  const rows=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Dejavu Marketing//Agora Operaciones//ES","CALSCALE:GREGORIAN"];
+  for(const activity of myEvents(staff.events,personId)){
+    const start=stamp(eventStart(activity,personId)),end=stamp(eventEnd(activity,personId));
+    if(!start||!end)continue;
+    rows.push("BEGIN:VEVENT","UID:"+clean(activity.id)+"-"+clean(user.uid)+"@agora-dejavu",
+      "DTSTAMP:"+stamp(Date.now()),"DTSTART:"+start,"DTEND:"+end,
+      "SUMMARY:"+clean(activity.title||activity.type||"Jornada"),
+      "LOCATION:"+clean(destination(activity)||placeLabel(activity)),
+      "DESCRIPTION:"+clean([activity.type,activity.campaign,activity.notes].filter(Boolean).join(" · ")),
+      "BEGIN:VALARM","TRIGGER:-PT60M","ACTION:DISPLAY",
+      "DESCRIPTION:Próxima jornada ÁGORA","END:VALARM","END:VEVENT");
+  }
+  rows.push("END:VCALENDAR");
+  const link=document.createElement("a");
+  const uri=URL.createObjectURL(new Blob([rows.join("\r\n")+"\r\n"],{type:"text/calendar;charset=utf-8"}));
+  link.href=uri;link.download="AGORA_Mis_Jornadas.ics";document.body.appendChild(link);
+  link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(uri),2500);
+  status("Calendario descargado. Ábrelo en tu app de calendario para agregar tus jornadas.","ok");
+};
 $("trip-origin").addEventListener("input",()=>{
   const e=currentEvent(),origin=$("trip-origin").value.trim(),url=e?mapsUrl(origin,destination(e)):"";
   const link=$("j-route");link.hidden=!url;if(url)link.href=url;
@@ -577,7 +622,14 @@ $("j-active").addEventListener("click",e=>{
   if(e.target.id==="end-shift")markEnd();
 });
 $("trip-start").onclick=startTrip;$("trip-arrive").onclick=arriveTrip;
-$("live-location").onchange=function(){if(this.checked)startTracking();else stopTracking()};
+$("live-location").onchange=function(){
+  if(!this.checked){
+    stopTracking();
+    if(currentClock()?.status==="en_curso")
+      status("Retiraste el permiso de ubicación continua. Puedes reactivarlo para volver a compartir tu ubicación.","error");
+  }else if(currentClock()?.status==="en_curso")startTracking();
+  else $("location-state").textContent="Permiso confirmado. La ubicación continua comenzará cuando marques entrada.";
+};
 window.addEventListener("pagehide",stopTracking);
 if(auth&&fs)onAuthStateChanged(auth,session,e=>status(errorMessage(e),"error"));
 else status("Firebase no se inició. Contacta a coordinación.","error");
