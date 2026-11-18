@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="es-MX"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ÁGORA · Mis jornadas | Dejavú Marketing</title>
+<meta name="theme-color" content="#151719">
+<style>
+:root{--ink:#1c1e20;--gold:#b99757;--bg:#f5f5f3;--muted:#69717a;--line:#e4e2de;--dark:#151719;--green:#266a4e;--red:#a23e37}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px/1.5 Arial,sans-serif;color:var(--ink)}
+header{display:flex;align-items:center;gap:16px;background:var(--dark);color:#fff;padding:11px clamp(14px,3vw,44px);flex-wrap:wrap}
+header img{display:block;width:150px;height:60px;object-fit:contain;background:#fff;border-radius:10px;padding:7px}
+header strong{font-size:18px}header span{font-size:12px;color:#ddcfaa;display:block}
+header a{margin-left:auto;color:#f1d69c;font-size:12px}
+main{max-width:1160px;margin:auto;padding:25px 16px 50px}
+h1{font-size:clamp(23px,4vw,31px);margin:0 0 5px}h2{font-size:17px;margin:0 0 12px}h3{font-size:15px;margin:0 0 6px}
+p{margin:5px 0 12px}.intro{color:var(--muted);font-size:13px}
+.panel,.loginbox{background:white;border:1px solid var(--line);border-radius:15px;padding:20px;box-shadow:0 5px 25px #17191d08}
+.loginbox{max-width:510px;margin:34px auto;padding:30px}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+.stack{display:grid;gap:15px}.muted{color:var(--muted);font-size:12px}.status{padding:12px 14px;border:1px solid #e8d7ad;background:#fff9ec;border-radius:10px;font-size:13px}
+.status.ok{border-color:#bae0cc;background:#effaf4;color:#225d43}.status.error{border-color:#ebc3be;background:#fff3f2;color:#87392e}
+button,input,textarea,select{font:inherit}button{border:1px solid #d6d1c5;background:white;color:var(--ink);border-radius:9px;padding:11px 14px;cursor:pointer;font-weight:bold;min-height:41px}
+button.primary{background:var(--dark);color:white;border-color:var(--dark)}button.danger{background:#fff5f4;color:var(--red);border-color:#edd0cb}
+button:disabled{opacity:.5;cursor:not-allowed}
+input:not([type=checkbox]),select,textarea{display:block;width:100%;padding:11px 12px;border:1px solid #d7d9dc;border-radius:9px;min-width:0;background:#fff}
+textarea{min-height:78px;resize:vertical}
+label{display:block;font-weight:bold;font-size:12px;margin-bottom:8px}label small{display:block;font-weight:normal;color:var(--muted)}
+.controls{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin:12px 0}
+.card{border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:11px;padding:15px;background:#fff}
+.card b{display:block}.card small{color:#687079}.card.active{border-left-color:var(--green)}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.disclaimer{font-size:12px;color:var(--muted)}
+#staff-board[hidden],#login[hidden],#admin-message[hidden]{display:none!important}
+.geo{color:#287455;font-size:12px}
+.notice{margin-top:10px;color:#926f32;font-size:12px}
+#j-events{display:grid;gap:12px}#j-name{font-size:17px;font-weight:700}
+#j-punches,#j-trips{display:grid;gap:10px}
+hr{border:0;border-top:1px solid var(--line);margin:16px 0}
+@media(max-width:760px){.grid,.two{grid-template-columns:1fr}.loginbox{padding:20px}header img{width:100px;height:51px}main{padding:20px 12px 40px}.panel{padding:16px}}
+</style>
+</head><body>
+<header><img src="./assets/dejavu-horizontal.png" alt="Dejavú Marketing"><div><strong>ÁGORA · Mis jornadas</strong><span>Marcaje de asistencia y traslados</span></div><a href="./visor.html">Visor general</a></header>
+<main>
+<section id="login" class="loginbox">
+<h1>Acceso individual</h1><p class="intro">Usa tu cuenta de Google autorizada o el correo y contraseña asignados por coordinación.</p>
+<button id="google" class="primary" style="width:100%">Continuar con Google</button>
+<hr><form id="credentials"><label>Correo electrónico / usuario de acceso<input id="email" type="email" autocomplete="username" required placeholder="usuario@dominio.com"></label>
+<label>Contraseña<input id="password" type="password" autocomplete="current-password" required></label>
+<button class="primary" type="submit" style="width:100%">Ingresar con contraseña</button></form>
+<div class="controls"><button id="recover">Recuperar contraseña</button><button id="verify" hidden>Enviar verificación de correo</button><button id="login-switch" type="button">Cambiar cuenta</button></div>
+<p class="disclaimer">Los usuarios se autentican en Firebase; las contraseñas nunca se guardan en la agenda de ÁGORA.</p>
+</section>
+<div id="auth-status" class="status" role="status" aria-live="polite">Esperando identificación.</div>
+<div id="admin-message" class="panel" hidden><h2>Acceso de coordinación</h2><p>Esta cuenta es administrativa. Para revisar las jornadas del personal usa el panel de control.</p><a href="./control-jornadas.html">Abrir control de jornadas</a></div>
+<div id="staff-board" hidden>
+<div class="controls"><div id="j-name"></div><button id="logout">Cerrar sesión</button></div>
+<div class="status" id="policy-state"></div>
+<p class="disclaimer">La hora de entrada y salida se confirma por el servidor de Firebase. Al marcar, tu dispositivo compartirá la ubicación puntual con tu consentimiento. La ubicación en vivo durante la jornada es opcional, visible y se detiene cuando cierras esta página; no funciona continuamente en segundo plano.</p>
+<div class="grid">
+<section class="panel"><h2>Mis actividades</h2><p class="intro">Selecciona la jornada que tienes asignada. No se muestran datos de otros integrantes.</p><div id="j-events"></div></section>
+<section class="stack">
+<section class="panel"><h2>Mi registro de jornada</h2><div id="j-active"></div><div id="j-punches"></div>
+<hr><label><input type="checkbox" id="live-location"> Compartir ubicación mientras esta página esté abierta (opcional)</label>
+<p id="location-state" class="geo">Ubicación continua desactivada.</p>
+</section>
+<section class="panel"><h2>Traslado y llegada</h2><div id="j-trip-form">
+<label>Origen del traslado<input id="trip-origin" maxlength="180" placeholder="Punto de salida"></label>
+<div class="two"><label>Minutos de recorrido<input id="trip-minutes" type="number" min="0" max="1440" value="30"></label><label>Margen adicional<input id="trip-buffer" type="number" min="0" max="180" value="15"></label></div>
+<div class="controls"><button id="trip-start" class="primary">Iniciar traslado</button><button id="trip-arrive">Marcar llegada</button></div></div><div id="j-trips"></div>
+<p class="disclaimer">La ETA se calcula con minutos introducidos, no con el tráfico en vivo de Google Maps. La hora real de llegada se registra en Firebase.</p>
+</section></section></div>
+</div></main><script type="module" src="./jornadas-live.js"></script>
+</body></html>

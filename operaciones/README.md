@@ -28,7 +28,7 @@
 - V4 publicada en GitHub Pages: HTML de operaciones y módulo \`cloud-v4.js\`.
 - Firebase Web SDK conectado con el proyecto público ya utilizado por ÁGORA: \`agora-dejavu-38b8c\`.
 - Reglas específicas añadidas a \`firestore.rules\`, con pruebas de seguridad en emulador.
-- **Pendiente activar las reglas en Firebase de producción**. El visor conectado no será funcional hasta confirmar permisos y el despliegue seguro. Un PR o GitHub Pages exitoso NO demuestra sincronización entre dos sesiones.
+- **Reglas base de Operaciones desplegadas** en Firebase con respaldo verificado: GitHub Actions #44211385303. La ampliación de marcaje individual exige una NUEVA ejecución manual con respaldo. Un PR o GitHub Pages exitoso NO demuestra sincronización entre dos usuarios reales.
 - No se sobrescriben las operaciones de Compras, Archivos, Finanzas ni el sitio principal.
 - No se ha migrado ningún respaldo local ni datos reales al nuevo módulo.
 
@@ -91,3 +91,24 @@ npx firebase emulators:exec --only firestore --project demo-agora-ops --non-inte
 - `visor-demo.html` conserva la versión local anterior para las pruebas históricas; `demo.html` se conserva como simulador no colaborativo. No confundirlas con el editor y visor reales.
 - El archivo de pruebas `operaciones/tests/qa-safe-view.mjs` comprueba que no salen campos de salarios, cuentas bancarias, placas, datos de colegas ni aprobaciones.
 - **No se han comprobado todavía los datos de reglas vigentes en Firebase ni una sincronización real de dos usuarios**. No se debe fusionar o publicar la rama hasta resolver la federación WIF, obtener respaldo real y comprobar compatibilidad.
+
+
+## Jornadas del personal, marcaje GPS y traslados (ampliación)
+
+**Vista individual:** https://dejavump.github.io/agora-compras-dejavu/operaciones/jornadas.html  
+**Control coordinadores:** https://dejavump.github.io/agora-compras-dejavu/operaciones/control-jornadas.html  
+**Visor protegido:** https://dejavump.github.io/agora-compras-dejavu/operaciones/visor.html
+
+- **Acceso individual:** Google o Firebase Authentication con correo verificado y contraseña. El usuario de acceso es actualmente el correo; alias sin correo necesitan identidad segura de backend y no una búsqueda pública de usuarios.
+- **Alta de cuentas:** habilitar proveedor Correo electrónico/Contraseña en Firebase Authentication y crear/invitar cuentas autorizadas. La interfaz no registra contraseñas de terceros. El coordinador vincula el UID con personal desde Accesos del editor.
+- **Habilitar jornada:** con un UID vinculado a la persona asignada, desde Control de jornadas seleccionar Horario fijo o Número de horas, configurar inicio/final, cupo y Guardar. Sin política, la jornada está bloqueada.
+- **Entrada:** permiso GPS, descripción y hora registrada con serverTimestamp de Firebase; no se acepta una hora enviada por el teléfono.
+- **Salida:** descripción breve, ubicación actual y hora de servidor. La salida se permite incluso si el acceso se bloqueó o expiró, para cerrar correctamente.
+- **Ubicación durante turno:** opción separada y visible, únicamente la última coordenada actualizada, sin historial de ruta; requiere navegador abierto. watchPosition puede suspenderse en segundo plano y el GPS puede ser impreciso o manipulado.
+- **Traslados:** origen, minutos manuales, margen, hora de salida confirmada, ETA calculada y llegada real certificada por servidor. Google Maps abre indicaciones pero no hay información automática de tráfico.
+- **Bloqueo:** las reglas del servidor impiden entradas fuera de ventana, después de bloqueo o sin política. El modo Número de horas limita el seguimiento tras agotar el cupo. El cierre automático con la página cerrada necesita backend programado y NO está implementado.
+- **Privacidad:** staff solo consulta sus jornadas y registros; coordinación puede ver registros y últimos puntos GPS. Sin consultas públicas ni tarifas en visor.
+- **Pruebas:** emulador con identidades ficticias en test-clock-rules.mjs y preflight de reglas actuales; no se usa nómina o GPS de personas reales.
+- **Activación Firestore:** revisar GitHub Actions «Dejavú Staff · Firebase (reglas seguras)» y ejecutar un NUEVO workflow_dispatch desde main confirmando agora-dejavu-38b8c. No re-ejecutar runs antiguos. Las reglas anteriores se comparan y respaldan antes de publicar.
+
+**Pendientes reales:** habilitar Email/Password si falta; provisionar/verificar cuentas reales; despliegue manual de las reglas de marcaje; pruebas de GPS en dispositivos reales y dos cuentas; definir aviso de privacidad y retención de datos de ubicación.
