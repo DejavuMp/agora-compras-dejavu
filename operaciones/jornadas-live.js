@@ -16,6 +16,7 @@ import {
 import {localDay,atLocalDay,shiftOf,eventStart,eventEnd,myEvents,filteredEvents,payLabel,paymentFilter,netHours,reportFromFinishedClock} from "./staff-dashboard.mjs";
 import {timeStatement,hours,overtimeText} from "./ops-timekeeping.mjs";
 import {receiptData,receiptHtml} from "./ops-receipt.mjs";
+import {ownBreaks,openBreak,nextBreakSlot,verifiedBreakSummary} from "./ops-breaks.mjs";
 const {auth,firestore:fs}=window.AGORA_FIREBASE||{};
 const $=id=>document.getElementById(id);
 const esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -25,7 +26,7 @@ const errorMessage=e=>e?.code==="permission-denied"?"El servidor rechazó la ope
   String(e?.message||e||"No fue posible completar la operación");
 let user=null,personId="",access=new Map(),records=new Map(),trips=new Map(),
   staff=null,selected="",authEpoch=0,unsubs=[],geoWatch=null,lastLiveUpdate=0,busy=false,
-  logs=new Map(),logsLoaded=false,staffTab="inicio",calendarMode="timeline",
+  logs=new Map(),logsLoaded=false,breaks=new Map(),breaksReady=false,staffTab="inicio",calendarMode="timeline",
   calendarDay=localDay(Date.now()),calendarDays=7,payFilter="todos";
 const key=(uid,eventId)=>uid+"_"+eventId;
 const accessRef=(id)=>doc(fs,"agora_ops_shift_access",key(user.uid,id));
@@ -38,7 +39,7 @@ function status(msg,kind=""){
 function clearSubscriptions(){
   for(const off of unsubs.splice(0))try{off()}catch(_){}
   stopTracking();
-  access.clear();records.clear();trips.clear();logs.clear();logsLoaded=false;staff=null;selected="";personId="";
+  access.clear();records.clear();trips.clear();logs.clear();breaks.clear();breaksReady=false;logsLoaded=false;staff=null;selected="";personId="";
 }
 function stopTracking(){
   if(geoWatch!==null&&navigator.geolocation){navigator.geolocation.clearWatch(geoWatch);geoWatch=null}
@@ -51,6 +52,8 @@ function currentEvent(){
 function currentPolicy(){return access.get(key(user?.uid||"",selected))}
 function currentClock(){return records.get(key(user?.uid||"",selected))}
 function currentTrip(){return trips.get(key(user?.uid||"",selected))}
+function currentBreaks(){return ownBreaks([...breaks.values()],user?.uid||"",selected)}
+function activeBreak(){return openBreak(currentBreaks())}
 const nowText=v=>when(v);
 function linkGeo(geo,label){
   const url=locUrl(geo);
@@ -195,6 +198,18 @@ function renderAttendance(){
     return;
   }
   const check=allowedByPolicy(p);
+  const shiftBreaks=currentBreaks(),currentRest=openBreak(shiftBreaks);
+  const restSummary=verifiedBreakSummary(r,shiftBreaks);
+  const pauseMarkup=!breaksReady?
+    '<div class="staff-break-zone"><p>El control de descansos no está habilitado en Firebase. Al terminar podrás declarar los minutos en tu comprobante.</p></div>':
+    currentRest?
+    '<div class="staff-break-zone"><strong>En descanso desde '+esc(when(currentRest.startedAt))+'</strong>'+
+    '<p>Tu jornada sigue abierta. Pulsa Reanudar para continuar.</p>'+
+    '<button type="button" id="j-break-resume" '+(busy?"disabled":"")+'>Reanudar jornada</button></div>':
+    '<div class="staff-break-zone"><p>Descansos: '+restSummary.minutes+' min · '+shiftBreaks.length+' pausa(s)</p>'+
+    (nextBreakSlot(shiftBreaks)?
+      '<button type="button" id="j-break-start" '+(busy?"disabled":"")+'>Iniciar descanso</button>':
+      '<small>Límite de ocho pausas alcanzado.</small>')+'</div>';
   $("policy-state").textContent=p?
     (p.enabled?"Acceso "+(check.ok?"habilitado":"fuera de horario")+" · "+(p.mode==="horas"?"Cupo de "+(p.maxMinutes/60).toFixed(1)+" horas":"Horario fijo")+
       " · "+when(p.startsAt)+" a "+when(p.endsAt):"Jornada bloqueada por coordinación"):
@@ -214,11 +229,12 @@ function renderAttendance(){
     (!r?'<p><b>Actividad asignada:</b> '+esc(e.type||"Actividad")+' · '+esc(e.title||"Operación programada")+'</p>'+
       (e.notes?'<p><b>Indicaciones:</b> '+esc(e.notes)+'</p>':"")+
       '<button class="primary" id="start-shift" '+(!canStart?"disabled":"")+'>Confirmar GPS e iniciar jornada</button>':"")+
-    (r?.status==="en_curso"?'<details class="staff-incidents"><summary>¿Hubo alguna incidencia? Agrega un comentario (opcional)</summary>'+
+    (r?.status==="en_curso"?pauseMarkup+'<details class="staff-incidents"><summary>¿Hubo alguna incidencia? Agrega un comentario (opcional)</summary>'+
       '<label>Comentario de cierre<textarea id="end-note" maxlength="240" placeholder="Incidencia, resultado u observación"></textarea></label></details>'+
-      '<button class="primary" id="end-shift" '+(busy?"disabled":"")+'>Confirmar GPS y finalizar jornada</button>':"")+
+      '<button class="primary" id="end-shift" '+(busy||!!currentRest?"disabled":"")+'>Confirmar GPS y finalizar jornada</button>':"")+
     (!check.ok&&!r?'<p class="notice">'+esc(check.reason)+'</p>':"")+
-    (ended?'<p><button type="button" class="staff-subtle" data-staff-tab="pagos">Ir a mis pagos y reportes</button></p>':"")+
+    (ended?'<p><button type="button" class="staff-subtle" data-staff-tab="pagos">Ver mis comprobantes</button></p>':"")+
+    (ended&&breaksReady&&shiftBreaks.length?'<p><b>Descanso con marcajes:</b> '+restSummary.minutes+' min en '+shiftBreaks.length+' pausa(s)</p>':"")+
     '</div>';
   if($("end-note")&&existingNote)$("end-note").value=existingNote;
   if($("start-activity")&&existingActivity)$("start-activity").value=existingActivity;
@@ -262,11 +278,14 @@ function renderPayments(events){
       const clock=records.get(key(user.uid,e.id));
       const total=elapsedMinutes(clock?.startedAt,clock?.endedAt)/60;
       const planned=timeStatement({clock,event:e,personId}).plannedMinutes;
+      const pauses=ownBreaks([...breaks.values()],user.uid,e.id);
+      const cert=breaksReady&&pauses.length?verifiedBreakSummary(clock,pauses):null;
       return '<article class="staff-payment"><div class="pay-row"><div><h4>'+esc(e.title||"Actividad")+'</h4>'+
         '<span class="staff-status-tag">Sin reporte de horas</span></div></div>'+
         '<p>'+esc(dateLabel(eventStart(e,personId)))+' · '+esc(placeLabel(e))+'</p>'+
         '<p>Entrada y salida confirmadas · '+esc(total.toFixed(2))+' h transcurridas · '+esc(hours(planned))+' programadas</p>'+
-        '<label class="staff-break-declaration">Descanso realizado (minutos, declaración del integrante)<input type="number" data-break-for="'+esc(e.id)+'" min="0" max="'+Math.max(0,Math.floor(total*60))+'" step="1" value="0"></label>'+
+        (cert?'<p class="staff-break-verified">Descansos con marcajes de Firebase: '+cert.minutes+' min · '+pauses.length+' pausas</p>':
+          '<label class="staff-break-declaration">Descanso realizado (minutos, declaración del integrante)<input type="number" data-break-for="'+esc(e.id)+'" min="0" max="'+Math.max(0,Math.floor(total*60))+'" step="1" value="0"></label>')+
         '<div class="pay-row"><button type="button" class="primary" data-create-report="'+esc(e.id)+'" '+(busy?"disabled":"")+'>Crear comprobante de horas</button></div>'+
         '<p>La entrada y salida provienen de Firebase. El descanso se declara aquí y queda sujeto a revisión. Las horas extras no se aprueban automáticamente.</p></article>';
     }).join(""):"";
@@ -317,7 +336,7 @@ function render(){
   const next=events.find(e=>instant(eventEnd(e,personId))>=Date.now());
   const stateEl=$("j-operational-status");
   if(current){
-    stateEl.textContent="En jornada · "+(current.title||"Actividad")+" · "+placeLabel(current);
+    stateEl.textContent=(breaksReady&&openBreak(ownBreaks([...breaks.values()],user.uid,current.id))?"En descanso":"En jornada")+" · "+(current.title||"Actividad")+" · "+placeLabel(current);
     stateEl.className="staff-current-state active";
   }else if(next&&access.get(key(user.uid,next.id))?.enabled===true){
     stateEl.textContent="Fuera de jornada · Próxima actividad: "+(next.title||"Actividad")+" · "+dateLabel(eventStart(next,personId));
@@ -350,7 +369,11 @@ async function createReport(eventId,declaredBreakMins=0){
   }
   const id="j_"+user.uid+"_"+eventId;
   await action(async()=>{
-    const docValue=reportFromFinishedClock({clock,event,uid:user.uid,personId,id,breakMins:declaredBreakMins});
+    const pauses=ownBreaks([...breaks.values()],user.uid,eventId);
+    const cert=verifiedBreakSummary(clock,pauses);
+    if(breaksReady&&cert.active)throw Error("Debes reanudar tu descanso antes de crear el reporte.");
+    const actualBreak=breaksReady&&pauses.length?cert.minutes:declaredBreakMins;
+    const docValue=reportFromFinishedClock({clock,event,uid:user.uid,personId,id,breakMins:actualBreak});
     await setDoc(doc(fs,"agora_ops_logs",id),{...docValue,updatedAt:serverTimestamp()});
     setTab("pagos");
   },"Creando un reporte de horas basado en tu marcaje oficial…");
@@ -434,11 +457,9 @@ async function markStart(){
 }
 async function markEnd(){
   const r=currentClock();if(!r||r.status!=="en_curso")return;
+  if(breaksReady&&activeBreak()){status("Primero reanuda tu descanso para finalizar la jornada.","error");return}
   const note=$("end-note")?.value.trim()||"Actividad terminada según la programación.";
   await action(async()=>{
-    // La geolocalización continua puede bloquear una segunda lectura en
-    // navegadores móviles. Reutilizar exclusivamente el último GPS realmente
-    // recibido dentro de los últimos 30 segundos; nunca inventar ubicación.
     const last=r.lastGeo||{},at=instant(r.lastGeoAt);
     const recent=gpsValid({latitude:last.lat,longitude:last.lng,accuracy:last.accuracy})&&
       Number.isFinite(at)&&Date.now()-at>=0&&Date.now()-at<=30000;
@@ -460,6 +481,28 @@ async function markEnd(){
     });
     stopTracking();
   },"Registrando término y ubicación de salida…");
+}
+async function startBreak(){
+  const e=currentEvent(),clock=currentClock(),entries=currentBreaks();
+  if(!breaksReady||!e||!user||clock?.status!=="en_curso")return;
+  if(openBreak(entries)){status("Primero reanuda tu descanso actual.","error");return}
+  const slot=nextBreakSlot(entries);
+  if(!slot){status("Ya tienes ocho descansos registrados en esta jornada.","error");return}
+  await action(async()=>{
+    await setDoc(doc(fs,"agora_ops_breaks",key(user.uid,e.id)+"_"+slot),{
+      ownerUid:user.uid,personId,eventId:e.id,slot,status:"en_descanso",
+      startedAt:serverTimestamp(),updatedAt:serverTimestamp()
+    });
+  },"Registrando inicio de descanso con la hora del servidor…");
+}
+async function resumeBreak(){
+  const e=currentEvent(),clock=currentClock(),record=activeBreak();
+  if(!breaksReady||!e||clock?.status!=="en_curso"||!record)return;
+  await action(async()=>{
+    await updateDoc(doc(fs,"agora_ops_breaks",key(user.uid,e.id)+"_"+record.slot),{
+      status:"reanudado",endedAt:serverTimestamp(),updatedAt:serverTimestamp()
+    });
+  },"Registrando reanudación con la hora del servidor…");
 }
 async function startTrip(){
   const e=currentEvent(),p=currentPolicy();
@@ -561,6 +604,19 @@ async function session(u){
     watch(query(collection(fs,"agora_ops_trips"),where("ownerUid","==",u.uid)),snap=>{
       trips=new Map(snap.docs.map(d=>[d.id,d.data()]));
     });
+    // El visor anterior sigue disponible si las reglas de descansos aún
+    // no están desplegadas: así no se rompen los marcajes existentes.
+    const offBreaks=onSnapshot(
+      query(collection(fs,"agora_ops_breaks"),where("ownerUid","==",u.uid)),
+      {includeMetadataChanges:true},
+      snap=>{
+        if(snap.metadata.fromCache)return;
+        breaks=new Map(snap.docs.map(d=>[d.id,{...d.data(),id:d.id}]));
+        breaksReady=true;render();
+      },
+      ()=>{breaks.clear();breaksReady=false;render()}
+    );
+    unsubs.push(offBreaks);
     watch(query(collection(fs,"agora_ops_logs"),where("ownerUid","==",u.uid)),snap=>{
       logs=new Map(snap.docs.map(d=>[d.id,{...d.data(),id:d.id}]));
       logsLoaded=true;
@@ -670,6 +726,8 @@ $("trip-origin").addEventListener("input",()=>{
 });
 
 $("j-active").addEventListener("click",e=>{
+  if(e.target.id==="j-break-start")startBreak();
+  if(e.target.id==="j-break-resume")resumeBreak();
   if(e.target.id==="start-shift")markStart();
   if(e.target.id==="end-shift")markEnd();
 });
