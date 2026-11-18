@@ -112,7 +112,7 @@
 
 /* Cronograma: matriz real, colores de estatus, fechas y sucursales. */
 .ops-matrix-scroll{width:100%;max-width:100%;overflow:auto;max-height:650px;overscroll-behavior:contain;border:1px solid #e5e5e1;border-radius:11px;margin:0 15px 8px;width:calc(100% - 30px)}
-.ops-matrix{border-collapse:separate;border-spacing:0;min-width:calc(245px + var(--matrix-days)*126px);font:12px Arial,sans-serif}
+.ops-matrix{border-collapse:separate;border-spacing:0;min-width:100%;font:12px Arial,sans-serif}
 .ops-matrix th,.ops-matrix td{border-right:1px solid #e8e8e5;border-bottom:1px solid #e8e8e5;min-width:126px;max-width:126px;vertical-align:middle;text-align:center;background:#fff;padding:6px}
 .ops-matrix thead th{position:sticky;top:0;z-index:2;background:#f1eee7;color:#555;padding:10px 5px;font-size:11px}
 .ops-matrix thead th span{display:block;font-weight:500;text-transform:capitalize}
@@ -430,7 +430,7 @@ function renderOpsMatrix(events,first,days){
   return '<div class="ops-matrix-legend" aria-label="Estados del cronograma">'+
     '<span class="done">Realizada</span><span class="confirmed">Confirmada</span>'+
     '<span class="running">En curso</span><span class="pending">Por confirmar</span><span class="draft">Borrador</span></div>'+
-    '<div class="ops-matrix-scroll"><table class="ops-matrix" style="--matrix-days:'+days+'">'+head+
+    '<div class="ops-matrix-scroll"><table class="ops-matrix" style="min-width:'+(245+days*126)+'px">'+head+
     '<tbody>'+(rows.length?body:'<tr><td colspan="'+(days+1)+'">No hay actividades asignadas a este periodo.</td></tr>')+
     '</tbody></table></div><p class="ops-matrix-help">Desliza horizontalmente para ver más fechas. Pulsa cualquier actividad para abrir su ficha.</p>';
 }
