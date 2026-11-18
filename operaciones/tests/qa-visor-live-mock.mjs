@@ -22,6 +22,7 @@ const authModule=[
  "export function onAuthStateChanged(_auth,ready){queueMicrotask(()=>ready({uid:'coord-qa',emailVerified:true}));return ()=>{}}",
  "export async function signInWithPopup(){}",
  "export async function signInWithRedirect(){}",
+ "export async function signInWithEmailAndPassword(){}",
  "export async function signOut(){}"
 ].join("\n");
 const dbModule=[
