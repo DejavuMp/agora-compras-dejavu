@@ -48,6 +48,8 @@ jobs:
         run: node operaciones/tests/qa-ops-pwa.mjs
       - name: Validar ventanas, geolocalización y traslados
         run: node operaciones/tests/qa-jornadas.mjs
+      - name: Validar revisión de excedentes por coordinación
+        run: node operaciones/tests/qa-extra-review.mjs
       - name: Validar recordatorios personales sin push
         run: |
           node --check operaciones/ops-reminders.mjs
