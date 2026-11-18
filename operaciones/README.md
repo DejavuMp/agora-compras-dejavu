@@ -124,3 +124,20 @@ npx firebase emulators:exec --only firestore --project demo-agora-ops --non-inte
 7. `jornadas.html` se mantiene solo como redirección compatible al visor para enlaces antiguos.
 
 **Nota:** el acceso mediante un alias distinto del correo requiere un servicio de autenticación adicional. El formulario actual usa el correo asignado y la contraseña, o Google. El proveedor Email/Password debe estar habilitado en Firebase Authentication y las cuentas deben provisionarse por el equipo autorizado.
+
+
+## Mis jornadas · experiencia unificada (cronograma, registro y pagos)
+
+El personal usa **una sola dirección:** https://dejavump.github.io/agora-compras-dejavu/operaciones/visor.html, con acceso aprobado por coordinación. La vista individual incluye:
+
+- **Inicio:** próxima jornada, sede, transporte, estado de asistencia y botones directos.
+- **Cronograma:** alternar Por día / Cronograma, fecha de inicio editable y periodos de 7, 14 o 30 días; muestra turno asignado, jornada n/N, proyecto, sucursal, vehículo y acceso rápido al marcaje.
+- **Asistencia:** seleccionar actividad, ver condiciones de habilitación y registrar entrada/salida con timestamp de Firebase y ubicación puntual del dispositivo.
+- **Traslados:** origen, minutos manuales, margen, ETA estimada, salida y llegada reales y enlace de Google Maps.
+- **Mis pagos:** se leen solamente documentos propios de `agora_ops_logs` filtrados por `ownerUid`. La jornada terminada permite crear un reporte a partir de los marcajes certificados; luego se puede enviar **Solicitar pago** a coordinación. No existe pago automático ni transferencia financiera desde esta vista.
+- **Estados:** Horas capturadas → En revisión → Validado → Pago programado → Marcado como pagado. Una solicitud devuelta se presenta como **Corrección solicitada**, con comentario si está disponible.
+- **Importes:** antes de validación no se estiman ni muestran salarios. Solo se muestra un `approvedAmount` individual después de la validación por coordinación. «Marcado como pagado» es un estado operativo, no una constancia bancaria.
+
+La vista del staff no consulta la agenda administrativa completa, ni tarifas de otras personas. La creación de reportes exige jornada finalizada y horas positivas, se limita a un reporte por evento desde la interfaz y requiere validación de Firestore. No reconstruye las herramientas antiguas de pagos de ÁGORA.
+
+**Pruebas:** `qa-staff-dashboard.mjs` comprueba cronograma diario y 7/14/30 días, múltiples jornadas y borrador sin importes; `qa-jornadas-live-mock.mjs` recorre cronograma, entrada/salida, traslado, reporte y envío en un navegador simulado. Se mantiene pendiente una validación de pago real con dos cuentas autorizadas.

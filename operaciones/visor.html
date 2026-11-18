@@ -120,6 +120,81 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
 #viewer-staff hr{border:0;border-top:1px solid #e3e4e5;margin:16px 0}
 @media(max-width:850px){#viewer-staff .grid{grid-template-columns:1fr}}
 @media(max-width:600px){#viewer-staff .two{grid-template-columns:1fr}.request-panel{padding:17px}}
+
+/* Mis jornadas · navegación práctica por secciones dentro del mismo visor. */
+#viewer-staff .staff-tab-panel[hidden],#viewer-staff #j-route[hidden]{display:none!important}
+#viewer-staff .staff-account-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin:0 0 15px}
+#viewer-staff .staff-account-bar>span{font-size:16px;font-weight:bold}
+#viewer-staff .staff-account-bar button{background:#fff;border:1px solid #d8d8d4;border-radius:9px;padding:9px 12px;color:#303333;cursor:pointer}
+#viewer-staff .staff-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;margin:0 0 18px}
+#viewer-staff .staff-metric{border-radius:13px;background:white;border:1px solid #e5e3dd;padding:16px}
+#viewer-staff .staff-metric strong{display:block;font-size:25px;line-height:1.2;margin:4px 0}
+#viewer-staff .staff-metric small{font-size:12px;color:#686e73}
+#viewer-staff .staff-metric .label{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:#95713b;font-weight:bold}
+#viewer-staff .staff-tabs{display:flex;gap:7px;overflow-x:auto;padding:5px 0 12px;margin:0 0 15px;border-bottom:1px solid #e2e1dc;scrollbar-width:thin}
+#viewer-staff .staff-tabs button{white-space:nowrap;flex:0 0 auto;border-radius:9px;background:#fff;border:1px solid #dfded8;font-size:13px;color:#353739;padding:11px 15px;font-weight:bold}
+#viewer-staff .staff-tabs button.active{background:#1e1f21;border-color:#1e1f21;color:#fff}
+#viewer-staff .staff-dashboard{display:grid;grid-template-columns:1.2fr 1fr;gap:15px;align-items:start}
+#viewer-staff .staff-section-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;margin:0 0 16px;flex-wrap:wrap}
+#viewer-staff .staff-section-heading h3{font:700 19px/1.3 Arial,sans-serif;margin:0 0 3px}
+#viewer-staff .staff-section-heading p{margin:0;color:#6c747a;font-size:12px;line-height:1.5}
+#viewer-staff .staff-hint{padding:12px 14px;border-left:3px solid #b99657;background:#fcfaf5;border-radius:8px;font-size:12px;line-height:1.6;color:#555a5d;margin:10px 0 15px}
+#viewer-staff button.staff-subtle{background:#f8f6f1;color:#6f5833;border-color:#e7dcc7;font-size:12px;min-height:36px}
+#viewer-staff .staff-calendar-tools{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin:6px 0 15px}
+#viewer-staff .staff-calendar-tools label{min-width:140px;margin:0}
+#viewer-staff .staff-calendar-tools label input,#viewer-staff .staff-calendar-tools label select{margin-top:4px;padding:10px;font-size:12px;min-height:42px}
+#viewer-staff .staff-mode{display:flex;background:#f2f0eb;padding:4px;border-radius:10px;gap:4px}
+#viewer-staff .staff-mode button{border:0;background:transparent;padding:10px;font-size:12px;min-height:40px}
+#viewer-staff .staff-mode button.active{background:#1e1f21;color:#fff}
+#viewer-staff .staff-day-nav{display:flex;gap:5px;align-items:center}
+#viewer-staff .staff-day-nav button{font-size:12px;padding:10px}
+#viewer-staff .staff-period-caption{color:#686e73;font-size:12px;margin:0 0 16px}
+#viewer-staff .staff-calendar-day{margin:13px 0;border-top:1px solid #e7e7e3;padding-top:11px}
+#viewer-staff .staff-calendar-day>h4{font:700 14px Arial,sans-serif;margin:0 0 10px}
+#viewer-staff .staff-event-list{display:grid;gap:9px}
+#viewer-staff .staff-event-row{display:grid;grid-template-columns:minmax(105px,.27fr) 1fr auto;gap:15px;align-items:center;border:1px solid #e7e7e4;border-left:4px solid #b99757;border-radius:11px;padding:13px;background:#fff}
+#viewer-staff .staff-event-row strong{display:block;font-size:14px}
+#viewer-staff .staff-event-row small{display:block;color:#6b7278;margin-top:5px;font-size:11px}
+#viewer-staff .staff-event-row .staff-time{font-size:13px;font-weight:bold;line-height:1.5}
+#viewer-staff .staff-event-row .staff-event-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+#viewer-staff .staff-event-row .staff-event-actions button{min-height:38px;font-size:12px}
+#viewer-staff .staff-pill{display:inline-block;border-radius:25px;padding:4px 9px;background:#f2f0e8;color:#706346;font-size:11px;font-weight:bold;margin-top:5px}
+#viewer-staff .staff-pill.done{background:#e4f4e9;color:#286448}
+#viewer-staff .staff-pill.active{background:#fff1d8;color:#865d16}
+#viewer-staff .staff-pill.blocked{background:#f1f1f0;color:#666}
+#viewer-staff .staff-featured{border:1px solid #e6e0d5;border-left:4px solid #ba9556;border-radius:12px;padding:17px;background:#fff}
+#viewer-staff .staff-featured h4{font-size:18px;margin:4px 0 12px}
+#viewer-staff .staff-featured p{margin:7px 0;color:#58616a;font-size:13px}
+#viewer-staff .staff-featured .staff-featured-actions{display:flex;gap:8px;flex-wrap:wrap;margin:15px 0 2px}
+#viewer-staff .staff-featured .staff-featured-actions button{min-height:41px}
+#viewer-staff .staff-upcoming-item{padding:13px 0;border-bottom:1px solid #eee}
+#viewer-staff .staff-upcoming-item:last-child{border:0}
+#viewer-staff .staff-upcoming-item strong{font-size:13px}
+#viewer-staff .staff-upcoming-item small{display:block;font-size:11px;color:#767e83;margin:6px 0}
+#viewer-staff .staff-upcoming-item button{font-size:12px;min-height:36px;padding:7px 11px}
+#viewer-staff .staff-select-label{display:block;max-width:680px;font-weight:bold;font-size:12px;margin:10px 0 18px}
+#viewer-staff .staff-select-label select{font-weight:normal}
+#viewer-staff .staff-policy{padding:12px 14px;border-radius:9px;background:#fbf6e9;border:1px solid #e5d8c2;font-size:12px;line-height:1.5;margin:13px 0}
+#viewer-staff .staff-location-consent{background:#f8f8f7;border:1px solid #e6e7e7;border-radius:10px;padding:14px;margin:20px 0}
+#viewer-staff .staff-location-consent label{display:flex;align-items:flex-start;gap:9px}
+#viewer-staff .staff-location-consent label input{margin:0}
+#viewer-staff .staff-pay-summary{display:flex;flex-wrap:wrap;gap:8px;margin:13px 0}
+#viewer-staff .staff-pay-summary>span{border:1px solid #e6e2d9;background:#fff;border-radius:10px;padding:10px 12px;font-weight:bold;font-size:12px}
+#viewer-staff .staff-pay-toolbar{display:flex;justify-content:flex-end;margin:10px 0}
+#viewer-staff .staff-pay-toolbar label{min-width:210px}
+#viewer-staff .staff-payment-list{display:grid;gap:12px}
+#viewer-staff .staff-payment{border:1px solid #e3e4e2;border-left:4px solid #b99757;border-radius:11px;padding:16px;background:#fff}
+#viewer-staff .staff-payment h4{font:700 15px Arial,sans-serif;margin:0 0 7px}
+#viewer-staff .staff-payment p{color:#646e73;font-size:12px;margin:6px 0}
+#viewer-staff .staff-payment .pay-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+#viewer-staff .staff-payment .pay-row>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#viewer-staff .staff-payment .staff-status-tag{background:#f3f0e7;border-radius:20px;padding:5px 10px;color:#755b2e;font-size:11px;font-weight:bold}
+#viewer-staff .staff-payment .staff-status-tag.done{background:#e2f4e8;color:#2a684a}
+#viewer-staff .staff-payment .staff-status-tag.review{background:#e8effe;color:#325a8d}
+#viewer-staff .staff-payment .pay-row button{font-size:12px;min-height:39px}
+#viewer-staff .staff-empty{padding:22px;background:#fbfaf8;border:1px dashed #dedbd2;border-radius:11px;color:#656c70;font-size:13px}
+@media(max-width:920px){#viewer-staff .staff-dashboard{grid-template-columns:1fr}#viewer-staff .staff-event-row{grid-template-columns:1fr;gap:6px}#viewer-staff .staff-metrics{gap:7px}}
+@media(max-width:600px){#viewer-staff .staff-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}#viewer-staff .staff-metric{padding:11px}#viewer-staff .staff-metric strong{font-size:20px}#viewer-staff .staff-metric small{font-size:10px}#viewer-staff .staff-metric .label{font-size:10px}#viewer-staff .staff-tabs button{padding:11px}#viewer-staff .staff-calendar-tools{align-items:stretch}#viewer-staff .staff-calendar-tools label{flex:1 1 150px}#viewer-staff .staff-day-nav{width:100%;justify-content:space-between}#viewer-staff .staff-day-nav button{flex:1}}
 </style>
 </head>
 <body>
@@ -145,32 +220,82 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
   <div class="request-actions"><button id="viewer-send-verification" type="button">Enviar verificación</button><button id="viewer-verified-refresh" type="button">Ya verifiqué mi correo</button><button id="viewer-verify-out" type="button">Cambiar cuenta</button></div>
 </section>
 <section id="viewer-staff" hidden aria-label="Mis jornadas individuales">
-  <div class="staff-title"><div><div class="overline">ACCESO PERSONAL AUTORIZADO</div><h2>Mis jornadas</h2><p>Registra entrada, salida y llegada a la sede de tus actividades asignadas.</p></div><a class="editlink" href="./control-jornadas.html" hidden id="staff-admin-link">Control de coordinación</a></div>
+  <div class="staff-title">
+    <div><div class="overline">ÁGORA · ACCESO INDIVIDUAL</div><h2>Mis jornadas</h2><p>Tu programación, registros y pagos en un solo lugar.</p></div>
+    <a class="editlink" href="./control-jornadas.html" hidden id="staff-admin-link">Control de coordinación</a>
+  </div>
   <section id="login" hidden aria-hidden="true">
     <button id="google">Continuar con Google</button>
     <form id="credentials"><input id="email" type="email" autocomplete="username"><input id="password" type="password" autocomplete="current-password"></form>
     <button id="recover">Recuperar contraseña</button><button id="verify" hidden>Enviar verificación</button><button id="login-switch">Cambiar cuenta</button>
   </section>
-  <div id="auth-status" class="staff-status" role="status" aria-live="polite">Cargando jornadas autorizadas…</div>
+  <div id="auth-status" class="staff-status" role="status" aria-live="polite">Sincronizando tus jornadas…</div>
   <div id="admin-message" hidden><p>Acceso de coordinación. Consulta la agenda general o el control de jornadas.</p></div>
   <div id="staff-board" hidden>
-<div class="controls"><div id="j-name"></div><button id="logout">Cerrar sesión</button></div>
-<div class="status" id="policy-state"></div>
-<p class="disclaimer">La hora de entrada y salida se confirma por el servidor de Firebase. Al marcar, tu dispositivo compartirá la ubicación puntual con tu consentimiento. La ubicación en vivo durante la jornada es opcional, visible y se detiene cuando cierras esta página; no funciona continuamente en segundo plano.</p>
-<div class="grid">
-<section class="panel"><h2>Mis actividades</h2><p class="intro">Selecciona la jornada que tienes asignada. No se muestran datos de otros integrantes.</p><div id="j-events"></div></section>
-<section class="stack">
-<section class="panel"><h2>Mi registro de jornada</h2><div id="j-active"></div><div id="j-punches"></div>
-<hr><label><input type="checkbox" id="live-location"> Compartir ubicación mientras esta página esté abierta (opcional)</label>
-<p id="location-state" class="geo">Ubicación continua desactivada.</p>
-</section>
-<section class="panel"><h2>Traslado y llegada</h2><div id="j-trip-form">
-<label>Origen del traslado<input id="trip-origin" maxlength="180" placeholder="Punto de salida"></label>
-<div class="two"><label>Minutos de recorrido<input id="trip-minutes" type="number" min="0" max="1440" value="30"></label><label>Margen adicional<input id="trip-buffer" type="number" min="0" max="180" value="15"></label></div>
-<div class="controls"><button id="trip-start" class="primary">Iniciar traslado</button><button id="trip-arrive">Marcar llegada</button></div></div><div id="j-trips"></div>
-<p class="disclaimer">La ETA se calcula con minutos introducidos, no con el tráfico en vivo de Google Maps. La hora real de llegada se registra en Firebase.</p>
-</section></section></div>
-</div>
+    <div class="staff-account-bar"><span id="j-name">Personal autorizado</span><button id="logout" type="button">Salir de mi cuenta</button></div>
+    <div id="j-summary" class="staff-metrics" aria-label="Resumen personal de actividades"></div>
+    <nav id="staff-tabs" class="staff-tabs" aria-label="Secciones de Mis jornadas">
+      <button type="button" data-staff-tab="inicio" aria-selected="true" class="active">Inicio</button>
+      <button type="button" data-staff-tab="cronograma" aria-selected="false">Cronograma</button>
+      <button type="button" data-staff-tab="asistencia" aria-selected="false">Asistencia</button>
+      <button type="button" data-staff-tab="traslados" aria-selected="false">Traslados</button>
+      <button type="button" data-staff-tab="pagos" aria-selected="false">Mis pagos</button>
+    </nav>
+    <section class="staff-tab-panel" data-staff-panel="inicio" aria-label="Resumen de mi jornada">
+      <div class="staff-dashboard">
+        <section class="panel"><div class="staff-section-heading"><div><h3>Mi próxima jornada</h3><p>Consulta tu turno y accede al marcaje en un toque.</p></div></div><div id="j-today"></div></section>
+        <section class="panel"><div class="staff-section-heading"><div><h3>Enseguida</h3><p>Actividades asignadas para los próximos días.</p></div><button type="button" class="staff-subtle" data-staff-tab="cronograma">Ver todo el cronograma</button></div><div id="j-upcoming"></div></section>
+      </div>
+      <div class="staff-hint">Tus datos se actualizan desde Firebase. Solo tú y coordinación pueden consultar tus registros de asistencia y pagos.</div>
+    </section>
+    <section class="staff-tab-panel" data-staff-panel="cronograma" hidden aria-label="Mi cronograma">
+      <section class="panel">
+        <div class="staff-section-heading"><div><h3>Mi programación</h3><p>Filtra tus días de actividad y consulta cada turno.</p></div></div>
+        <div class="staff-calendar-tools">
+          <div class="staff-mode" role="group" aria-label="Tipo de vista del calendario">
+            <button type="button" data-calendar-mode="dia">Por día</button>
+            <button type="button" data-calendar-mode="timeline" class="active">Cronograma</button>
+          </div>
+          <label>Desde el día<input id="j-date" type="date"></label>
+          <label id="j-period-field">Periodo<select id="j-period"><option value="7">7 días</option><option value="14">14 días</option><option value="30">30 días</option></select></label>
+          <div class="staff-day-nav"><button type="button" id="j-prev">Anterior</button><button type="button" id="j-now">Hoy</button><button type="button" id="j-next">Siguiente</button></div>
+        </div>
+        <p id="j-period-caption" class="staff-period-caption" aria-live="polite"></p>
+        <div id="j-events" class="staff-event-list"></div>
+      </section>
+    </section>
+    <section class="staff-tab-panel" data-staff-panel="asistencia" hidden aria-label="Mi asistencia">
+      <section class="panel"><div class="staff-section-heading"><div><h3>Marcar mi jornada</h3><p>Confirma tu lugar, entrada y salida con la hora oficial del servidor.</p></div></div>
+        <label class="staff-select-label">Jornada a registrar<select id="j-select-attendance" data-choose-event></select></label>
+        <div id="policy-state" class="staff-policy" role="status"></div>
+        <div id="j-active"></div><div id="j-punches"></div>
+        <div class="staff-location-consent"><label><input type="checkbox" id="live-location"> Compartir ubicación mientras esta página esté abierta (opcional)</label><p id="location-state" class="geo">Ubicación continua desactivada.</p></div>
+        <p class="disclaimer">La hora de marcaje se guarda desde Firebase. El dispositivo comparte su ubicación puntual cuando confirmas entrada o salida. La ubicación continua es opcional, visible y se detiene al cerrar la página.</p>
+      </section>
+    </section>
+    <section class="staff-tab-panel" data-staff-panel="traslados" hidden aria-label="Mis traslados">
+      <section class="panel">
+        <div class="staff-section-heading"><div><h3>Traslado y llegada</h3><p>Planifica tu recorrido y registra tu llegada a la sede.</p></div></div>
+        <label class="staff-select-label">Jornada de destino<select id="j-select-trip" data-choose-event></select></label>
+        <div class="staff-hint">La llegada estimada considera los minutos que captures y tu margen. No se calcula tráfico en tiempo real.</div>
+        <div id="j-trip-form">
+          <label>¿Desde dónde sales?<input id="trip-origin" maxlength="180" placeholder="Ej. Base Dejavú, Metro o domicilio"></label>
+          <div class="two"><label>Minutos estimados de recorrido<input id="trip-minutes" type="number" min="0" max="1440" value="30"></label><label>Margen adicional (min)<input id="trip-buffer" type="number" min="0" max="180" value="15"></label></div>
+          <div class="controls"><button id="trip-start" class="primary" type="button">Iniciar traslado</button><button id="trip-arrive" type="button">Confirmar llegada</button><a id="j-route" href="#" target="_blank" rel="noopener noreferrer" hidden>Ver ruta en Google Maps</a></div>
+        </div>
+        <div id="j-trips"></div>
+      </section>
+    </section>
+    <section class="staff-tab-panel" data-staff-panel="pagos" hidden aria-label="Mis pagos">
+      <section class="panel">
+        <div class="staff-section-heading"><div><h3>Mis horas y pagos</h3><p>Registra tus horas y consulta el avance de tus solicitudes.</p></div></div>
+        <div class="staff-hint">Terminar una jornada no solicita el pago automáticamente. Primero crea o revisa el reporte de horas y después envíalo a coordinación. Los importes se muestran únicamente si fueron validados.</div>
+        <div class="staff-pay-summary" id="j-pay-summary"></div>
+        <div class="staff-pay-toolbar"><label>Mostrar<select id="j-pay-filter"><option value="todos">Todos los registros</option><option value="pendientes">Por solicitar / corregir</option><option value="revision">En revisión</option><option value="pagados">Validados y pagados</option></select></label></div>
+        <div id="j-payment-list" class="staff-payment-list"></div>
+      </section>
+    </section>
+  </div>
 </section>
 <div id="viewer-agenda" hidden><div class="viewer-toggle" role="group" aria-label="Tipo de vista"><button type="button" id="show-day" class="active">Por día</button><button type="button" id="show-schedule">Cronograma</button></div><select id="days-control" aria-label="Días del cronograma" hidden><option value="7">Próximos 7 días</option><option value="14">Próximos 14 días</option><option value="30">Próximos 30 días</option></select>
 <div id="metrics" class="cards"></div>
