@@ -201,7 +201,11 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
 #viewer-staff .staff-current-state.blocked{border-left-color:#c98b3b;background:#fff7e9;color:#895916}
 #viewer-staff details.staff-incidents{margin-top:14px;border:1px solid #ece7dc;border-radius:10px;padding:11px;background:#fcfcfb}
 #viewer-staff details.staff-incidents summary{font-size:12px;font-weight:700;cursor:pointer}
+#viewer-staff .staff-install-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#viewer-staff #install-ops-app{background:#252729;color:white;border-color:#252729}
 </style>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="../icons/icon-192.png">
 </head>
 <body>
 <header><picture class="deja-logo"><source media="(max-width:760px)" srcset="./assets/dejavu-monograma.png"><img src="./assets/dejavu-horizontal.png" alt="Dejavú Marketing" width="180" height="65" loading="eager"></picture><div class="identity"><small>ÁGORA · OPERACIÓN</small><strong>Centro de Operaciones / Visor</strong></div><div id="clock" class="clock">--:--</div><a id="viewer-editor-link" class="editlink" href="./" hidden>Abrir editor</a></header>
@@ -238,7 +242,7 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
   <div id="auth-status" class="staff-status" role="status" aria-live="polite">Sincronizando tus jornadas…</div>
   <div id="admin-message" hidden><p>Acceso de coordinación. Consulta la agenda general o el control de jornadas.</p></div>
   <div id="staff-board" hidden>
-    <div class="staff-account-bar"><span id="j-name">¡Hola!</span><button id="logout" type="button">Salir de mi cuenta</button></div>
+    <div class="staff-account-bar"><span id="j-name">¡Hola!</span><div class="staff-install-actions"><button id="install-ops-app" type="button">Instalar ÁGORA</button><button id="logout" type="button">Salir de mi cuenta</button></div></div>
     <div id="j-operational-status" class="staff-current-state" role="status" aria-live="polite">Comprobando si tienes una jornada en curso…</div><div id="j-summary" class="staff-metrics" aria-label="Resumen personal de actividades"></div>
     <nav id="staff-tabs" class="staff-tabs" aria-label="Secciones de Mis jornadas">
       <button type="button" data-staff-tab="inicio" aria-selected="true" class="active">Inicio</button>
@@ -309,4 +313,24 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
 <footer>Visor protegido: la programación proviene de Firestore y se actualiza sin recargar. Solo administradores y coordinadores autorizados pueden consultar la agenda. No se presentan nombres del personal, tarifas, montos, sueldos ni cuentas privadas. El staff marca sus jornadas desde el acceso individual con cuenta verificada, sin acceso a datos ajenos.</footer></div>
 </main>
 <script type="module" src="./visor-live.js"></script>
+<script>
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js",{scope:"./"}).catch(()=>{}));
+}
+</script>
+<script>
+let agoraInstallPrompt=null;
+window.addEventListener("beforeinstallprompt",event=>{
+  event.preventDefault();agoraInstallPrompt=event;
+});
+window.addEventListener("appinstalled",()=>{agoraInstallPrompt=null;});
+document.getElementById("install-ops-app")?.addEventListener("click",()=>{
+  if(agoraInstallPrompt){
+    const prompt=agoraInstallPrompt;agoraInstallPrompt=null;prompt.prompt();return;
+  }
+  alert(/iPad|iPhone|iPod/i.test(navigator.userAgent)?
+    "En iPhone, abre este visor en Safari, pulsa Compartir y selecciona «Añadir a pantalla de inicio».":
+    "Abre el menú del navegador y selecciona «Instalar aplicación» o «Añadir a pantalla de inicio».");
+});
+</script>
 </body></html>

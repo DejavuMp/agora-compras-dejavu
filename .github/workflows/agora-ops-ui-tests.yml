@@ -9,6 +9,8 @@ on:
       - "operaciones/access-link-model.mjs"
       - "operaciones/editor-jornadas-control.mjs"
       - "operaciones/visor.html"
+      - "operaciones/manifest.webmanifest"
+      - "operaciones/sw.js"
       - "operaciones/jornadas*"
       - "operaciones/staff-dashboard.mjs"
       - "operaciones/control-jornadas*"
@@ -38,6 +40,8 @@ jobs:
           node --check operaciones/jornadas-live.js
           node --check operaciones/control-jornadas.js
           node --check operaciones/visor-live.js
+      - name: Validar app instalable y caché privada
+        run: node operaciones/tests/qa-ops-pwa.mjs
       - name: Validar ventanas, geolocalización y traslados
         run: node operaciones/tests/qa-jornadas.mjs
       - name: Validar cronograma staff y pagos sin montos inventados

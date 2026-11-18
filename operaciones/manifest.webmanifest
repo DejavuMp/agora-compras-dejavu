@@ -1,0 +1,26 @@
+{
+  "name": "ÁGORA · Operaciones | Dejavú Marketing",
+  "short_name": "ÁGORA Ops",
+  "description": "Programación, jornadas y operaciones del equipo Dejavú Marketing.",
+  "id": "./visor.html",
+  "start_url": "./visor.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f5f2",
+  "theme_color": "#202122",
+  "lang": "es-MX",
+  "icons": [
+    {
+      "src": "../icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "../icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
