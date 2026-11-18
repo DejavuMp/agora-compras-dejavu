@@ -46,7 +46,7 @@ const notice=(txt,kind="")=>{
 function loading(title,body="",actions=""){
   document.getElementById("app").style.display="none";ready=false;
   root.style.display="grid";
-  root.innerHTML='<div class="ops-lock"><div class="ops-symbol">D</div><div class="ops-eyebrow">DEJAVÚ MARKETING · ÁGORA</div><h1>'+h(title)+'</h1><p>'+h(body)+'</p>'+actions+'<div id="ops-lock-note"></div></div>';
+  root.innerHTML='<div class="ops-lock"><div class="ops-symbol"><img src="./assets/dejavu-monograma.png" alt="Dejavú Marketing"></div><div class="ops-eyebrow">DEJAVÚ MARKETING · ÁGORA</div><h1>'+h(title)+'</h1><p>'+h(body)+'</p>'+actions+'<div id="ops-lock-note"></div></div>';
 }
 function show(){
   document.getElementById("app").style.display="";
