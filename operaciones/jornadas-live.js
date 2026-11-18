@@ -17,6 +17,7 @@ import {localDay,atLocalDay,shiftOf,eventStart,eventEnd,myEvents,filteredEvents,
 import {timeStatement,hours,overtimeText} from "./ops-timekeeping.mjs";
 import {receiptData,receiptHtml} from "./ops-receipt.mjs";
 import {ownBreaks,openBreak,nextBreakSlot,verifiedBreakSummary} from "./ops-breaks.mjs";
+import {eligibleNotices} from "./ops-reminders.mjs";
 const {auth,firestore:fs}=window.AGORA_FIREBASE||{};
 const $=id=>document.getElementById(id);
 const esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -27,7 +28,7 @@ const errorMessage=e=>e?.code==="permission-denied"?"El servidor rechazó la ope
 let user=null,personId="",access=new Map(),records=new Map(),trips=new Map(),
   staff=null,selected="",authEpoch=0,unsubs=[],geoWatch=null,lastLiveUpdate=0,busy=false,
   logs=new Map(),logsLoaded=false,breaks=new Map(),breaksReady=false,staffTab="inicio",calendarMode="timeline",
-  calendarDay=localDay(Date.now()),calendarDays=7,payFilter="todos";
+  calendarDay=localDay(Date.now()),calendarDays=7,payFilter="todos",remindersEnabled=false,remindersSeen=new Set();
 const key=(uid,eventId)=>uid+"_"+eventId;
 const accessRef=(id)=>doc(fs,"agora_ops_shift_access",key(user.uid,id));
 const clockRef=(id)=>doc(fs,"agora_ops_clock",key(user.uid,id));
@@ -39,7 +40,7 @@ function status(msg,kind=""){
 function clearSubscriptions(){
   for(const off of unsubs.splice(0))try{off()}catch(_){}
   stopTracking();
-  access.clear();records.clear();trips.clear();logs.clear();breaks.clear();breaksReady=false;logsLoaded=false;staff=null;selected="";personId="";
+  access.clear();records.clear();trips.clear();logs.clear();breaks.clear();breaksReady=false;logsLoaded=false;remindersSeen.clear();staff=null;selected="";personId="";
 }
 function stopTracking(){
   if(geoWatch!==null&&navigator.geolocation){navigator.geolocation.clearWatch(geoWatch);geoWatch=null}
@@ -356,6 +357,7 @@ function render(){
   renderTrips();
   renderPayments(events);
   setTab(staffTab);
+  checkShiftNotices();
 }
 async function createReport(eventId,declaredBreakMins=0){
   if(!user||!personId||!staff||!logsLoaded)return;
@@ -623,6 +625,41 @@ async function session(u){
     });
   }catch(e){if(version===authEpoch)status("No se pudo comprobar el acceso: "+errorMessage(e),"error")}
 }
+function checkShiftNotices(){
+  if(!remindersEnabled||!user||!staff)return;
+  const clocks=new Map((staff.events||[]).map(e=>[e.id,records.get(key(user.uid,e.id))]).filter(x=>!!x[1]));
+  for(const item of eligibleNotices(staff.events,personId,clocks,Date.now())){
+    const dedupe=user.uid+"_"+item.key;
+    if(remindersSeen.has(dedupe))continue;
+    remindersSeen.add(dedupe);
+    const area=$("j-reminders-status");
+    if(area)area.textContent=item.heading+" · "+item.description;
+    if("Notification" in window&&Notification.permission==="granted"){
+      try{new Notification("ÁGORA · "+item.heading,{body:item.description,tag:"agora-"+dedupe,
+        icon:"./assets/dejavu-monograma.png"})}catch(_){}
+    }
+  }
+}
+async function enableShiftNotices(){
+  if(!user||!personId)return;
+  if("Notification" in window){
+    try{
+      const permission=await Notification.requestPermission();
+      if(permission!=="granted"){
+        $("j-reminders-status").textContent="Sin permiso de notificaciones. Puedes utilizar el calendario del teléfono para recibir avisos.";
+        return;
+      }
+    }catch(_){
+      $("j-reminders-status").textContent="No fue posible activar las notificaciones de este navegador.";
+      return;
+    }
+  }
+  remindersEnabled=true;
+  $("j-reminders-enable").textContent="Avisos activos";
+  $("j-reminders-enable").disabled=true;
+  $("j-reminders-status").textContent="Avisos locales activos mientras el visor esté abierto. No son notificaciones push en segundo plano.";
+  checkShiftNotices();
+}
 async function googleLogin(){
   try{await signInWithPopup(auth,new GoogleAuthProvider())}
   catch(e){
@@ -653,6 +690,9 @@ $("verify").onclick=async()=>{
   catch(e){status(errorMessage(e),"error")}
 };
 $("logout").onclick=()=>signOut(auth);
+$("j-reminders-enable").onclick=enableShiftNotices;
+window.addEventListener("focus",checkShiftNotices);
+setInterval(checkShiftNotices,60000);
 $("staff-board").addEventListener("click",event=>{
   const tab=event.target.closest("[data-staff-tab]");
   if(tab){setTab(tab.dataset.staffTab);return}
