@@ -214,6 +214,11 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
 #viewer-staff #j-break-start{background:#fff;color:#654c22;border:1px solid #d2b476}
 #viewer-staff #j-break-resume{background:#3b674d;color:white;border-color:#3b674d}
 #viewer-staff .staff-break-verified{padding:10px 14px;border-radius:8px;background:#f0f9f2;color:#286342;font-size:12px;font-weight:700}
+
+#viewer-staff .staff-reminders{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#f8f7f4;border:1px solid #e7e3da;border-radius:11px;padding:14px 16px;margin-bottom:16px}
+#viewer-staff .staff-reminders b{font-size:13px}
+#viewer-staff .staff-reminders p{font-size:11px;color:#667077;margin:4px 0}
+#viewer-staff #j-reminders-enable{border:1px solid #d7cab3;background:white;color:#4b422f;padding:10px 14px;font-weight:700}
 </style>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="../icons/icon-192.png">
@@ -254,7 +259,11 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
   <div id="admin-message" hidden><p>Acceso de coordinación. Consulta la agenda general o el control de jornadas.</p></div>
   <div id="staff-board" hidden>
     <div class="staff-account-bar"><span id="j-name">¡Hola!</span><div class="staff-install-actions"><button id="install-ops-app" type="button">Instalar ÁGORA</button><button id="logout" type="button">Salir de mi cuenta</button></div></div>
-    <div id="j-operational-status" class="staff-current-state" role="status" aria-live="polite">Comprobando si tienes una jornada en curso…</div><div id="j-summary" class="staff-metrics" aria-label="Resumen personal de actividades"></div>
+    <div id="j-operational-status" class="staff-current-state" role="status" aria-live="polite">Comprobando si tienes una jornada en curso…</div>
+    <div class="staff-reminders">
+      <div><b>Recordatorios de mi jornada</b><p id="j-reminders-status" role="status" aria-live="polite">Los avisos se muestran únicamente mientras tengas ÁGORA abierta.</p></div>
+      <button type="button" id="j-reminders-enable">Activar avisos</button>
+    </div><div id="j-summary" class="staff-metrics" aria-label="Resumen personal de actividades"></div>
     <nav id="staff-tabs" class="staff-tabs" aria-label="Secciones de Mis jornadas">
       <button type="button" data-staff-tab="inicio" aria-selected="true" class="active">Inicio</button>
       <button type="button" data-staff-tab="cronograma" aria-selected="false">Cronograma</button>
