@@ -28,6 +28,11 @@ jobs:
           node-version: "22"
       - name: Verificar proyecciones de seguridad sin Firebase de producción
         run: node operaciones/tests/qa-safe-view.mjs
+      - name: Validar sintaxis de control, inicio de sesión y marcaje individual
+        run: |
+          node --check operaciones/jornadas-live.js
+          node --check operaciones/control-jornadas.js
+          node --check operaciones/visor-live.js
       - name: Validar ventanas, geolocalización y traslados
         run: node operaciones/tests/qa-jornadas.mjs
       - name: Comprobar control de jornadas sin almacenamiento local
