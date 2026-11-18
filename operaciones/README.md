@@ -95,9 +95,9 @@ npx firebase emulators:exec --only firestore --project demo-agora-ops --non-inte
 
 ## Jornadas del personal, marcaje GPS y traslados (ampliación)
 
-**Vista individual:** https://dejavump.github.io/agora-compras-dejavu/operaciones/jornadas.html  
+**Vista individual (dentro del visor):** https://dejavump.github.io/agora-compras-dejavu/operaciones/visor.html  
 **Control coordinadores:** https://dejavump.github.io/agora-compras-dejavu/operaciones/control-jornadas.html  
-**Visor protegido:** https://dejavump.github.io/agora-compras-dejavu/operaciones/visor.html
+**Visor protegido (entrada única):** https://dejavump.github.io/agora-compras-dejavu/operaciones/visor.html
 
 - **Acceso individual:** Google o Firebase Authentication con correo verificado y contraseña. El usuario de acceso es actualmente el correo; alias sin correo necesitan identidad segura de backend y no una búsqueda pública de usuarios.
 - **Alta de cuentas:** habilitar proveedor Correo electrónico/Contraseña en Firebase Authentication y crear/invitar cuentas autorizadas. La interfaz no registra contraseñas de terceros. El coordinador vincula el UID con personal desde Accesos del editor.
@@ -112,3 +112,15 @@ npx firebase emulators:exec --only firestore --project demo-agora-ops --non-inte
 - **Activación Firestore:** revisar GitHub Actions «Dejavú Staff · Firebase (reglas seguras)» y ejecutar un NUEVO workflow_dispatch desde main confirmando agora-dejavu-38b8c. No re-ejecutar runs antiguos. Las reglas anteriores se comparan y respaldan antes de publicar.
 
 **Pendientes reales:** habilitar Email/Password si falta; provisionar/verificar cuentas reales; despliegue manual de las reglas de marcaje; pruebas de GPS en dispositivos reales y dos cuentas; definir aviso de privacidad y retención de datos de ubicación.
+
+
+## Flujo único de acceso al visor (corrección de UX)
+1. El usuario abre **operaciones/visor.html**. Puede entrar mediante Google o una cuenta de Firebase Authentication con correo y contraseña. La contraseña nunca se almacena en Firestore.
+2. Si el correo no está verificado, el visor ofrece el envío de verificación. Un correo verificado **no concede permisos operativos automáticamente**.
+3. Si la cuenta aún no tiene rol, aparece **Solicitar autorización de acceso**, sin agenda, nombres de personal, tarifas ni marcajes. La solicitud se escribe en `agora_ops_access_requests/{uid}` con estado `pendiente`; no existe escritura pública.
+4. Coordinación abre **Accesos** desde el editor, revisa la solicitud y vincula el UID a la ficha de personal correspondiente; se crean sus datos individuales y permisos de lectura de jornadas.
+5. Tras la aprobación, el visor muestra **Mis jornadas dentro de la misma URL** (entrada, salida, ubicación puntual y traslados). El usuario no se redirige a otro portal.
+6. Administradores y coordinadores siguen viendo únicamente el visor general; pueden regresar al editor y al control de jornadas.
+7. `jornadas.html` se mantiene solo como redirección compatible al visor para enlaces antiguos.
+
+**Nota:** el acceso mediante un alias distinto del correo requiere un servicio de autenticación adicional. El formulario actual usa el correo asignado y la contraseña, o Google. El proveedor Email/Password debe estar habilitado en Firebase Authentication y las cuentas deben provisionarse por el equipo autorizado.
