@@ -6,7 +6,9 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 
 const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
-const page=await browser.newPage({viewport:{width:1366,height:900}});
+// Production is used from Mexico. Keeping this timezone in CI catches the
+// date-only parsing bug that can move an activity to the following day.
+const page=await browser.newPage({viewport:{width:1366,height:900},timezoneId:'America/Mexico_City'});
 const failures=[];
 page.on('pageerror',e=>failures.push(e.message));
 const origin='http://127.0.0.1:8765/operaciones/';
@@ -94,6 +96,10 @@ try{
   await page.locator('[data-action="board-view-dia"]').click();
   assert.equal(await page.locator('.ops-board .ops-card').count(),1,'Regresa a la vista diaria');
   assert.equal((await state()).events.length,3,'Cambiar vista no modifica eventos');
+  // Calendario operativo: la misma jornada debe permanecer en su fecha local.
+  await page.locator('[data-nav="calendario"]').first().click();
+  await page.locator('[data-mode="dia"]').click();
+  assert.equal(await page.locator('.dayitem').count(),1,'Calendario diario conserva la fecha local de la jornada');
   // Edición de una jornada no debe modificar otras ni duplicar recursos.
   await action('edit-event',first.id);
   assert.equal(await page.locator('#ev-site-name').inputValue(),'Sucursal ficticia Coyoacán');
