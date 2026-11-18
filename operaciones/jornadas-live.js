@@ -460,7 +460,21 @@ async function markEnd(){
   if(breaksReady&&activeBreak()){status("Primero reanuda tu descanso para finalizar la jornada.","error");return}
   const note=$("end-note")?.value.trim()||"Actividad terminada según la programación.";
   await action(async()=>{
-    const geo=await locSnapshot();
+    const last=r.lastGeo||{},at=instant(r.lastGeoAt);
+    const recent=gpsValid({latitude:last.lat,longitude:last.lng,accuracy:last.accuracy})&&
+      Number.isFinite(at)&&Date.now()-at>=0&&Date.now()-at<=30000;
+    let geo;
+    if(recent)geo={lat:last.lat,lng:last.lng,accuracy:last.accuracy};
+    else{
+      if(geoWatch!==null&&navigator.geolocation){
+        navigator.geolocation.clearWatch(geoWatch);geoWatch=null;
+      }
+      try{geo=await locSnapshot()}
+      catch(error){
+        if($("live-location").checked&&currentClock()?.status==="en_curso")startTracking();
+        throw error;
+      }
+    }
     await updateDoc(clockRef(selected),{
       status:"finalizada",endGeo:geo,endNote:note.slice(0,240),
       endedAt:serverTimestamp(),updatedAt:serverTimestamp()
