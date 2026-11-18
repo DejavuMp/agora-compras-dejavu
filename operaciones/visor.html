@@ -203,6 +203,10 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
 #viewer-staff details.staff-incidents summary{font-size:12px;font-weight:700;cursor:pointer}
 #viewer-staff .staff-install-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 #viewer-staff #install-ops-app{background:#252729;color:white;border-color:#252729}
+
+#viewer-staff .staff-break-declaration{display:block;max-width:330px;font-weight:700;color:#4f5458;font-size:12px;margin:12px 0}
+#viewer-staff .staff-break-declaration input{display:block;width:100%;margin-top:7px;border:1px solid #d5d5d0;border-radius:9px;padding:10px;background:#fff;color:#222;font:inherit}
+#viewer-staff [data-print-report]{display:inline-block;padding:11px 14px;background:#f6f3ea;border:1px solid #d0c3aa;border-radius:9px;color:#483a20;cursor:pointer;font-weight:700;font-size:12px;margin:8px 0}
 </style>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="../icons/icon-192.png">
@@ -249,7 +253,7 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
       <button type="button" data-staff-tab="cronograma" aria-selected="false">Cronograma</button>
       <button type="button" data-staff-tab="asistencia" aria-selected="false">Asistencia</button>
       <button type="button" data-staff-tab="traslados" aria-selected="false">Traslados</button>
-      <button type="button" data-staff-tab="pagos" aria-selected="false">Mis pagos</button>
+      <button type="button" data-staff-tab="pagos" aria-selected="false">Comprobantes</button>
     </nav>
     <section class="staff-tab-panel" data-staff-panel="inicio" aria-label="Resumen de mi jornada">
       <div class="staff-dashboard">
@@ -296,10 +300,10 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
         <div id="j-trips"></div>
       </section>
     </section>
-    <section class="staff-tab-panel" data-staff-panel="pagos" hidden aria-label="Mis pagos">
+    <section class="staff-tab-panel" data-staff-panel="pagos" hidden aria-label="Mis comprobantes">
       <section class="panel">
-        <div class="staff-section-heading"><div><h3>Mis horas y pagos</h3><p>Registra tus horas y consulta el avance de tus solicitudes.</p></div></div>
-        <div class="staff-hint">Terminar una jornada no solicita el pago automáticamente. Primero crea o revisa el reporte de horas y después envíalo a coordinación. Los importes se muestran únicamente si fueron validados.</div>
+        <div class="staff-section-heading"><div><h3>Mis comprobantes de trabajo</h3><p>Consulta tus horas, descansos declarados y tiempo extraordinario pendiente de revisión.</p></div></div>
+        <div class="staff-hint">Después de terminar tu actividad podrás declarar los minutos de descanso y crear un comprobante de trabajo. La entrada y salida provienen del registro de Firebase. El tiempo excedente se señala para revisión, no equivale a pago autorizado. El expediente bancario y la herramienta de pagos se administrarán por separado.</div>
         <div class="staff-pay-summary" id="j-pay-summary"></div>
         <div class="staff-pay-toolbar"><label>Mostrar<select id="j-pay-filter"><option value="todos">Todos los registros</option><option value="pendientes">Por solicitar / corregir</option><option value="revision">En revisión</option><option value="pagados">Validados y pagados</option></select></label></div>
         <div id="j-payment-list" class="staff-payment-list"></div>
