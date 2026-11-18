@@ -1055,7 +1055,8 @@ match /agora_finance_requests/{requestId} {
         getAfter(identityCredentialPath(registry.credentialId)).data.jobTitle == registry.jobTitle &&
         getAfter(identityCredentialPath(registry.credentialId)).data.active == registry.credentialActive &&
         getAfter(identityCredentialPath(registry.credentialId)).data.status == registry.credentialStatus &&
-        getAfter(identityCredentialPath(registry.credentialId)).data.blockReason == registry.blockReason &&
+        getAfter(identityCredentialPath(registry.credentialId)).data.blockReason ==
+          (registry.credentialActive == true ? '' : 'Credencial suspendida') &&
         getAfter(identityCredentialPath(registry.credentialId)).data.lastAuditId == registry.lastAuditId;
     }
 
