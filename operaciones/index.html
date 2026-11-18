@@ -121,7 +121,9 @@ const isoLocal=(d)=>`${isoDate(d)}T${String(d.getHours()).padStart(2,'0')}:${Str
 const startOfDay=(d)=>new Date(d.getFullYear(),d.getMonth(),d.getDate());
 const plusDays=(d,n)=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);
 const monday=(d)=>plusDays(startOfDay(d),-(d.getDay()+6)%7);
-const toDate=(s)=>new Date(s);
+// A date-only string is UTC in JavaScript. Parse it as a local calendar day so
+// Mexico City users do not see an event shifted into the following column.
+const toDate=(s)=>{if(typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)}return new Date(s)};
 const dateMs=(s)=>new Date(s).getTime();
 const fmtDate=(s,opts={day:'2-digit',month:'short'})=>new Intl.DateTimeFormat('es-MX',opts).format(new Date(s));
 const fmtLong=(s)=>new Intl.DateTimeFormat('es-MX',{day:'numeric',month:'long',year:'numeric'}).format(new Date(s));
