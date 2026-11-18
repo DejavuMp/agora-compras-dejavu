@@ -5,11 +5,15 @@ on:
     paths:
       - "firestore.rules"
       - "firebase.json"
+      - "identidad/**"
+      - "operaciones/ops-safe-view.mjs"
       - ".github/firebase-staff/**"
       - ".github/workflows/dejavu-staff-firebase-rules.yml"
   pull_request:
     paths:
       - "firestore.rules"
+      - "identidad/**"
+      - "operaciones/ops-safe-view.mjs"
       - ".github/firebase-staff/**"
       - ".github/workflows/dejavu-staff-firebase-rules.yml"
   workflow_dispatch:
@@ -39,6 +43,14 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - name: Verificar sintaxis y comportamiento de ÁGORA Identidad
+        run: |
+          node --check identidad/app.js
+          node --check identidad/firebase-identity.js
+          node --check identidad/verify.js
+          node identidad/tests/domain.test.mjs
+          node identidad/tests/app-structure.test.mjs
+          node identidad/tests/rules-structure.test.mjs
       - name: Probar preflight con reglas simuladas, sin tocar producción
         run: node .github/firebase-staff/test-preflight.mjs
       - name: Instalar dependencias temporales de test

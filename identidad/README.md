@@ -6,7 +6,7 @@ Implementación aislada del portal de identidad sobre el proyecto Firebase exist
 ## Rutas
 
 - `identidad/`: alta, expediente privado, credencial, RH y asignaciones del día.
-- `identidad/verificar.html?id=<token>`: verificación pública limitada de la credencial.
+- `identidad/verificar.html?id=<token>`: verificación pública limitada de la credencial (estado genérico, sin motivo interno del bloqueo).
 
 ## Colecciones
 
@@ -20,7 +20,10 @@ Implementación aislada del portal de identidad sobre el proyecto Firebase exist
 - `agora_identity_audit`: auditoría append-only.
 
 Los permisos técnicos siguen en `agora_users`; el cargo operativo no concede privilegios.
-Las actividades del día se proyectan exclusivamente desde `agora_ops_staff/{uid}`.
+RH puede asignar un coordinador activo al emitir un ID o desde el directorio. El personal
+administrativo también puede solicitar su propio ID sin perder acceso a la administración.
+Las actividades del día se proyectan exclusivamente desde `agora_ops_staff/{uid}`, usando
+la vista segura de Operaciones (sede, cargo y horario), sin salarios ni información de terceros.
 
 ## Pruebas locales sin dependencias
 

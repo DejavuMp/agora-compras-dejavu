@@ -118,6 +118,13 @@ export async function listPendingRegistrations(){
   return snap.docs.map(data);
 }
 
+export async function listActiveCoordinators(){
+  const snap=await getDocs(query(collection(db,"agora_users"),where("role","==","coordinador"),limit(200)));
+  return snap.docs.map(data).filter(item=>item?.active===true).map(item=>({
+    uid:item.id,name:normalizeText(item.name||item.email,140),email:cleanEmail(item.email)
+  })).sort((a,b)=>a.name.localeCompare(b.name,"es"));
+}
+
 export async function listDirectory(account,userUid){
   if(account?.role==="admin"){
     const snap=await getDocs(query(collection(db,"agora_identity_registry"),limit(200)));
@@ -200,7 +207,8 @@ export async function updateCredential(actor,registry,{active,reason,jobTitle}){
     blockReason,updatedAt:serverTimestamp(),updatedBy:actor.uid,lastAuditId:auditId
   });
   batch.update(credentialRef,{
-    jobTitle:nextJob,active:isActive,status:next.credentialStatus,blockReason,
+    jobTitle:nextJob,active:isActive,status:next.credentialStatus,
+    blockReason:isActive?"":"Credencial suspendida",
     updatedAt:serverTimestamp(),updatedBy:actor.uid,lastAuditId:auditId
   });
   batch.set(doc(db,"agora_identity_audit",auditId),{

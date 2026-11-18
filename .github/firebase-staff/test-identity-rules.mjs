@@ -3,6 +3,7 @@
  * Nunca conecta con el proyecto real.
  */
 import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
 import {initializeTestEnvironment,assertFails,assertSucceeds} from '@firebase/rules-unit-testing';
 import {
   collection,doc,getDoc,getDocs,setDoc,serverTimestamp,Timestamp,writeBatch
@@ -100,7 +101,7 @@ try{
     updatedAt:serverTimestamp(),updatedBy:coordId,lastAuditId:blockAudit
   });
   block.update(doc(coord,'agora_identity_credentials',credentialId),{
-    active:false,status:'bloqueada',blockReason:'Fin de turno',
+    active:false,status:'bloqueada',blockReason:'Credencial suspendida',
     updatedAt:serverTimestamp(),updatedBy:coordId,lastAuditId:blockAudit
   });
   block.set(doc(coord,'agora_identity_audit',blockAudit),{
@@ -108,6 +109,9 @@ try{
   });
   await yes('coordinacion asignada bloquea credencial con auditoria sincronizada',block.commit());
   await yes('publico consulta estado bloqueado sin datos privados',getDoc(doc(anon,'agora_identity_credentials',credentialId)));
+  const publicSnap=await getDoc(doc(anon,'agora_identity_credentials',credentialId));
+  assert.equal(publicSnap.data().blockReason,'Credencial suspendida');
+  assert.notEqual(publicSnap.data().blockReason,'Fin de turno');
   await yes('RH lista auditoria',getDocs(collection(admin,'agora_identity_audit')));
   await no('publico no lee auditoria',getDocs(collection(anon,'agora_identity_audit')));
   console.log('Todas las '+passed+' pruebas de Identidad pasaron.');

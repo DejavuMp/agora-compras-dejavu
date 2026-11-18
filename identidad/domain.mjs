@@ -50,7 +50,10 @@ function sameLocalDay(a, b) {
 export function projectTodayAssignments(staffDocument, now = new Date()) {
   const personId = normalizeText(staffDocument?.personId, 100);
   if (!personId || !Array.isArray(staffDocument?.events)) return [];
+  const sites = new Map((Array.isArray(staffDocument.sites) ? staffDocument.sites : [])
+    .filter(site => typeof site?.id === "string").map(site => [site.id, site]));
   return staffDocument.events.flatMap((event) => {
+    if (["cancelado","borrador"].includes(event?.status)) return [];
     const assignment = Array.isArray(event?.staff) ? event.staff.find((item) => item?.personId === personId) : null;
     const start = instant(assignment?.start ?? event?.start);
     const end = instant(assignment?.end ?? event?.end);
@@ -58,9 +61,9 @@ export function projectTodayAssignments(staffDocument, now = new Date()) {
     return [{
       eventId: normalizeText(event.id, 100),
       project: normalizeText(event.project || event.campaign || event.title || event.type, 160),
-      site: normalizeText(event.siteName || event.site || event.place, 180),
+      site: normalizeText(event.venueName || sites.get(event.siteId)?.name || event.location || event.siteName || event.site || event.place, 180),
       start: new Date(start), end: new Date(end),
-      jobTitle: normalizeText(assignment.role || assignment.jobTitle || "", 80),
+      jobTitle: normalizeText(assignment.role || assignment.jobTitle || staffDocument?.person?.role || "", 80),
       activity: normalizeText(assignment.activity || event.activity || event.type || "", 240),
       responsible: normalizeText(assignment.assignedByName || event.responsible || event.coordinator || "", 140),
       instructions: normalizeText(assignment.instructions || event.instructions || event.notes || "", 300)
@@ -77,6 +80,6 @@ export function publicCredential(registry) {
     jobTitle: registry.jobTitle,
     active: registry.credentialActive === true,
     status: registry.credentialActive === true ? "vigente" : "bloqueada",
-    blockReason: registry.credentialActive === true ? "" : normalizeText(registry.blockReason, 240)
+    blockReason: registry.credentialActive === true ? "" : "Credencial suspendida"
   };
 }
