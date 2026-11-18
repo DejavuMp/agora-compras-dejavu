@@ -16,6 +16,7 @@ import {
 import {localDay,atLocalDay,shiftOf,eventStart,eventEnd,myEvents,filteredEvents,payLabel,paymentFilter,netHours,reportFromFinishedClock} from "./staff-dashboard.mjs";
 import {timeStatement,hours,overtimeText} from "./ops-timekeeping.mjs";
 import {receiptData,receiptHtml} from "./ops-receipt.mjs";
+import {ownBreaks,openBreak,nextBreakSlot,verifiedBreakSummary} from "./ops-breaks.mjs";
 const {auth,firestore:fs}=window.AGORA_FIREBASE||{};
 const $=id=>document.getElementById(id);
 const esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -25,7 +26,7 @@ const errorMessage=e=>e?.code==="permission-denied"?"El servidor rechazó la ope
   String(e?.message||e||"No fue posible completar la operación");
 let user=null,personId="",access=new Map(),records=new Map(),trips=new Map(),
   staff=null,selected="",authEpoch=0,unsubs=[],geoWatch=null,lastLiveUpdate=0,busy=false,
-  logs=new Map(),logsLoaded=false,staffTab="inicio",calendarMode="timeline",
+  logs=new Map(),logsLoaded=false,breaks=new Map(),breaksReady=false,staffTab="inicio",calendarMode="timeline",
   calendarDay=localDay(Date.now()),calendarDays=7,payFilter="todos";
 const key=(uid,eventId)=>uid+"_"+eventId;
 const accessRef=(id)=>doc(fs,"agora_ops_shift_access",key(user.uid,id));
@@ -38,7 +39,7 @@ function status(msg,kind=""){
 function clearSubscriptions(){
   for(const off of unsubs.splice(0))try{off()}catch(_){}
   stopTracking();
-  access.clear();records.clear();trips.clear();logs.clear();logsLoaded=false;staff=null;selected="";personId="";
+  access.clear();records.clear();trips.clear();logs.clear();breaks.clear();breaksReady=false;logsLoaded=false;staff=null;selected="";personId="";
 }
 function stopTracking(){
   if(geoWatch!==null&&navigator.geolocation){navigator.geolocation.clearWatch(geoWatch);geoWatch=null}
@@ -51,6 +52,8 @@ function currentEvent(){
 function currentPolicy(){return access.get(key(user?.uid||"",selected))}
 function currentClock(){return records.get(key(user?.uid||"",selected))}
 function currentTrip(){return trips.get(key(user?.uid||"",selected))}
+function currentBreaks(){return ownBreaks([...breaks.values()],user?.uid||"",selected)}
+function activeBreak(){return openBreak(currentBreaks())}
 const nowText=v=>when(v);
 function linkGeo(geo,label){
   const url=locUrl(geo);
