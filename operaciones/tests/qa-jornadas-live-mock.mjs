@@ -103,13 +103,23 @@ try{
   await page.waitForFunction(()=>document.querySelector("#j-trips")?.textContent.includes("Llegada registrada"));
 
   await page.locator('#staff-tabs [data-staff-tab="pagos"]').click();
+  await page.locator('[data-break-for="evento1"]').fill("15");
   await page.locator('[data-create-report="evento1"]').click();
   await page.waitForFunction(()=>document.querySelector("#j-payment-list")?.textContent.includes("Horas capturadas"));
+  const receiptWindow=page.waitForEvent("popup");
+  await page.locator('[data-print-report]').click();
+  const receiptPage=await receiptWindow;
+  await receiptPage.waitForLoadState("domcontentloaded");
+  assert.ok((await receiptPage.locator("body").innerText()).includes("Comprobante de jornada"));
+  assert.ok((await receiptPage.locator("body").innerText()).includes("Descanso declarado"));
+  assert.ok(!(await receiptPage.locator("body").innerText()).includes("NOMINA_PRIVADA"));
+  await receiptPage.close();
   await page.locator('[data-request-payment]').click();
   await page.waitForFunction(()=>document.querySelector("#j-payment-list")?.textContent.includes("En revisión"));
   const reports=await page.evaluate(()=>[...window.__mockRecords.logs.values()]);
   assert.equal(reports.length,1,"El reporte no debe duplicarse");
   assert.equal(reports[0].paymentStatus,"solicitado");
+  assert.equal(reports[0].breakMins,15,"El descanso declarado se registra en la ficha.");
   assert.equal(reports[0].requestedAmount,null,"El staff no define monto");
   assert.ok(reports[0].requestedHours>0);
   assert.ok(!(await page.locator("#j-payment-list").innerText()).includes("Tarifa por hora"));
