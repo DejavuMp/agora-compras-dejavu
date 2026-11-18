@@ -436,7 +436,24 @@ async function markEnd(){
   const r=currentClock();if(!r||r.status!=="en_curso")return;
   const note=$("end-note")?.value.trim()||"Actividad terminada según la programación.";
   await action(async()=>{
-    const geo=await locSnapshot();
+    // La geolocalización continua puede bloquear una segunda lectura en
+    // navegadores móviles. Reutilizar exclusivamente el último GPS realmente
+    // recibido dentro de los últimos 30 segundos; nunca inventar ubicación.
+    const last=r.lastGeo||{},at=instant(r.lastGeoAt);
+    const recent=gpsValid({latitude:last.lat,longitude:last.lng,accuracy:last.accuracy})&&
+      Number.isFinite(at)&&Date.now()-at>=0&&Date.now()-at<=30000;
+    let geo;
+    if(recent)geo={lat:last.lat,lng:last.lng,accuracy:last.accuracy};
+    else{
+      if(geoWatch!==null&&navigator.geolocation){
+        navigator.geolocation.clearWatch(geoWatch);geoWatch=null;
+      }
+      try{geo=await locSnapshot()}
+      catch(error){
+        if($("live-location").checked&&currentClock()?.status==="en_curso")startTracking();
+        throw error;
+      }
+    }
     await updateDoc(clockRef(selected),{
       status:"finalizada",endGeo:geo,endNote:note.slice(0,240),
       endedAt:serverTimestamp(),updatedAt:serverTimestamp()
