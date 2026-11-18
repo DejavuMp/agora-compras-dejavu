@@ -278,11 +278,14 @@ function renderPayments(events){
       const clock=records.get(key(user.uid,e.id));
       const total=elapsedMinutes(clock?.startedAt,clock?.endedAt)/60;
       const planned=timeStatement({clock,event:e,personId}).plannedMinutes;
+      const pauses=ownBreaks([...breaks.values()],user.uid,e.id);
+      const cert=breaksReady&&pauses.length?verifiedBreakSummary(clock,pauses):null;
       return '<article class="staff-payment"><div class="pay-row"><div><h4>'+esc(e.title||"Actividad")+'</h4>'+
         '<span class="staff-status-tag">Sin reporte de horas</span></div></div>'+
         '<p>'+esc(dateLabel(eventStart(e,personId)))+' · '+esc(placeLabel(e))+'</p>'+
         '<p>Entrada y salida confirmadas · '+esc(total.toFixed(2))+' h transcurridas · '+esc(hours(planned))+' programadas</p>'+
-        '<label class="staff-break-declaration">Descanso realizado (minutos, declaración del integrante)<input type="number" data-break-for="'+esc(e.id)+'" min="0" max="'+Math.max(0,Math.floor(total*60))+'" step="1" value="0"></label>'+
+        (cert?'<p class="staff-break-verified">Descansos con marcajes de Firebase: '+cert.minutes+' min · '+pauses.length+' pausas</p>':
+          '<label class="staff-break-declaration">Descanso realizado (minutos, declaración del integrante)<input type="number" data-break-for="'+esc(e.id)+'" min="0" max="'+Math.max(0,Math.floor(total*60))+'" step="1" value="0"></label>')+
         '<div class="pay-row"><button type="button" class="primary" data-create-report="'+esc(e.id)+'" '+(busy?"disabled":"")+'>Crear comprobante de horas</button></div>'+
         '<p>La entrada y salida provienen de Firebase. El descanso se declara aquí y queda sujeto a revisión. Las horas extras no se aprueban automáticamente.</p></article>';
     }).join(""):"";
@@ -333,7 +336,7 @@ function render(){
   const next=events.find(e=>instant(eventEnd(e,personId))>=Date.now());
   const stateEl=$("j-operational-status");
   if(current){
-    stateEl.textContent="En jornada · "+(current.title||"Actividad")+" · "+placeLabel(current);
+    stateEl.textContent=(breaksReady&&openBreak(ownBreaks([...breaks.values()],user.uid,current.id))?"En descanso":"En jornada")+" · "+(current.title||"Actividad")+" · "+placeLabel(current);
     stateEl.className="staff-current-state active";
   }else if(next&&access.get(key(user.uid,next.id))?.enabled===true){
     stateEl.textContent="Fuera de jornada · Próxima actividad: "+(next.title||"Actividad")+" · "+dateLabel(eventStart(next,personId));
@@ -366,7 +369,11 @@ async function createReport(eventId,declaredBreakMins=0){
   }
   const id="j_"+user.uid+"_"+eventId;
   await action(async()=>{
-    const docValue=reportFromFinishedClock({clock,event,uid:user.uid,personId,id,breakMins:declaredBreakMins});
+    const pauses=ownBreaks([...breaks.values()],user.uid,eventId);
+    const cert=verifiedBreakSummary(clock,pauses);
+    if(breaksReady&&cert.active)throw Error("Debes reanudar tu descanso antes de crear el reporte.");
+    const actualBreak=breaksReady&&pauses.length?cert.minutes:declaredBreakMins;
+    const docValue=reportFromFinishedClock({clock,event,uid:user.uid,personId,id,breakMins:actualBreak});
     await setDoc(doc(fs,"agora_ops_logs",id),{...docValue,updatedAt:serverTimestamp()});
     setTab("pagos");
   },"Creando un reporte de horas basado en tu marcaje oficial…");
