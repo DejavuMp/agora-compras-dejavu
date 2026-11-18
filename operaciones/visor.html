@@ -219,6 +219,11 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
 #viewer-staff .staff-reminders b{font-size:13px}
 #viewer-staff .staff-reminders p{font-size:11px;color:#667077;margin:4px 0}
 #viewer-staff #j-reminders-enable{border:1px solid #d7cab3;background:white;color:#4b422f;padding:10px 14px;font-weight:700}
+
+#viewer-staff .staff-month-report{border:1px solid #dfd8c9;border-radius:11px;padding:14px;background:#fbfaf7;display:flex;align-items:flex-end;flex-wrap:wrap;gap:10px;margin:12px 0 18px}
+#viewer-staff .staff-month-report label{font-size:12px;font-weight:700;min-width:180px}
+#viewer-staff .staff-month-report input{font:inherit;width:100%;margin-top:5px;border:1px solid #ccc;border-radius:8px;padding:9px;background:#fff}
+#viewer-staff #j-print-month{background:#222729;color:white;border:1px solid #222729;font-size:12px;min-height:40px}
 </style>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="../icons/icon-192.png">
@@ -321,6 +326,10 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
         <div class="staff-section-heading"><div><h3>Mis comprobantes de trabajo</h3><p>Consulta tus horas, descansos declarados y tiempo extraordinario pendiente de revisión.</p></div></div>
         <div class="staff-hint">Después de terminar tu actividad podrás declarar los minutos de descanso y crear un comprobante de trabajo. La entrada y salida provienen del registro de Firebase. El tiempo excedente se señala para revisión, no equivale a pago autorizado. El expediente bancario y la herramienta de pagos se administrarán por separado.</div>
         <div class="staff-pay-summary" id="j-pay-summary"></div>
+        <div class="staff-month-report">
+          <label for="j-month-report">Mes del resumen<input type="month" id="j-month-report"></label>
+          <button type="button" id="j-print-month">Generar resumen de días y horas (.PDF)</button>
+        </div>
         <div class="staff-pay-toolbar"><label>Mostrar<select id="j-pay-filter"><option value="todos">Todos los registros</option><option value="pendientes">Por solicitar / corregir</option><option value="revision">En revisión</option><option value="pagados">Validados y pagados</option></select></label></div>
         <div id="j-payment-list" class="staff-payment-list"></div>
       </section>
