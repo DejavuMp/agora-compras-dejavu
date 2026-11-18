@@ -249,7 +249,7 @@ $("viewer-recover").addEventListener("click",async()=>{
   }
 });
 $("viewer-request-submit").addEventListener("click",async()=>{
-  const user=auth.currentUser;
+  const user=signedIn;
   if(!user||!user.emailVerified)return;
   const button=$("viewer-request-submit");button.disabled=true;
   try{
