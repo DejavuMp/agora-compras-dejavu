@@ -29,7 +29,8 @@ const authJS=[
 const dbJS=[
   "const staff="+JSON.stringify(staff)+";",
   "const access="+JSON.stringify(policy)+";",
-  "const rec={clock:new Map(),trips:new Map()};",
+  "const rec={clock:new Map(),trips:new Map(),logs:new Map()};",
+  "window.__mockRecords=rec;",
   "const listeners={};",
   "export function doc(_db,...parts){return parts.join('/');}",
   "export function collection(_db,coll){return coll;}",
@@ -44,7 +45,7 @@ const dbJS=[
   "function snapshot(coll){",
   " if(coll==='agora_ops_staff/staff-qa')return {metadata:{fromCache:false},exists:()=>true,data:()=>staff};",
   " let map=coll==='agora_ops_shift_access'?new Map([['staff-qa_evento1',access]]):",
-  " (coll==='agora_ops_clock'?rec.clock:rec.trips);",
+  " (coll==='agora_ops_clock'?rec.clock:coll==='agora_ops_logs'?rec.logs:rec.trips);",
   " return {metadata:{fromCache:false},docs:[...map.entries()].map(([id,data])=>({id,data:()=>data}))};",
   "}",
   "export function onSnapshot(ref,_o,fn){",
@@ -52,9 +53,9 @@ const dbJS=[
   " (listeners[coll]??=[]).push(fn);queueMicrotask(()=>fn(snapshot(coll)));",
   " return ()=>{listeners[coll]=listeners[coll].filter(x=>x!==fn)};}",
   "export async function setDoc(ref,data){const [coll,id]=ref.split('/');",
-  " const row=rec[coll==='agora_ops_clock'?'clock':'trips'];row.set(id,data);emit(coll);}",
+  " const row=rec[coll==='agora_ops_clock'?'clock':coll==='agora_ops_logs'?'logs':'trips'];row.set(id,data);emit(coll);}",
   "export async function updateDoc(ref,data){const [coll,id]=ref.split('/');",
-  " const row=rec[coll==='agora_ops_clock'?'clock':'trips'];row.set(id,{...row.get(id),...data});emit(coll);}"
+  " const row=rec[coll==='agora_ops_clock'?'clock':coll==='agora_ops_logs'?'logs':'trips'];row.set(id,{...row.get(id),...data});emit(coll);}"
 ].join("\n");
 try{
   await c.route("**/firebase-init.js",r=>r.fulfill({status:200,headers,body:"window.AGORA_FIREBASE={auth:{},firestore:{}};"}));
@@ -64,6 +65,15 @@ try{
   page.on("pageerror",e=>errors.push(e.message));
   await page.goto("http://127.0.0.1:8765/operaciones/visor.html",{waitUntil:"domcontentloaded"});
   await page.waitForFunction(()=>document.querySelector("#j-events")?.textContent.includes("Volanteo de prueba"));
+  assert.ok(await page.locator('[data-staff-tab="inicio"]').isVisible());
+  await page.locator('#staff-tabs [data-staff-tab="cronograma"]').click();
+  await page.locator("#j-period").selectOption("14");
+  await page.locator("#j-period").selectOption("30");
+  await page.locator("#j-period").selectOption("7");
+  await page.locator('[data-calendar-mode="dia"]').click();
+  await page.locator('[data-calendar-mode="timeline"]').click();
+  assert.ok(await page.locator("#j-events").isVisible());
+  await page.locator('#staff-tabs [data-staff-tab="asistencia"]').click();
   assert.equal(new URL(page.url()).pathname,"/operaciones/visor.html","El staff permanece dentro del visor");
   assert.ok(await page.locator("#viewer-agenda").isHidden(),"Sin acceso a agenda administrativa");
   assert.ok(await page.locator("#viewer-request").isHidden(),"Una cuenta asignada no requiere repetir solicitud");
@@ -74,6 +84,7 @@ try{
   await page.locator("#end-note").fill("Jornada realizada sin incidencias");
   await page.locator("#end-shift").click();
   await page.waitForFunction(()=>document.querySelector("#j-active")?.textContent.includes("Salida oficial:"));
+  await page.locator('#staff-tabs [data-staff-tab="traslados"]').click();
   await page.locator("#trip-origin").fill("Metro ficticio");
   await page.locator("#trip-minutes").fill("30");
   await page.locator("#trip-buffer").fill("15");
@@ -81,6 +92,18 @@ try{
   await page.waitForFunction(()=>document.querySelector("#j-trips")?.textContent.includes("Traslado en curso"));
   await page.locator("#trip-arrive").click();
   await page.waitForFunction(()=>document.querySelector("#j-trips")?.textContent.includes("Llegada registrada"));
+
+  await page.locator('#staff-tabs [data-staff-tab="pagos"]').click();
+  await page.locator('[data-create-report="evento1"]').click();
+  await page.waitForFunction(()=>document.querySelector("#j-payment-list")?.textContent.includes("Horas capturadas"));
+  await page.locator('[data-request-payment]').click();
+  await page.waitForFunction(()=>document.querySelector("#j-payment-list")?.textContent.includes("En revisión"));
+  const reports=await page.evaluate(()=>[...window.__mockRecords.logs.values()]);
+  assert.equal(reports.length,1,"El reporte no debe duplicarse");
+  assert.equal(reports[0].paymentStatus,"solicitado");
+  assert.equal(reports[0].requestedAmount,null,"El staff no define monto");
+  assert.ok(reports[0].requestedHours>0);
+  assert.ok(!(await page.locator("#j-payment-list").innerText()).includes("Tarifa por hora"));
   assert.deepEqual(errors,[],"Interfaz no debe lanzar errores de JavaScript");
   console.log("OK: UI de personal: turno, salida, GPS, traslado y arribo en un navegador simulado. NO producción.");
 }finally{await c.close();await browser.close()}
