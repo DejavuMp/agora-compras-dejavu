@@ -74,6 +74,17 @@ try{
  assert.ok(await page.locator("#ops-planned-hours").isVisible());
  await page.locator("#ev-work-mode").selectOption("jornada_campo");
  assert.equal(await page.locator("#ev-work-mode").inputValue(),"jornada_campo");
+ // La estimación sin costo funciona con coordenadas sin consultar servicios externos.
+ await page.locator("#ev-origin").fill("19.4326,-99.1332");
+ await page.locator("#ev-site-address").fill("19.354,-99.180");
+ await page.locator("#ev-start").fill((await page.locator("#ev-start").inputValue()));
+ await page.locator('[data-action="estimate-route-free"]').click();
+ await page.waitForFunction(()=>Number(document.querySelector("#ev-travel")?.value)>5);
+ const estimated=Number(await page.locator("#ev-travel").inputValue());
+ assert.ok(estimated>=10&&estimated<120,"Se calculó traslado aproximado sin costo.");
+ assert.ok((await page.locator("#ev-route-estimate-result").innerText()).includes("rango orientativo"));
+ assert.ok((await page.locator("#ops-departure-preview").innerText()).includes("Salida sugerida"));
+
  await page.locator('[data-person-name]').first().fill("Ana QAA");
  await page.locator("#ev-title").fill("Prueba de nombre mal escrito");
  await page.locator('#event-form button[type="submit"]').click();
