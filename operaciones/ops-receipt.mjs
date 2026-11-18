@@ -21,7 +21,7 @@ export function receiptData({log,event,clock,person,personId}){
     throw Error("La jornada todavía no tiene salida certificada.");
   const summary=timeStatement({clock,event,personId,breakMins:log.breakMins||0});
   return {
-    folio:"AGO-"+new Intl.DateTimeFormat("en-CA",{timeZone:"America/Mexico_City",year:"numeric",month:"2-digit",day:"2-digit"}).format(instant(clock.startedAt)).replace(/-/g,"")+"-"+idHash(log.id),
+    folio:"AGO-"+new Intl.DateTimeFormat("en-US",{timeZone:"America/Mexico_City",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(instant(clock.startedAt)).filter(p=>["year","month","day"].includes(p.type)).sort((a,b)=>({year:0,month:1,day:2}[a.type]-({year:0,month:1,day:2}[b.type]))).map(p=>p.value).join("")+"-"+idHash(log.id),
     name:person.name||"Integrante de Dejavú Marketing",
     activity:event.title||event.type||"Actividad",
     type:workModeLabel(event),
