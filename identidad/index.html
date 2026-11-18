@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#11100e">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="description" content="ÁGORA Dejavú — identidad única, credencial y expediente RH">
+  <title>ÁGORA · Identidad y RH</title>
+  <link rel="stylesheet" href="./style.css">
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#app">Saltar al contenido</a>
+  <header class="topbar">
+    <a class="brand" href="../" aria-label="Volver a ÁGORA">
+      <img src="../operaciones/assets/dejavu-monograma.png" alt="">
+      <span><b>ÁGORA</b><small>Identidad Única · RH Digital</small></span>
+    </a>
+    <div class="session">
+      <span id="session-label">Sin sesión</span>
+      <button id="login-button" class="button primary" type="button">Entrar con Google</button>
+      <button id="logout-button" class="button ghost" type="button" hidden>Salir</button>
+    </div>
+  </header>
+  <div id="system-status" class="status" role="status" aria-live="polite">Preparando acceso seguro…</div>
+  <main id="app" tabindex="-1"></main>
+  <footer>
+    <p>Dejavú Marketing · El cargo operativo no concede permisos administrativos.</p>
+    <p>El aviso de privacidad de esta versión es provisional y requiere validación jurídica.</p>
+  </footer>
+  <noscript>Esta aplicación necesita JavaScript para autenticar y proteger tu información.</noscript>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

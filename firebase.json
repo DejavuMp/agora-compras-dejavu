@@ -10,6 +10,8 @@
       "**/.*",
       "**/node_modules/**",
       "functions/**",
+      "security/**",
+      "identidad/tests/**",
       "firestore.archivos.rules.fragment",
       "integrar-en-agora.mjs",
       "README_ARCHIVOS.md",
