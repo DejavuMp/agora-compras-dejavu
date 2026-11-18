@@ -40,7 +40,7 @@ if(opsAt<0||candidate.indexOf(opsMarker,opsAt+1)!==-1||opsAt<=financeAt||opsAt>=
 }
 if(candidate[opsAt-1]!=='\n')throw Error('Separador de reglas de Operaciones inesperado');
 const withoutOps=candidate.slice(0,opsAt-1)+candidate.slice(financeEnd);
-const evidenceMarker='    // Fotos de evidencia compartidas: archivo JPEG optimizado, separado de los';
+const evidenceMarker='        // Fotos de evidencia compartidas: acceso a fichas publicadas.';
 function normalize(s){return String(s).replace(/\r\n?/g,'\n').trim()}
 function safeVariants(text){
  const {a,b,c}=assertIndexOrder(text);
@@ -55,7 +55,6 @@ function safeVariants(text){
 }
 // Solo admitir reglas idénticas a versiones conocidas de Staff (con o sin el
 // NUEVO bloque financiero). Cualquier edición ajena cancela el despliegue.
-const allowed=new Set([...safeVariants(candidate),...safeVariants(withoutOps),...safeVariants(legacy)].map(normalize));
 const headers={Authorization:'Bearer '+token,Accept:'application/json'};
 async function getJson(path){
  const url='https://firebaserules.googleapis.com/v1/'+path;
@@ -76,6 +75,8 @@ const live=files[0].content;
 mkdirSync('.github/firebase-staff/.preflight',{recursive:true});
 writeFileSync('.github/firebase-staff/.preflight/antes-dejavu.rules',live,'utf8');
 writeFileSync('.github/firebase-staff/.preflight/ruleset-name.txt',release.rulesetName+'\n','utf8');
+// Conservar el respaldo antes incluso si fallan los chequeos de variantes.
+const allowed=new Set([...safeVariants(candidate),...safeVariants(withoutOps),...safeVariants(legacy)].map(normalize));
 if(!allowed.has(normalize(live))){
  throw Error('REGLAS DISTINTAS EN PRODUCCIÓN. Se guardó respaldo. Se detiene para NO modificar permisos de Ágora Compras, Archivos u otros módulos.');
 }
