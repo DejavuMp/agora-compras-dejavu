@@ -62,8 +62,11 @@ try{
   await c.route("https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js",r=>r.fulfill({status:200,headers,body:dbJS}));
   const page=await c.newPage();
   page.on("pageerror",e=>errors.push(e.message));
-  await page.goto("http://127.0.0.1:8765/operaciones/jornadas.html",{waitUntil:"domcontentloaded"});
+  await page.goto("http://127.0.0.1:8765/operaciones/visor.html",{waitUntil:"domcontentloaded"});
   await page.waitForFunction(()=>document.querySelector("#j-events")?.textContent.includes("Volanteo de prueba"));
+  assert.equal(new URL(page.url()).pathname,"/operaciones/visor.html","El staff permanece dentro del visor");
+  assert.ok(await page.locator("#viewer-agenda").isHidden(),"Sin acceso a agenda administrativa");
+  assert.ok(await page.locator("#viewer-request").isHidden(),"Una cuenta asignada no requiere repetir solicitud");
   assert.ok(!(await page.locator("body").innerText()).includes("NOMINA_PRIVADA"));
   await page.locator("#start-activity").fill("Volanteo y entrega de cupones de prueba");
   await page.locator("#start-shift").click();
