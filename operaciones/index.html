@@ -91,6 +91,24 @@
 .ops-mobile-brand{display:none;width:52px;height:52px;flex-shrink:0;object-fit:contain;background:#fff;border:1px solid #e6e3dc;border-radius:11px;padding:3px}
 @media(max-width:750px){.ops-mobile-brand{display:block}}
 @media print{.ops-mobile-brand{display:none}}
+
+/* Solicitudes de acceso: vinculación clara sin copiar IDs ni ventanas prompt. */
+.ops-link-form{display:grid;gap:11px;margin:16px 0 4px;padding:17px;background:#f9f8f5;border:1px solid #d8c7aa;border-radius:12px;color:#242424}
+.ops-link-form h3{font:700 17px/1.35 Arial,sans-serif;margin:0}
+.ops-link-form p{margin:0;line-height:1.5;overflow-wrap:anywhere}
+.ops-link-form small{color:#6b747b}
+.ops-link-form label:not(.ops-link-verify){display:block;font-weight:700;font-size:12px}
+.ops-link-form select,.ops-link-form input[type=text]{width:100%;min-width:0;max-width:100%;background:white;color:#222;border:1px solid #b8b6b1;border-radius:9px;padding:11px 10px;font:14px Arial,sans-serif}
+.ops-link-form #ops-link-new{display:grid;gap:8px}
+.ops-link-form #ops-link-new[hidden]{display:none!important}
+.ops-link-form .ops-link-verify{display:flex;align-items:flex-start;gap:9px;font-size:12px;line-height:1.5;font-weight:500}
+.ops-link-form .ops-link-verify input{margin:1px 0 0;flex-shrink:0}
+.ops-link-form .ops-link-note{font-size:12px;color:#636b72}
+.ops-link-form .ops-link-actions{display:flex;flex-wrap:wrap;gap:9px}
+.ops-link-form button:disabled{opacity:.6;cursor:not-allowed}
+.ops-link-form .ops-link-secondary{background:white!important;border:1px solid #bdb8ac!important;color:#2e2f30!important}
+.ops-link-form .ops-link-error{font-size:12px;color:#a53b30;font-weight:600;min-height:0}
+@media(max-width:600px){.ops-requests{top:12px;right:10px;width:calc(100vw - 20px);max-height:calc(100vh - 24px);padding:12px}.ops-request-item{align-items:flex-start;flex-direction:column}.ops-link-form{padding:13px}}
 </style>
 </head>
 <body><div id="ops-gate" aria-live="polite"></div><div id="app" style="display:none"></div><div id="modal-root"></div><div class="toast-wrap" id="toast-wrap" aria-live="polite"></div>
@@ -283,7 +301,7 @@ function handleSubmit(form){if(form.id==='event-form'){
   toast(count===1?'Actividad guardada.':'Se crearon '+count+' jornadas diarias.');
   return;
 }
-if(form.id==='person-form'){let name=read('p-name');if(!name){toast('Escribe el nombre.','error');return}let id=form.dataset.id||uid(),obj={id,name,role:read('p-role'),phone:read('p-phone'),email:read('p-email'),hourRate:Number(read('p-hour-rate')||0),dayRate:Number(read('p-day-rate')||0),active:document.getElementById('p-active').checked};let i=db.people.findIndex(x=>x.id===id);if(i<0)db.people.push(obj);else db.people[i]=obj;save();closeModal();render();toast('Personal guardado.');return}
+if(form.id==='person-form'){let name=read('p-name');if(!name){toast('Escribe el nombre.','error');return}let id=form.dataset.id||uid(),previous=db.people.find(x=>x.id===id)||{},obj={...previous,id,name,role:read('p-role'),phone:read('p-phone'),email:read('p-email'),hourRate:Number(read('p-hour-rate')||0),dayRate:Number(read('p-day-rate')||0),active:document.getElementById('p-active').checked};let i=db.people.findIndex(x=>x.id===id);if(i<0)db.people.push(obj);else db.people[i]=obj;save();closeModal();render();toast('Personal guardado.');return}
 if(form.id==='vehicle-form'){let name=read('v-name');if(!name){toast('Escribe el nombre de la unidad.','error');return}let id=form.dataset.id||uid(),obj={id,name,plate:read('v-plate'),type:read('v-type'),capacity:Number(read('v-capacity')||0),notes:read('v-notes'),active:document.getElementById('v-active').checked};let i=db.vehicles.findIndex(x=>x.id===id);if(i<0)db.vehicles.push(obj);else db.vehicles[i]=obj;save();closeModal();render();toast('Vehículo guardado.');return}
 if(form.id==='block-form'){let val=read('b-resource'),start=read('b-start'),end=read('b-end'),reason=read('b-reason');if(!val||!validPeriod(start,end)||!reason){toast('Revisa el recurso, motivo y fechas.','error');return}let [resourceType,resourceId]=val.split(':');let obj={id:form.dataset.id||uid(),resourceType,resourceId,start,end,reason};let i=db.blocks.findIndex(x=>x.id===obj.id);if(i<0)db.blocks.push(obj);else db.blocks[i]=obj;save();closeModal();render();toast('Bloqueo registrado; revisa si afecta actividades existentes.');return}
 if(form.id==='log-form'){let start=read('l-start'),end=read('l-end'),personId=read('l-person'),breakMins=Number(read('l-break')||0);if(ui.role==='personal'&&personId!==ui.personId){toast('Selecciona tu propio registro.','error');return}if(!personId||!validPeriod(start,end)||breakMins<0||breakMins>=hDiff(start,end)*60){toast('Revisa persona, horarios y descansos.','error');return}let eventId=read('l-event');if(eventId&&!db.events.find(x=>x.id===eventId)){toast('Evento inexistente.','error');return}let old=db.logs.find(x=>x.id===form.dataset.id);if(old&&ui.role==='personal'&&!['capturado','revision'].includes(old.paymentStatus||'capturado')){toast('Solicitudes enviadas: pide una corrección a coordinación.','error');return}if(old?.paymentStatus==='pagado'&&ui.role!=='coordinador'){toast('No se pueden modificar registros pagados.','error');return}let revised=old&&(['solicitado','validado','programado','pagado'].includes(old.paymentStatus));if(revised&&!confirm('Modificar horas validadas o pagadas requiere una nueva revisión. ¿Continuar?'))return;let obj={...old,id:form.dataset.id||uid(),personId,start,end,breakMins,eventId,paymentBasis:read('l-basis'),place:read('l-place'),activity:read('l-activity'),notes:read('l-notes'),paymentStatus:revised?'solicitado':old?.paymentStatus||'capturado',updatedAt:new Date().toISOString()};if(revised){obj.requestedAmount=null;obj.requestedRate=null;obj.approvedAmount=null;obj.approvedHours=null;audit('Revisión de registro previamente validado',obj)}if(db.logs.some(x=>x.id!==obj.id&&x.personId===obj.personId&&overlap(x.start,x.end,obj.start,obj.end))){toast('Ya existen horas reales de esa persona en este mismo horario. Evita la duplicación para pago.','error');return}let i=db.logs.findIndex(x=>x.id===obj.id);if(i<0)db.logs.push(obj);else db.logs[i]=obj;save();closeModal();render();toast('Jornada guardada. Solicita el pago cuando esté completa.');return}
