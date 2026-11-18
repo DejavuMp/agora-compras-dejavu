@@ -5,6 +5,9 @@ on:
     paths:
       - "operaciones/demo.html"
       - "operaciones/visor.html"
+      - "operaciones/jornadas*"
+      - "operaciones/control-jornadas*"
+      - "operaciones/visor-live.js"
       - "operaciones/tests/**"
       - ".github/workflows/agora-ops-ui-tests.yml"
   pull_request:
@@ -25,6 +28,11 @@ jobs:
           node-version: "22"
       - name: Verificar proyecciones de seguridad sin Firebase de producción
         run: node operaciones/tests/qa-safe-view.mjs
+      - name: Validar ventanas, geolocalización y traslados
+        run: node operaciones/tests/qa-jornadas.mjs
+      - name: Comprobar control de jornadas sin almacenamiento local
+        run: |
+          node -e "const fs=require('fs');for(const path of ['operaciones/jornadas-live.js','operaciones/control-jornadas.js']){const s=fs.readFileSync(path,'utf8');if(s.includes('localStorage')||!s.includes('onSnapshot')||!s.includes('serverTimestamp'))process.exit(1)}"
       - name: Verificar que el visor de producción no use almacenamiento local
         run: |
           node -e "const fs=require('fs');const h=fs.readFileSync('operaciones/visor.html','utf8');const js=fs.readFileSync('operaciones/visor-live.js','utf8');if(h.includes('localStorage')||js.includes('localStorage'))process.exit(1);if(!js.includes('onSnapshot')||!js.includes('getDocFromServer'))process.exit(1)"
