@@ -9,6 +9,7 @@ on:
       - "operaciones/access-link-model.mjs"
       - "operaciones/visor.html"
       - "operaciones/jornadas*"
+      - "operaciones/staff-dashboard.mjs"
       - "operaciones/control-jornadas*"
       - "operaciones/visor-live.js"
       - "operaciones/tests/**"
@@ -38,6 +39,12 @@ jobs:
           node --check operaciones/visor-live.js
       - name: Validar ventanas, geolocalización y traslados
         run: node operaciones/tests/qa-jornadas.mjs
+      - name: Validar cronograma staff y pagos sin montos inventados
+        run: |
+          node --check operaciones/staff-dashboard.mjs
+          node --check operaciones/jornadas-live.js
+          node operaciones/tests/qa-staff-dashboard.mjs
+
       - name: Validar lógica de vinculación individual y edición de fichas
         run: |
           node --check operaciones/cloud-v4.js
