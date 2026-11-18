@@ -73,17 +73,24 @@ try{
   await page.locator('[data-calendar-mode="dia"]').click();
   await page.locator('[data-calendar-mode="timeline"]').click();
   assert.ok(await page.locator("#j-events").isVisible());
+  const calendar=page.waitForEvent("download");
+  await page.locator("#j-download-calendar").click();
+  const calendarFile=await calendar;
+  assert.ok(calendarFile.suggestedFilename().endsWith(".ics"),"El staff puede exportar sus jornadas");
   await page.locator('#staff-tabs [data-staff-tab="asistencia"]').click();
   assert.equal(new URL(page.url()).pathname,"/operaciones/visor.html","El staff permanece dentro del visor");
   assert.ok(await page.locator("#viewer-agenda").isHidden(),"Sin acceso a agenda administrativa");
   assert.ok(await page.locator("#viewer-request").isHidden(),"Una cuenta asignada no requiere repetir solicitud");
   assert.ok(!(await page.locator("body").innerText()).includes("NOMINA_PRIVADA"));
-  await page.locator("#start-activity").fill("Volanteo y entrega de cupones de prueba");
+  assert.ok((await page.locator("#j-name").textContent()).includes("¡Hola, Persona ficticia QA!"));
+  await page.locator("#start-shift").click();
+  await page.waitForFunction(()=>document.querySelector("#auth-status")?.textContent.includes("Acepta compartir ubicación"));
+  await page.locator("#live-location").check();
   await page.locator("#start-shift").click();
   await page.waitForFunction(()=>document.querySelector("#j-active")?.textContent.includes("Entrada oficial:"));
   // Simular una jornada ficticia de una hora en Firestore mock (sin modificar reloj real).
   await page.evaluate(()=>{window.__mockRecords.clock.get("staff-qa_evento1").startedAt=new Date(Date.now()-60*60000)});
-  await page.locator("#end-note").fill("Jornada realizada sin incidencias");
+  assert.ok((await page.locator("#j-operational-status").textContent()).includes("En jornada"));
   await page.locator("#end-shift").click();
   await page.waitForFunction(()=>document.querySelector("#j-active")?.textContent.includes("Salida oficial:"));
   await page.locator('#staff-tabs [data-staff-tab="traslados"]').click();

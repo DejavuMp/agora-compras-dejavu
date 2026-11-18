@@ -195,6 +195,12 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
 #viewer-staff .staff-empty{padding:22px;background:#fbfaf8;border:1px dashed #dedbd2;border-radius:11px;color:#656c70;font-size:13px}
 @media(max-width:920px){#viewer-staff .staff-dashboard{grid-template-columns:1fr}#viewer-staff .staff-event-row{grid-template-columns:1fr;gap:6px}#viewer-staff .staff-metrics{gap:7px}}
 @media(max-width:600px){#viewer-staff .staff-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}#viewer-staff .staff-metric{padding:11px}#viewer-staff .staff-metric strong{font-size:20px}#viewer-staff .staff-metric small{font-size:10px}#viewer-staff .staff-metric .label{font-size:10px}#viewer-staff .staff-tabs button{padding:11px}#viewer-staff .staff-calendar-tools{align-items:stretch}#viewer-staff .staff-calendar-tools label{flex:1 1 150px}#viewer-staff .staff-day-nav{width:100%;justify-content:space-between}#viewer-staff .staff-day-nav button{flex:1}}
+
+#viewer-staff .staff-current-state{padding:13px 16px;border-left:5px solid #ac9a78;background:#fcfaf5;border-radius:10px;margin:12px 0 18px;font-size:13px;font-weight:700}
+#viewer-staff .staff-current-state.active{border-left-color:#2d8c62;background:#edf9f1;color:#24593e}
+#viewer-staff .staff-current-state.blocked{border-left-color:#c98b3b;background:#fff7e9;color:#895916}
+#viewer-staff details.staff-incidents{margin-top:14px;border:1px solid #ece7dc;border-radius:10px;padding:11px;background:#fcfcfb}
+#viewer-staff details.staff-incidents summary{font-size:12px;font-weight:700;cursor:pointer}
 </style>
 </head>
 <body>
@@ -232,8 +238,8 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
   <div id="auth-status" class="staff-status" role="status" aria-live="polite">Sincronizando tus jornadas…</div>
   <div id="admin-message" hidden><p>Acceso de coordinación. Consulta la agenda general o el control de jornadas.</p></div>
   <div id="staff-board" hidden>
-    <div class="staff-account-bar"><span id="j-name">Personal autorizado</span><button id="logout" type="button">Salir de mi cuenta</button></div>
-    <div id="j-summary" class="staff-metrics" aria-label="Resumen personal de actividades"></div>
+    <div class="staff-account-bar"><span id="j-name">¡Hola!</span><button id="logout" type="button">Salir de mi cuenta</button></div>
+    <div id="j-operational-status" class="staff-current-state" role="status" aria-live="polite">Comprobando si tienes una jornada en curso…</div><div id="j-summary" class="staff-metrics" aria-label="Resumen personal de actividades"></div>
     <nav id="staff-tabs" class="staff-tabs" aria-label="Secciones de Mis jornadas">
       <button type="button" data-staff-tab="inicio" aria-selected="true" class="active">Inicio</button>
       <button type="button" data-staff-tab="cronograma" aria-selected="false">Cronograma</button>
@@ -250,7 +256,7 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
     </section>
     <section class="staff-tab-panel" data-staff-panel="cronograma" hidden aria-label="Mi cronograma">
       <section class="panel">
-        <div class="staff-section-heading"><div><h3>Mi programación</h3><p>Filtra tus días de actividad y consulta cada turno.</p></div></div>
+        <div class="staff-section-heading"><div><h3>Mi programación</h3><p>Filtra tus días de actividad y consulta cada turno.</p></div><button type="button" id="j-download-calendar" class="staff-subtle">Añadir a mi calendario (.ics)</button></div>
         <div class="staff-calendar-tools">
           <div class="staff-mode" role="group" aria-label="Tipo de vista del calendario">
             <button type="button" data-calendar-mode="dia">Por día</button>
@@ -269,8 +275,8 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
         <label class="staff-select-label">Jornada a registrar<select id="j-select-attendance" data-choose-event></select></label>
         <div id="policy-state" class="staff-policy" role="status"></div>
         <div id="j-active"></div><div id="j-punches"></div>
-        <div class="staff-location-consent"><label><input type="checkbox" id="live-location"> Compartir ubicación mientras esta página esté abierta (opcional)</label><p id="location-state" class="geo">Ubicación continua desactivada.</p></div>
-        <p class="disclaimer">La hora de marcaje se guarda desde Firebase. El dispositivo comparte su ubicación puntual cuando confirmas entrada o salida. La ubicación continua es opcional, visible y se detiene al cerrar la página.</p>
+        <div class="staff-location-consent"><label><input type="checkbox" id="live-location"> Acepto compartir mi ubicación durante la jornada mientras esta página esté abierta (requerido para iniciar)</label><p id="location-state" class="geo">Ubicación continua desactivada.</p></div>
+        <p class="disclaimer">La hora de marcaje se guarda desde Firebase. Para iniciar debes permitir ubicación puntual y seguimiento visible mientras tengas esta página abierta. Puedes revocar el permiso en cualquier momento; si cierras la app el seguimiento se detendrá y no se simulará ubicación en segundo plano.</p>
       </section>
     </section>
     <section class="staff-tab-panel" data-staff-panel="traslados" hidden aria-label="Mis traslados">
