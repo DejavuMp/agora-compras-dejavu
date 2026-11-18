@@ -223,7 +223,7 @@ function renderAttendance(){
   if($("end-note")&&existingNote)$("end-note").value=existingNote;
   if($("start-activity")&&existingActivity)$("start-activity").value=existingActivity;
   $("j-punches").innerHTML="";
-  $("live-location").disabled=busy||(!r&&!check.ok)||r?.status==="finalizada"||(remaining!==null&&remaining===0);
+  $("live-location").disabled=(!r&&!check.ok)||r?.status==="finalizada"||(remaining!==null&&remaining===0);
   if($("live-location").disabled&&geoWatch!==null)stopTracking();
 }
 function renderTrips(){
