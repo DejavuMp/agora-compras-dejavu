@@ -20,6 +20,9 @@ const financeAt=candidate.indexOf(financeMarker);
 const opsAt=candidate.indexOf(opsMarker);
 const endAt=candidate.indexOf(endMarker,opsAt);
 assert.ok(financeAt>0&&opsAt>financeAt&&endAt>opsAt,"El archivo tiene bloques conocidos");
+const clockAt=candidate.indexOf("    // ÁGORA · Marcaje verificable y traslados (solo UID autorizado).");
+assert.ok(clockAt>opsAt&&clockAt<endAt,"La nueva ampliación de marcajes está delimitada");
+const beforeClock=candidate.slice(0,clockAt-1)+candidate.slice(endAt);
 const withoutOps=candidate.slice(0,opsAt-1)+candidate.slice(endAt);
 const legacy=candidate.slice(0,financeAt)+candidate.slice(endAt);
 const drift=candidate.replace("      allow list: if false;","      allow list: if true;");
@@ -55,6 +58,7 @@ async function verify(label,live,shouldPass){
 }
 try{
   await verify("repositorio actual",candidate,true);
+  await verify("producción actual con Operaciones y sin marcajes",beforeClock,true);
   await verify("producción anterior a Operaciones",withoutOps,true);
   await verify("versión histórica sin Finanzas",legacy,true);
   await verify("diferencias desconocidas",drift,false);
