@@ -6,6 +6,7 @@
  */
 import "../firebase-init.js";
 import {projectStaffView} from "./ops-safe-view.mjs";
+import {availablePeople,personForLink} from "./access-link-model.mjs";
 import {
   GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
@@ -28,6 +29,7 @@ const blank = () => ({people:[],vehicles:[],events:[],blocks:[],sites:[],campaig
 },audit:[],logs:[],incidents:[]});
 let account=null,role=null,personId="",baseBoard=null,saving=false,ready=false;
 let logs = new Map(),incidents = new Map(),requests = new Map();
+let linkingUid=null;
 let unwatches=[],dirtyWaiting=false,authVersion=0,view=null;
 const root=document.getElementById("ops-gate");
 const app=window.AGORA_OPS_APP;
@@ -188,53 +190,120 @@ const setup=document.createElement("div");setup.className="ops-headbar";setup.in
 document.body.insertBefore(setup,document.getElementById("app"));
 document.getElementById("ops-signout").addEventListener("click",()=>signOut(auth));
 document.getElementById("ops-access").addEventListener("click",()=>renderRequests(true));
+function linkingForm(uid) {
+  const request=requests.get(uid),board=baseBoard?.payload;
+  if(!request)return "";
+  const people=availablePeople(board?.people,uid);
+  return '<form id="ops-link-form" class="ops-link-form" data-link-uid="'+h(uid)+'">'+
+    '<h3>Vincular cuenta con personal</h3>'+
+    '<p>Cuenta solicitante: <b>'+h(request.name||request.email)+'</b><br><small>'+h(request.email)+'</small></p>'+
+    '<label for="ops-link-person">Ficha de personal</label>'+
+    '<select id="ops-link-person" required>'+
+      '<option value="">Selecciona una ficha</option>'+
+      people.map(p=>'<option value="'+h(p.id)+'">'+h(p.name)+(p.email?' · '+h(p.email):'')+'</option>').join("")+
+      '<option value="__new__">+ Registrar nueva ficha de personal</option>'+
+    '</select>'+
+    '<div id="ops-link-new" hidden><label for="ops-link-name">Nombre completo de la nueva ficha</label>'+
+      '<input id="ops-link-name" type="text" maxlength="120" autocomplete="off" placeholder="Nombre del integrante">'+
+      '<p class="ops-link-note">Se creará una ficha con este nombre y el correo de la solicitud. Sin tarifas ni información de pago.</p></div>'+
+    '<label class="ops-link-verify"><input type="checkbox" id="ops-link-confirm" required> Confirmo que revisé la identidad y que la ficha elegida corresponde a esta cuenta.</label>'+
+    '<div class="ops-link-actions"><button type="submit" id="ops-link-save">Confirmar y vincular</button>'+
+      '<button type="button" id="ops-link-cancel" class="ops-link-secondary">Cancelar</button></div>'+
+    '<p id="ops-link-error" class="ops-link-error" role="alert" aria-live="polite"></p>'+
+  '</form>';
+}
 function renderRequests(open=false){
-  document.getElementById("ops-access").hidden=role!=="coordinador";
-  document.getElementById("ops-ident").textContent=account?.email||"";
+  const access=document.getElementById("ops-access");
+  if(access)access.hidden=role!=="coordinador";
+  const ident=document.getElementById("ops-ident");
+  if(ident)ident.textContent=account?.email||"";
   let el=document.getElementById("ops-requests");
-  if(role!=="coordinador"){if(el)el.remove();return;}
+  if(role!=="coordinador"){if(el)el.remove();linkingUid=null;return;}
   if(!el){el=document.createElement("div");el.id="ops-requests";el.className="ops-requests";el.hidden=true;document.body.appendChild(el);}
   if(open)el.hidden=!el.hidden;
   const pending=[...requests.values()].filter(r=>r.status==="pendiente");
+  if(linkingUid&&!pending.some(r=>r.uid===linkingUid))linkingUid=null;
   el.innerHTML='<div class="ops-requests-inner"><div class="ops-request-head"><b>Solicitudes de acceso ('+pending.length+')</b><button id="ops-requests-close">Cerrar</button></div>'+
-    (pending.length?pending.map(r=>'<div class="ops-request-item"><div><b>'+h(r.name||r.email)+'</b><small>'+h(r.email)+' · UID: '+h(r.uid)+'</small></div><button data-approve="'+h(r.uid)+'">Vincular con personal</button></div>').join(""):'<p>No hay solicitudes pendientes.</p>')+'</div>';
-  el.querySelector("#ops-requests-close").onclick=()=>el.hidden=true;
-  el.querySelectorAll("[data-approve]").forEach(btn=>btn.addEventListener("click",()=>approve(btn.dataset.approve)));
+    (pending.length?pending.map(r=>'<div class="ops-request-item"><div><b>'+h(r.name||r.email)+'</b><small>'+h(r.email)+' · UID: '+h(r.uid)+'</small></div>'+
+      '<button type="button" data-approve="'+h(r.uid)+'">Vincular con personal</button></div>').join(""):'<p>No hay solicitudes pendientes.</p>')+
+    (linkingUid?linkingForm(linkingUid):"")+'</div>';
+  el.querySelector("#ops-requests-close").onclick=()=>{el.hidden=true;linkingUid=null;};
+  el.querySelectorAll("[data-approve]").forEach(btn=>btn.addEventListener("click",()=>{
+    linkingUid=btn.dataset.approve;
+    renderRequests();
+    el.querySelector("#ops-link-person")?.focus();
+  }));
+  const form=el.querySelector("#ops-link-form");
+  if(!form)return;
+  const select=form.querySelector("#ops-link-person");
+  const nameBox=form.querySelector("#ops-link-new");
+  const nameInput=form.querySelector("#ops-link-name");
+  select.onchange=()=>{
+    const isNew=select.value==="__new__";
+    nameBox.hidden=!isNew;
+    nameInput.required=isNew;
+    if(isNew)nameInput.focus();
+  };
+  form.querySelector("#ops-link-cancel").onclick=()=>{linkingUid=null;renderRequests();};
+  form.onsubmit=event=>{
+    event.preventDefault();
+    if(!form.reportValidity())return;
+    approve(form.dataset.linkUid,select.value,nameInput.value);
+  };
 }
-async function approve(uid){
-  const r=requests.get(uid);
-  const board=baseBoard?.payload;
-  if(!r||!board)return;
-  const options=board.people.map(p=>p.name+"  ["+p.id+"]").join("\n");
-  const id=prompt("Escribe el ID de la persona que corresponde a "+r.email+".\n\n"+options);
-  if(!id)return;
-  const person=board.people.find(p=>p.id===id);
-  if(!person){alert("No existe esa persona en el directorio.");return;}
-  if(person.authUid&&person.authUid!==uid){alert("Esa ficha ya está vinculada con otra cuenta.");return;}
-  if(!confirm("Vincular "+person.name+" con "+r.email+" y habilitar su Mi espacio?"))return;
+async function approve(uid,selection,newName){
+  const request=requests.get(uid);
+  const form=document.getElementById("ops-link-form");
+  const status=document.getElementById("ops-link-error");
+  if(!form||!request||!baseBoard?.payload||saving)return;
+  const button=form.querySelector("#ops-link-save");
+  const errorText=text=>{if(status)status.textContent=text};
+  const newid=selection==="__new__"?"personal-"+crypto.randomUUID():"";
   try{
-    saving=true;notice("Firebase · vinculando personal","pending");
+    // Validar antes de escribir: ningún usuario autoriza a otra ficha por coincidencia de nombre.
+    personForLink(baseBoard.payload,{uid,email:request.email,selection,newName,newId:newid});
+    saving=true;button.disabled=true;errorText("Comprobando solicitud y ficha con Firebase…");
+    notice("Firebase · vinculando personal","pending");
     await runTransaction(fs,async tx=>{
       const memberRef=doc(fs,"agora_ops_members",uid);
       const reqRef=doc(fs,"agora_ops_access_requests",uid);
       const [scheduleSnap,reqSnap,memberSnap]=await Promise.all([
         tx.get(SCHEDULE),tx.get(reqRef),tx.get(memberRef)
       ]);
-      if(!scheduleSnap.exists()||scheduleSnap.data().revision!==baseBoard.revision)throw Error("La agenda cambió. Actualiza antes de asignar.");
-      if(!reqSnap.exists()||reqSnap.data().status!=="pendiente")throw Error("La solicitud ya fue atendida.");
-      if(memberSnap.exists()&&memberSnap.data().active===true)throw Error("La cuenta ya tiene acceso.");
+      if(!scheduleSnap.exists())throw Error("La agenda compartida todavía no está disponible.");
+      if(!reqSnap.exists()||reqSnap.data().status!=="pendiente")
+        throw Error("La solicitud ya fue atendida. Actualiza Accesos.");
+      const current=reqSnap.data();
+      if(current.uid!==uid||current.email!==request.email)
+        throw Error("La solicitud cambió de identidad. Actualiza Accesos.");
+      if(memberSnap.exists()&&memberSnap.data().active===true)
+        throw Error("Esta cuenta ya tiene un vínculo activo.");
       const old=scheduleSnap.data(),newBoard=clone(old.payload);
-      const p=newBoard.people.find(p=>p.id===id);
-      if(!p)throw Error("La persona ya no existe");
-      p.authUid=uid;
+      const {person,created,id}=personForLink(newBoard,{
+        uid,email:current.email,selection,newName,newId:newid
+      });
+      if(created)newBoard.people.push(person);
+      else{
+        const i=newBoard.people.findIndex(p=>p.id===id);
+        newBoard.people[i]=person;
+      }
       tx.set(SCHEDULE,{revision:old.revision+1,payload:newBoard,updatedAt:serverTimestamp(),updatedBy:account.uid});
-      tx.set(memberRef,{uid,email:r.email,role:"staff",personId:id,active:true,updatedAt:serverTimestamp()});
-      tx.set(doc(fs,"agora_ops_staff",uid),{...viewFor(p,newBoard),uid,updatedAt:serverTimestamp()});
+      tx.set(memberRef,{uid,email:current.email,role:"staff",personId:id,active:true,updatedAt:serverTimestamp()});
+      tx.set(doc(fs,"agora_ops_staff",uid),{...viewFor(person,newBoard),uid,updatedAt:serverTimestamp()});
       tx.update(reqRef,{status:"aprobada",approvedAt:serverTimestamp(),approvedBy:account.uid});
     });
-    notice("Firebase · acceso autorizado","ok");
-  }catch(e){alert("No se vinculó: "+err(e));notice("Firebase · "+err(e),"error")}
-  finally{saving=false;await refreshFromServer();}
+    linkingUid=null;
+    notice("Firebase · personal vinculado","ok");
+    renderRequests();
+  }catch(e){
+    const msg=err(e);
+    errorText("No se vinculó: "+msg);
+    notice("Firebase · "+msg,"error");
+  }finally{
+    saving=false;
+    if(button.isConnected)button.disabled=false;
+    await refreshFromServer();
+  }
 }
 function hasClash(board){
  const active=(board.events||[]).filter(e=>!["borrador","cancelado"].includes(e.status));
