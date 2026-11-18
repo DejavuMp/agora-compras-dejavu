@@ -81,10 +81,49 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
 @media(max-width:760px){.deja-logo{width:70px;height:66px;flex-basis:70px;padding:5px}.identity{min-width:170px}}
 @media print{.deja-logo{border:1px solid #ddd}}
 #viewer-credentials[hidden]{display:none!important}
+
+/* Un único acceso en el visor: autorización previa, agenda admin o Mis jornadas. */
+#viewer-agenda[hidden],#viewer-staff[hidden],#viewer-request[hidden],#viewer-verify[hidden],
+#viewer-editor-link[hidden],#viewer-staff #login[hidden],#viewer-staff #staff-board[hidden],
+#viewer-staff #admin-message[hidden]{display:none!important}
+#viewer-credentials[hidden]{display:none!important}
+.request-panel{max-width:680px;background:white;border:1px solid #e1dfd8;border-radius:15px;padding:24px;margin:20px 0;box-shadow:0 7px 23px #2222220a}
+.request-panel h2{font-size:21px;margin:8px 0}.request-panel p{font-size:13px;color:#5b6268;line-height:1.7}
+.request-actions{display:flex;gap:9px;flex-wrap:wrap}
+.request-actions button,#viewer-recover{border:1px solid #c5b393;background:#fff;border-radius:9px;padding:11px 14px;cursor:pointer;font-weight:bold}
+#viewer-request-submit{background:#1b1d1f;color:white;border-color:#1b1d1f}
+#viewer-request-submit:disabled{opacity:.55;cursor:not-allowed}
+#viewer-staff .staff-title{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:20px 0}
+#viewer-staff .staff-title h2{font-size:25px;margin:5px 0 6px}
+#viewer-staff .staff-title p{font-size:13px;color:#727983}
+#viewer-staff .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+#viewer-staff .stack,#viewer-staff #j-events,#viewer-staff #j-punches,#viewer-staff #j-trips{display:grid;gap:12px}
+#viewer-staff .panel{padding:20px;overflow:visible;border-radius:14px}
+#viewer-staff .card{min-height:0;border-left:4px solid #bc9a5d;border-radius:11px;padding:15px}
+#viewer-staff .card.active{border-left-color:#286a50}
+#viewer-staff .card b{font-size:14px}#viewer-staff .card small{font-size:12px}
+#viewer-staff label{display:block;font-size:12px;font-weight:700;margin-bottom:10px}
+#viewer-staff input:not([type=checkbox]),#viewer-staff textarea,#viewer-staff select{width:100%;display:block;margin-top:5px;padding:11px;border:1px solid #d5d7d9;background:white;border-radius:9px;font:inherit}
+#viewer-staff textarea{min-height:80px;resize:vertical}
+#viewer-staff button{border:1px solid #c9c6bf;border-radius:9px;padding:10px 14px;background:white;color:#202223;font-weight:bold;cursor:pointer;min-height:41px}
+#viewer-staff button.primary{background:#202223;color:white;border-color:#202223}
+#viewer-staff button:disabled{opacity:.5;cursor:not-allowed}
+#viewer-staff .controls{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin:12px 0}
+#viewer-staff .two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#viewer-staff .staff-status,#viewer-staff #policy-state{padding:12px 14px;background:#fff9ef;border:1px solid #e6d7bd;border-radius:10px;margin:12px 0}
+#viewer-staff .staff-status.ok{background:#effaf4;color:#256448;border-color:#b9dec8}
+#viewer-staff .staff-status.error{background:#fff2f0;color:#963b38;border-color:#edb7b0}
+#viewer-staff .intro,#viewer-staff .disclaimer{font-size:12px;color:#757c82;line-height:1.6}
+#viewer-staff #j-name{font-size:17px;font-weight:bold}
+#viewer-staff .geo{font-size:12px;color:#286a50}
+#viewer-staff .notice{font-size:12px;color:#987536}
+#viewer-staff hr{border:0;border-top:1px solid #e3e4e5;margin:16px 0}
+@media(max-width:850px){#viewer-staff .grid{grid-template-columns:1fr}}
+@media(max-width:600px){#viewer-staff .two{grid-template-columns:1fr}.request-panel{padding:17px}}
 </style>
 </head>
 <body>
-<header><picture class="deja-logo"><source media="(max-width:760px)" srcset="./assets/dejavu-monograma.png"><img src="./assets/dejavu-horizontal.png" alt="Dejavú Marketing" width="180" height="65" loading="eager"></picture><div class="identity"><small>ÁGORA · OPERACIÓN</small><strong>Centro de Operaciones / Visor</strong></div><div id="clock" class="clock">--:--</div><a class="editlink" href="./jornadas.html">Mis jornadas / Marcar entrada</a><a class="editlink" href="./">Abrir editor</a></header>
+<header><picture class="deja-logo"><source media="(max-width:760px)" srcset="./assets/dejavu-monograma.png"><img src="./assets/dejavu-horizontal.png" alt="Dejavú Marketing" width="180" height="65" loading="eager"></picture><div class="identity"><small>ÁGORA · OPERACIÓN</small><strong>Centro de Operaciones / Visor</strong></div><div id="clock" class="clock">--:--</div><a id="viewer-editor-link" class="editlink" href="./" hidden>Abrir editor</a></header>
 <main>
 <div class="hero"><div><div class="overline">AGENDA OPERATIVA · SOLO LECTURA</div><h1>Operación de la agencia</h1><p class="desc">Consulta las jornadas de una fecha o todo el cronograma en orden de operación.</p></div><div class="controls"><button id="local" class="active">Entrar con Google</button><button id="sample" hidden>Cerrar sesión</button><button id="refresh">Actualizar</button><button id="print">Imprimir</button></div></div>
 <div id="message" class="message"></div>
@@ -92,10 +131,51 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
 <label style="font-size:12px;font-weight:700">Correo de acceso<input id="viewer-email" type="email" required autocomplete="username" placeholder="tu@correo.com" style="display:block;padding:10px;border:1px solid #d3d4d6;border-radius:9px;margin-top:5px"></label>
 <label style="font-size:12px;font-weight:700">Contraseña<input id="viewer-password" type="password" required autocomplete="current-password" style="display:block;padding:10px;border:1px solid #d3d4d6;border-radius:9px;margin-top:5px"></label>
 <button type="submit" style="padding:10px 14px;border:1px solid #151719;background:#151719;color:white;border-radius:9px">Entrar con correo y contraseña</button>
-<a href="./jornadas.html" style="font-size:12px;font-weight:bold;color:#81622f;padding:10px">Acceso individual de personal</a></form><div class="viewer-toggle" role="group" aria-label="Tipo de vista"><button type="button" id="show-day" class="active">Por día</button><button type="button" id="show-schedule">Cronograma</button></div><select id="days-control" aria-label="Días del cronograma" hidden><option value="7">Próximos 7 días</option><option value="14">Próximos 14 días</option><option value="30">Próximos 30 días</option></select>
+<button id="viewer-recover" type="button">Recuperar contraseña</button></form>
+<section id="viewer-request" class="request-panel" hidden aria-label="Solicitar acceso">
+  <div class="overline">PRIMER ACCESO · AUTORIZACIÓN OBLIGATORIA</div>
+  <h2>Solicitar autorización de acceso</h2>
+  <p>Tu identidad está verificada, pero todavía no tienes permiso para consultar la operación. Solicita acceso y coordinación vinculará tu cuenta con tu ficha de personal. Hasta entonces, no podrás ver ni registrar jornadas.</p>
+  <p id="viewer-request-state" role="status" aria-live="polite">Comprobando el estado de tu solicitud…</p>
+  <div class="request-actions"><button id="viewer-request-submit" type="button">Enviar solicitud de autorización</button><button id="viewer-request-refresh" type="button">Comprobar autorización</button><button id="viewer-request-out" type="button">Cambiar cuenta</button></div>
+</section>
+<section id="viewer-verify" class="request-panel" hidden aria-label="Verificar correo">
+  <h2>Verifica tu correo para continuar</h2>
+  <p>Confirma la dirección de tu cuenta antes de solicitar autorización. El acceso no se habilita automáticamente.</p>
+  <div class="request-actions"><button id="viewer-send-verification" type="button">Enviar verificación</button><button id="viewer-verified-refresh" type="button">Ya verifiqué mi correo</button><button id="viewer-verify-out" type="button">Cambiar cuenta</button></div>
+</section>
+<section id="viewer-staff" hidden aria-label="Mis jornadas individuales">
+  <div class="staff-title"><div><div class="overline">ACCESO PERSONAL AUTORIZADO</div><h2>Mis jornadas</h2><p>Registra entrada, salida y llegada a la sede de tus actividades asignadas.</p></div><a class="editlink" href="./control-jornadas.html" hidden id="staff-admin-link">Control de coordinación</a></div>
+  <section id="login" hidden aria-hidden="true">
+    <button id="google">Continuar con Google</button>
+    <form id="credentials"><input id="email" type="email" autocomplete="username"><input id="password" type="password" autocomplete="current-password"></form>
+    <button id="recover">Recuperar contraseña</button><button id="verify" hidden>Enviar verificación</button><button id="login-switch">Cambiar cuenta</button>
+  </section>
+  <div id="auth-status" class="staff-status" role="status" aria-live="polite">Cargando jornadas autorizadas…</div>
+  <div id="admin-message" hidden><p>Acceso de coordinación. Consulta la agenda general o el control de jornadas.</p></div>
+  <div id="staff-board" hidden>
+<div class="controls"><div id="j-name"></div><button id="logout">Cerrar sesión</button></div>
+<div class="status" id="policy-state"></div>
+<p class="disclaimer">La hora de entrada y salida se confirma por el servidor de Firebase. Al marcar, tu dispositivo compartirá la ubicación puntual con tu consentimiento. La ubicación en vivo durante la jornada es opcional, visible y se detiene cuando cierras esta página; no funciona continuamente en segundo plano.</p>
+<div class="grid">
+<section class="panel"><h2>Mis actividades</h2><p class="intro">Selecciona la jornada que tienes asignada. No se muestran datos de otros integrantes.</p><div id="j-events"></div></section>
+<section class="stack">
+<section class="panel"><h2>Mi registro de jornada</h2><div id="j-active"></div><div id="j-punches"></div>
+<hr><label><input type="checkbox" id="live-location"> Compartir ubicación mientras esta página esté abierta (opcional)</label>
+<p id="location-state" class="geo">Ubicación continua desactivada.</p>
+</section>
+<section class="panel"><h2>Traslado y llegada</h2><div id="j-trip-form">
+<label>Origen del traslado<input id="trip-origin" maxlength="180" placeholder="Punto de salida"></label>
+<div class="two"><label>Minutos de recorrido<input id="trip-minutes" type="number" min="0" max="1440" value="30"></label><label>Margen adicional<input id="trip-buffer" type="number" min="0" max="180" value="15"></label></div>
+<div class="controls"><button id="trip-start" class="primary">Iniciar traslado</button><button id="trip-arrive">Marcar llegada</button></div></div><div id="j-trips"></div>
+<p class="disclaimer">La ETA se calcula con minutos introducidos, no con el tráfico en vivo de Google Maps. La hora real de llegada se registra en Firebase.</p>
+</section></section></div>
+</div>
+</section>
+<div id="viewer-agenda" hidden><div class="viewer-toggle" role="group" aria-label="Tipo de vista"><button type="button" id="show-day" class="active">Por día</button><button type="button" id="show-schedule">Cronograma</button></div><select id="days-control" aria-label="Días del cronograma" hidden><option value="7">Próximos 7 días</option><option value="14">Próximos 14 días</option><option value="30">Próximos 30 días</option></select>
 <div id="metrics" class="cards"></div>
 <div style="display:flex;justify-content:flex-end;margin:0 0 12px"><label style="font-size:12px;color:#555;display:flex;align-items:center;gap:8px">Tipo de actividad <select id="typefilter" style="border:1px solid #dedfdf;border-radius:9px;padding:10px;background:white"><option value="todos">Todas</option><option>Volanteo</option><option>Activación</option><option>Apertura</option><option>Reapertura</option><option>En vivo</option><option>Sampling</option><option>Promotoría</option><option>Montaje</option><option>Desmontaje</option><option>Otro</option></select></label></div><div class="layout"><section class="panel"><div class="panelhead"><div><h2 id="view-heading">Actividades del día</h2><small id="view-subheading">Una ficha por jornada: horario, personal y ruta</small></div><div class="weektools"><button id="prev" aria-label="Anterior">‹</button><button id="today">Hoy</button><span id="weektitle">—</span><input type="date" id="focusdate" aria-label="Elegir día" style="border:1px solid #dedfdf;border-radius:8px;padding:8px;max-width:140px"><button id="next" aria-label="Siguiente">›</button></div></div><div id="week" class="week"></div></section><aside class="side"><section class="panel"><div class="panelhead"><h2>Próximas actividades</h2></div><div id="upcoming" class="sidebody"></div></section><section class="panel"><div class="panelhead"><h2>Alertas de empalmes</h2></div><div id="alerts" class="sidebody"></div></section></aside></div>
-<footer>Visor protegido: la programación proviene de Firestore y se actualiza sin recargar. Solo administradores y coordinadores autorizados pueden consultar la agenda. No se presentan nombres del personal, tarifas, montos, sueldos ni cuentas privadas. El staff marca sus jornadas desde el acceso individual con cuenta verificada, sin acceso a datos ajenos.</footer>
+<footer>Visor protegido: la programación proviene de Firestore y se actualiza sin recargar. Solo administradores y coordinadores autorizados pueden consultar la agenda. No se presentan nombres del personal, tarifas, montos, sueldos ni cuentas privadas. El staff marca sus jornadas desde el acceso individual con cuenta verificada, sin acceso a datos ajenos.</footer></div>
 </main>
 <script type="module" src="./visor-live.js"></script>
 </body></html>
