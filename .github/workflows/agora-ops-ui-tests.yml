@@ -15,6 +15,7 @@ on:
       - "operaciones/staff-dashboard.mjs"
       - "operaciones/ops-timekeeping.mjs"
       - "operaciones/ops-receipt.mjs"
+      - "operaciones/ops-breaks.mjs"
       - "operaciones/control-jornadas*"
       - "operaciones/visor-live.js"
       - "operaciones/tests/**"
@@ -46,6 +47,10 @@ jobs:
         run: node operaciones/tests/qa-ops-pwa.mjs
       - name: Validar ventanas, geolocalización y traslados
         run: node operaciones/tests/qa-jornadas.mjs
+      - name: Validar descansos certificados y unión de pausas
+        run: |
+          node --check operaciones/ops-breaks.mjs
+          node operaciones/tests/qa-breaks.mjs
       - name: Validar horas, descansos declarados y comprobante personal
         run: |
           node --check operaciones/ops-timekeeping.mjs
