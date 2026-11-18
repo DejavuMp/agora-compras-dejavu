@@ -92,7 +92,7 @@ try{
   await page.evaluate(()=>{window.__mockRecords.clock.get("staff-qa_evento1").startedAt=new Date(Date.now()-60*60000)});
   assert.ok((await page.locator("#j-operational-status").textContent()).includes("En jornada"));
   await page.locator("#end-shift").click();
-  await page.waitForFunction(()=>document.querySelector("#j-active")?.textContent.includes("Salida oficial:"));
+  await page.waitForFunction(()=>document.querySelector("#j-active")?.textContent.includes("Salida oficial:"),{timeout:8000}).catch(async error=>{console.log("JORNADA END DEBUG",JSON.stringify({status:await page.locator("#auth-status").textContent(),body:await page.locator("#j-active").innerText(),checked:await page.locator("#live-location").isChecked(),clock:await page.evaluate(()=>[...window.__mockRecords.clock.values()])}));throw error;});
   await page.locator('#staff-tabs [data-staff-tab="traslados"]').click();
   await page.locator("#trip-origin").fill("Metro ficticio");
   await page.locator("#trip-minutes").fill("30");
