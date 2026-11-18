@@ -76,6 +76,8 @@ function render(){
   const remaining=r?.status==="en_curso"?timeLeft(p,r.startedAt):null;
   const canStart=check.ok&&!r&&!busy;
   const ended=r?.status==="finalizada";
+  const existingNote=$("end-note")?.value||"";
+  const existingActivity=$("start-activity")?.value||"";
   $("j-active").innerHTML='<div class="card"><b>'+esc(e.title||"Jornada")+'</b>'+
     '<p>Horario asignado: '+esc(when(e.staff?.[0]?.start||e.start))+' a '+esc(when(e.staff?.[0]?.end||e.end))+'</p>'+
     '<p>Sede: '+esc(e.venueName||e.location||"Por confirmar")+'</p>'+
@@ -89,6 +91,8 @@ function render(){
       '<button class="primary" id="end-shift" '+(busy?"disabled":"")+'>Marcar terminado y salida</button>':"")+
     (!check.ok&&!r?'<p class="notice">'+esc(check.reason)+'</p>':"")+
     '</div>';
+  if($("end-note")&&existingNote)$("end-note").value=existingNote;
+  if($("start-activity")&&existingActivity)$("start-activity").value=existingActivity;
   $("j-punches").innerHTML="";
   if(t){
     const eta=estimatedArrival(t.startedAt,t.travelMin,t.bufferMin);
@@ -268,6 +272,7 @@ $("credentials").onsubmit=async e=>{
   catch(err){status("No fue posible ingresar. Comprueba tus credenciales o que el acceso por contraseña esté habilitado.","error")}
   finally{$("password").value=""}
 };
+$("login-switch").onclick=()=>signOut(auth);
 $("recover").onclick=async()=>{
   const email=$("email").value.trim();
   if(!email){status("Introduce primero tu correo de acceso.","error");return}
