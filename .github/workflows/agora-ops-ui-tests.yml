@@ -4,6 +4,9 @@ on:
     branches: [main]
     paths:
       - "operaciones/demo.html"
+      - "operaciones/index.html"
+      - "operaciones/cloud-v4.js"
+      - "operaciones/access-link-model.mjs"
       - "operaciones/visor.html"
       - "operaciones/jornadas*"
       - "operaciones/control-jornadas*"
@@ -35,6 +38,11 @@ jobs:
           node --check operaciones/visor-live.js
       - name: Validar ventanas, geolocalización y traslados
         run: node operaciones/tests/qa-jornadas.mjs
+      - name: Validar lógica de vinculación individual y edición de fichas
+        run: |
+          node --check operaciones/cloud-v4.js
+          node operaciones/tests/qa-access-link.mjs
+
       - name: Comprobar control de jornadas sin almacenamiento local
         run: |
           node -e "const fs=require('fs');for(const path of ['operaciones/jornadas-live.js','operaciones/control-jornadas.js']){const s=fs.readFileSync(path,'utf8');if(s.includes('localStorage')||!s.includes('onSnapshot')||!s.includes('serverTimestamp'))process.exit(1)}"
@@ -58,6 +66,9 @@ jobs:
         run: node operaciones/tests/qa-jornadas-live-mock.mjs
       - name: Verificar solicitud inicial de acceso y privacidad del visor
         run: node operaciones/tests/qa-visor-authorization-mock.mjs
+      - name: Probar vinculación de solicitudes desde el editor, sin Firebase real
+        run: node operaciones/tests/qa-access-link-browser.mjs
+
       - name: Guardar vista de prueba
         if: always()
         uses: actions/upload-artifact@v4
