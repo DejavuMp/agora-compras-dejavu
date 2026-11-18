@@ -1,10 +1,11 @@
-/* ÁGORA visor colaborativo · solo cuentas admin/coordinador autorizadas.
- * No usa almacenamiento local ni lee fichas individuales, Finanzas o nómina.
+/* ÁGORA visor colaborativo: acceso único a agenda administrativa o Mis jornadas.
+ * Los permisos se confirman en Firestore; los marcajes del staff son por UID.
+ * Nadie sin aprobación puede consultar agenda, jornadas, finanzas o nómina.
  */
 import "../firebase-init.js";
-import {GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signInWithRedirect,signInWithEmailAndPassword,signOut}
+import {GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signInWithRedirect,signInWithEmailAndPassword,sendPasswordResetEmail,sendEmailVerification,signOut}
   from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
-import {doc,getDocFromServer,onSnapshot}
+import {doc,getDocFromServer,onSnapshot,setDoc,serverTimestamp}
   from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 import {projectViewerView} from "./ops-safe-view.mjs";
 
@@ -22,6 +23,66 @@ const validDate = d => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(String(d||"")) && N
 const overlaps=(e,start,end)=>instant(e.start)<end && instant(e.end)>start;
 const dateTime = d => ymd(d)+"T00:00";
 let authEpoch=0,unwatch=null,permission=false,connected=false,focus=day(new Date()),view="dia",range=7,filter="todos",events=[];
+let signedIn=null,requestWatch=null,staffModuleLoaded=false;
+function stopRequestWatch(){
+  if(requestWatch){requestWatch();requestWatch=null}
+}
+function viewerMode(mode){
+  $("viewer-agenda").hidden=mode!=="agenda";
+  $("viewer-staff").hidden=mode!=="staff";
+  $("viewer-request").hidden=mode!=="request";
+  $("viewer-verify").hidden=mode!=="verify";
+  $("viewer-editor-link").hidden=mode!=="agenda";
+  const title=document.querySelector(".hero h1"),description=document.querySelector(".hero .desc");
+  if(title)title.textContent=mode==="staff"?"Mis jornadas":mode==="agenda"?"Operación de la agencia":"Acceso a ÁGORA";
+  if(description)description.textContent=mode==="staff"?
+    "Tu jornada, asistencia y traslados en una sola vista.":mode==="agenda"?
+    "Consulta las jornadas de una fecha o todo el cronograma en orden de operación.":
+    "Ingresa con Google o tu correo y contraseña. El primer acceso requiere autorización de coordinación.";
+}
+async function showAuthorization(user,version){
+  viewerMode("request");
+  message("No se muestran actividades hasta que coordinación autorice tu cuenta.","pending");
+  const ref=doc(db,"agora_ops_access_requests",user.uid);
+  const label=$("viewer-request-state"),button=$("viewer-request-submit");
+  label.textContent="Comprobando el estado de tu solicitud…";
+  button.disabled=true;
+  const found=await getDocFromServer(ref);
+  if(version!==authEpoch)return;
+  if(found.exists()){
+    const state=found.data().status||"pendiente";
+    label.textContent=state==="aprobada"?
+      "Solicitud aprobada. Esperando que se complete la vinculación de tu ficha.":
+      "Solicitud "+state+". Coordinación debe validar tu identidad y asignarte a una ficha de personal.";
+    button.disabled=true;
+  }else{
+    label.textContent="Tu cuenta todavía no tiene autorización. Puedes solicitarla ahora.";
+    button.disabled=false;
+  }
+  stopRequestWatch();
+  requestWatch=onSnapshot(doc(db,"agora_ops_members",user.uid),
+    {includeMetadataChanges:true},snapshot=>{
+      if(version!==authEpoch||snapshot.metadata.fromCache)return;
+      const m=snapshot.data();
+      if(m?.active===true&&m.role==="staff"&&m.personId){
+        stopRequestWatch();
+        session(auth.currentUser);
+      }
+    },error=>message("Error comprobando autorización: "+String(error.message||error),"error"));
+}
+async function showStaff(user,version){
+  viewerMode("staff");
+  message("Acceso aprobado · Mis jornadas personales, sin información de terceros.","ok");
+  if(!staffModuleLoaded){
+    try{
+      await import("./jornadas-live.js");
+      staffModuleLoaded=true;
+    }catch(error){
+      if(version===authEpoch)message("No se pudo abrir Mis jornadas: "+String(error.message||error),"error");
+    }
+  }
+}
+
 function message(text,kind=""){
   $("message").textContent=text;
   $("message").dataset.state=kind;
@@ -77,9 +138,11 @@ function rows(list){
 }
 function render(){
   const authorized=permission&&connected;
-  $("local").hidden=permission;
-  $("sample").hidden=!permission;
+  $("local").hidden=!!signedIn;
+  $("sample").hidden=!signedIn;
+  $("refresh").hidden=!permission;
   $("refresh").disabled=!permission;
+  $("print").hidden=!authorized;
   $("print").disabled=!authorized;
   $("days-control").hidden=view!=="cronograma";
   $("show-day").classList.toggle("active",view==="dia");
@@ -108,43 +171,64 @@ function render(){
   $("alerts").innerHTML=flags?'<div class="alert">'+flags+' jornadas presentan posibles empalmes de personal o unidades. Consulta el editor para identificar los recursos involucrados.</div>':'<p class="muted">Sin empalmes detectados entre los turnos y vehículos asignados.</p>';
 }
 async function session(user){
-  const version=++authEpoch;clearSchedule();
+  const version=++authEpoch;
+  stopRequestWatch();
+  signedIn=user;
+  clearSchedule();
+  viewerMode("none");
   $("viewer-credentials").hidden=!!user;
+  render();
   if(!user){
-    $("local").hidden=false;$("sample").hidden=true;
-    message("Este visor requiere inicio de sesión con Google y permisos de coordinación. No se publican datos administrativos de forma abierta.");
+    message("Inicia sesión con Google o correo y contraseña. Para entrar por primera vez debes solicitar autorización.");
     return;
   }
-  $("local").hidden=true;$("sample").hidden=false;
-  message("Comprobando permisos en Firestore…");
-  if(!user.emailVerified){message("Tu correo de Google debe estar verificado.","error");return}
+  message("Verificando identidad y permisos con Firestore…","pending");
+  if(!user.emailVerified){
+    viewerMode("verify");
+    message("Verifica tu correo antes de solicitar la autorización de acceso.","pending");
+    return;
+  }
   try{
-    const userSnap=await getDocFromServer(doc(db,"agora_users",user.uid));
+    const [adminSnap,memberSnap]=await Promise.all([
+      getDocFromServer(doc(db,"agora_users",user.uid)),
+      getDocFromServer(doc(db,"agora_ops_members",user.uid))
+    ]);
     if(version!==authEpoch)return;
-    const profile=userSnap.data()||{};
-    if(!userSnap.exists()||profile.active!==true||!["admin","coordinador"].includes(profile.role)){
-      const member=await getDocFromServer(doc(db,"agora_ops_members",user.uid));
-      if(version!==authEpoch)return;
-      if(member.exists()&&member.data()?.active===true&&member.data()?.role==="staff"){
-        window.location.replace("./jornadas.html");
-        return;
-      }
-      message("Esta cuenta no tiene acceso al visor general. Para registrar tu turno entra a Mis jornadas.","error");
-      return;
+    const profile=adminSnap.exists()?adminSnap.data():{};
+    const member=memberSnap.exists()?memberSnap.data():{};
+    if(profile.active===true&&["admin","coordinador"].includes(profile.role)){
+      permission=true;
+      viewerMode("agenda");
+      message("Acceso autorizado. Comprobando la agenda en el servidor…");
+      unwatch=onSnapshot(doc(db,"agora_ops_control","schedule"),{includeMetadataChanges:true},snap=>{
+        if(version!==authEpoch)return;
+        if(snap.metadata.fromCache){
+          connected=false;
+          message("Esperando confirmación de Firebase; no se muestran datos sin verificar.","pending");
+          render();return;
+        }
+        const board=snap.data()?.payload || {events:[],sites:[]};
+        events=projectViewerView(board).events;
+        connected=true;
+        message("Firebase sincronizado · "+(snap.data()?.revision||0)+" · actualización automática en tiempo real","ok");
+        render();
+      },e=>{
+        connected=false;events=[];
+        message("No se pudo consultar la agenda: "+String(e?.message||e),"error");render();
+      });
+    }else if(member.active===true&&member.role==="staff"&&member.personId){
+      await showStaff(user,version);
+    }else{
+      await showAuthorization(user,version);
     }
-    permission=true;
-    message("Acceso autorizado. Comprobando la agenda en el servidor…");
-    unwatch=onSnapshot(doc(db,"agora_ops_control","schedule"),{includeMetadataChanges:true},snap=>{
-      if(version!==authEpoch)return;
-      if(snap.metadata.fromCache){connected=false;message("Esperando confirmación de Firebase; no se muestran datos sin verificar.","pending");render();return}
-      const board=snap.data()?.payload || {events:[],sites:[]};
-      events=projectViewerView(board).events;
-      connected=true;
-      message("Firebase sincronizado · "+(snap.data()?.revision||0)+" · actualización automática en tiempo real","ok");
-      render();
-    },e=>{connected=false;events=[];message("No se pudo consultar la agenda: "+String(e?.message||e),"error");render()});
     render();
-  }catch(e){if(version===authEpoch){message("No se pudieron verificar los permisos: "+String(e?.message||e),"error");render()}}
+  }catch(e){
+    if(version===authEpoch){
+      viewerMode("none");
+      message("No se pudieron comprobar los permisos: "+String(e?.message||e),"error");
+      render();
+    }
+  }
 }
 async function login(){
   try{await signInWithPopup(auth,new GoogleAuthProvider())}
@@ -154,6 +238,55 @@ async function login(){
     }else message(String(e?.message||e),"error")
   }
 }
+$("viewer-recover").addEventListener("click",async()=>{
+  const email=$("viewer-email").value.trim();
+  if(!email){message("Escribe tu correo para recuperar la contraseña.","error");return}
+  try{
+    await sendPasswordResetEmail(auth,email);
+    message("Si tu correo tiene una cuenta habilitada, recibirás instrucciones para restablecer la contraseña.","ok");
+  }catch(error){
+    message("No fue posible procesar la recuperación. Comprueba el correo e inténtalo de nuevo.","error");
+  }
+});
+$("viewer-request-submit").addEventListener("click",async()=>{
+  const user=auth.currentUser;
+  if(!user||!user.emailVerified)return;
+  const button=$("viewer-request-submit");button.disabled=true;
+  try{
+    const ref=doc(db,"agora_ops_access_requests",user.uid);
+    const existing=await getDocFromServer(ref);
+    if(existing.exists()){
+      $("viewer-request-state").textContent="Ya tienes una solicitud registrada. Espera la revisión de coordinación.";
+      return;
+    }
+    await setDoc(ref,{
+      uid:user.uid,email:(user.email||"").slice(0,240),
+      name:(user.displayName||user.email||"Solicitante").slice(0,140),
+      status:"pendiente",createdAt:serverTimestamp()
+    });
+    $("viewer-request-state").textContent="Solicitud enviada. Coordinación revisará tu acceso y te asignará una ficha. No puedes consultar jornadas mientras tanto.";
+    message("Solicitud de autorización recibida en Firebase.","ok");
+  }catch(error){
+    button.disabled=false;
+    message("No se pudo solicitar autorización: "+String(error.message||error),"error");
+  }
+});
+$("viewer-request-refresh").onclick=()=>session(auth.currentUser);
+$("viewer-request-out").onclick=()=>signOut(auth);
+$("viewer-verify-out").onclick=()=>signOut(auth);
+$("viewer-verified-refresh").onclick=async()=>{
+  try{
+    await auth.currentUser?.reload();
+    await session(auth.currentUser);
+  }catch(error){message(String(error.message||error),"error")}
+};
+$("viewer-send-verification").onclick=async()=>{
+  if(!auth.currentUser)return;
+  try{
+    await sendEmailVerification(auth.currentUser);
+    message("Se envió el correo de verificación. Después pulsa «Ya verifiqué mi correo».","ok");
+  }catch(error){message("No se pudo enviar la verificación: "+String(error.message||error),"error")}
+};
 $("viewer-credentials").addEventListener("submit",async event=>{
   event.preventDefault();
   const email=$("viewer-email").value.trim(),password=$("viewer-password").value;
