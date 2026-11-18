@@ -25,6 +25,11 @@ assert.ok(clockAt>opsAt&&clockAt<endAt,"La nueva ampliación de marcajes está d
 const beforeClock=candidate.slice(0,clockAt-1)+candidate.slice(endAt);
 const withoutOps=candidate.slice(0,opsAt-1)+candidate.slice(endAt);
 const legacy=candidate.slice(0,financeAt)+candidate.slice(endAt);
+const identityMarker="    // AGORA - Identidad Unica y RH. Fragmento para insertar dentro de";
+const identityAt=candidate.indexOf(identityMarker);
+assert.ok(identityAt>clockAt&&identityAt<endAt,"Identidad debe estar después de marcajes");
+const beforeIdentity=candidate.slice(0,identityAt)+candidate.slice(endAt);
+assert.equal(beforeIdentity.includes("agora_identity_"),false,"Las reglas anteriores a Identidad no contienen sus colecciones");
 const drift=candidate.replace("      allow list: if false;","      allow list: if true;");
 assert.notEqual(drift,candidate,"La alteración desconocida debe existir");
 
@@ -58,10 +63,12 @@ async function verify(label,live,shouldPass){
 }
 try{
   await verify("repositorio actual",candidate,true);
+  await verify("versión legítima anterior a Identidad",beforeIdentity,true);
   await verify("producción actual con Operaciones y sin marcajes",beforeClock,true);
   await verify("producción anterior a Operaciones",withoutOps,true);
   await verify("versión histórica sin Finanzas",legacy,true);
   await verify("diferencias desconocidas",drift,false);
+  await verify("deriva anterior a Identidad",beforeIdentity.replace("allow list: if false;","allow list: if true;"),false);
 }finally{
   globalThis.fetch=originalFetch;
   rmSync(dir,{recursive:true,force:true});

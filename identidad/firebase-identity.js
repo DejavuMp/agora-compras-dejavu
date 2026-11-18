@@ -45,15 +45,28 @@ export async function loadAccount(uid){
   return record?.active===true?record:null;
 }
 
+async function readOwnDocument(collectionName,uid){
+  try { return await getDoc(doc(db,collectionName,uid)); }
+  catch(error){
+    if(error?.code==="permission-denied"){
+      const permissionError=new Error("Firestore rechazó la lectura de "+collectionName+".");
+      permissionError.code="permission-denied";
+      permissionError.collection=collectionName;
+      throw permissionError;
+    }
+    throw error;
+  }
+}
+
 export async function loadOwnIdentity(user){
   const uid=user.uid;
   const [accountSnap,registrationSnap,linkSnap,profileSnap,financialSnap,opsSnap]=await Promise.all([
-    getDoc(doc(db,"agora_users",uid)),
-    getDoc(doc(db,"agora_identity_registrations",uid)),
-    getDoc(doc(db,"agora_identity_links",uid)),
-    getDoc(doc(db,"agora_identity_profiles",uid)),
-    getDoc(doc(db,"agora_identity_financial",uid)),
-    getDoc(doc(db,"agora_ops_staff",uid)).catch(()=>null)
+    readOwnDocument("agora_users",uid),
+    readOwnDocument("agora_identity_registrations",uid),
+    readOwnDocument("agora_identity_links",uid),
+    readOwnDocument("agora_identity_profiles",uid),
+    readOwnDocument("agora_identity_financial",uid),
+    readOwnDocument("agora_ops_staff",uid).catch(()=>null)
   ]);
   const account=data(accountSnap);
   const link=data(linkSnap);

@@ -49,6 +49,17 @@ if(clockAt<opsAt||clockAt>=financeEnd||candidate.indexOf(clockMarker,clockAt+1)!
  throw Error('Marcador de marcajes ambiguo; cancelar antes de consultar producción.');
 }
 const oldOps=candidate.slice(0,clockAt-1)+candidate.slice(financeEnd);
+// Identidad Única se añadió después de Operaciones y marcajes. Una versión
+// de producción legítima puede carecer SOLO de este bloque: reconocerla sin
+// permitir cambios en ninguna regla previa de Compras, Archivos ni Staff.
+const identityMarker='    // AGORA - Identidad Unica y RH. Fragmento para insertar dentro de';
+const identityAt=candidate.indexOf(identityMarker);
+if(identityAt<=clockAt || identityAt>=financeEnd ||
+   candidate.indexOf(identityMarker,identityAt+1)!==-1 ||
+   candidate.slice(identityAt-2,identityAt)!=='\n\n'){
+ throw Error('Bloque de Identidad no delimitado exactamente; cancelar.');
+}
+const beforeIdentity=candidate.slice(0,identityAt)+candidate.slice(financeEnd);
 const evidenceMarker='        // Fotos de evidencia compartidas: acceso a fichas publicadas.';
 function normalize(s){return String(s).replace(/\r\n?/g,'\n').trim()}
 function safeVariants(text){
@@ -85,13 +96,13 @@ mkdirSync('.github/firebase-staff/.preflight',{recursive:true});
 writeFileSync('.github/firebase-staff/.preflight/antes-dejavu.rules',live,'utf8');
 writeFileSync('.github/firebase-staff/.preflight/ruleset-name.txt',release.rulesetName+'\n','utf8');
 // Conservar el respaldo antes incluso si fallan los chequeos de variantes.
-const allowed=new Set([...safeVariants(candidate),...safeVariants(oldOps),...safeVariants(withoutOps),...safeVariants(legacy)].map(normalize));
+const allowed=new Set([...safeVariants(candidate),...safeVariants(beforeIdentity),...safeVariants(oldOps),...safeVariants(withoutOps),...safeVariants(legacy)].map(normalize));
 if(!allowed.has(normalize(live))){
  throw Error('REGLAS DISTINTAS EN PRODUCCIÓN. Se guardó respaldo. Se detiene para NO modificar permisos de Ágora Compras, Archivos u otros módulos.');
 }
 if(normalize(live)===normalize(candidate)){
  console.log('Las reglas de ÁGORA coinciden con el repositorio. No se requiere cambiar contenido.');
 }else{
- console.log('Las reglas activas de ÁGORA coinciden con una versión conocida; es seguro añadir permisos de Operaciones sin modificar los demás módulos.');
+ console.log('Las reglas activas de ÁGORA coinciden con una versión conocida; es seguro ampliar los permisos sin modificar las demás colecciones.');
 }
 console.log('Verificación previa de reglas completada. Proyecto: '+project);
