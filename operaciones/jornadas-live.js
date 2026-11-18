@@ -457,6 +457,7 @@ async function markStart(){
 }
 async function markEnd(){
   const r=currentClock();if(!r||r.status!=="en_curso")return;
+  if(breaksReady&&activeBreak()){status("Primero reanuda tu descanso para finalizar la jornada.","error");return}
   const note=$("end-note")?.value.trim()||"Actividad terminada según la programación.";
   await action(async()=>{
     const geo=await locSnapshot();
@@ -466,6 +467,28 @@ async function markEnd(){
     });
     stopTracking();
   },"Registrando término y ubicación de salida…");
+}
+async function startBreak(){
+  const e=currentEvent(),clock=currentClock(),entries=currentBreaks();
+  if(!breaksReady||!e||!user||clock?.status!=="en_curso")return;
+  if(openBreak(entries)){status("Primero reanuda tu descanso actual.","error");return}
+  const slot=nextBreakSlot(entries);
+  if(!slot){status("Ya tienes ocho descansos registrados en esta jornada.","error");return}
+  await action(async()=>{
+    await setDoc(doc(fs,"agora_ops_breaks",key(user.uid,e.id)+"_"+slot),{
+      ownerUid:user.uid,personId,eventId:e.id,slot,status:"en_descanso",
+      startedAt:serverTimestamp(),updatedAt:serverTimestamp()
+    });
+  },"Registrando inicio de descanso con la hora del servidor…");
+}
+async function resumeBreak(){
+  const e=currentEvent(),clock=currentClock(),record=activeBreak();
+  if(!breaksReady||!e||clock?.status!=="en_curso"||!record)return;
+  await action(async()=>{
+    await updateDoc(doc(fs,"agora_ops_breaks",key(user.uid,e.id)+"_"+record.slot),{
+      status:"reanudado",endedAt:serverTimestamp(),updatedAt:serverTimestamp()
+    });
+  },"Registrando reanudación con la hora del servidor…");
 }
 async function startTrip(){
   const e=currentEvent(),p=currentPolicy();
@@ -567,6 +590,19 @@ async function session(u){
     watch(query(collection(fs,"agora_ops_trips"),where("ownerUid","==",u.uid)),snap=>{
       trips=new Map(snap.docs.map(d=>[d.id,d.data()]));
     });
+    // El visor anterior sigue disponible si las reglas de descansos aún
+    // no están desplegadas: así no se rompen los marcajes existentes.
+    const offBreaks=onSnapshot(
+      query(collection(fs,"agora_ops_breaks"),where("ownerUid","==",u.uid)),
+      {includeMetadataChanges:true},
+      snap=>{
+        if(snap.metadata.fromCache)return;
+        breaks=new Map(snap.docs.map(d=>[d.id,{...d.data(),id:d.id}]));
+        breaksReady=true;render();
+      },
+      ()=>{breaks.clear();breaksReady=false;render()}
+    );
+    unsubs.push(offBreaks);
     watch(query(collection(fs,"agora_ops_logs"),where("ownerUid","==",u.uid)),snap=>{
       logs=new Map(snap.docs.map(d=>[d.id,{...d.data(),id:d.id}]));
       logsLoaded=true;
@@ -676,6 +712,8 @@ $("trip-origin").addEventListener("input",()=>{
 });
 
 $("j-active").addEventListener("click",e=>{
+  if(e.target.id==="j-break-start")startBreak();
+  if(e.target.id==="j-break-resume")resumeBreak();
   if(e.target.id==="start-shift")markStart();
   if(e.target.id==="end-shift")markEnd();
 });
