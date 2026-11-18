@@ -14,6 +14,8 @@ import {
   allowedByPolicy,estimatedArrival,when,elapsedMinutes,timeLeft,gpsValid,mapsUrl,clampMinutes,instant
 } from "./jornadas-logic.mjs";
 import {localDay,atLocalDay,shiftOf,eventStart,eventEnd,myEvents,filteredEvents,payLabel,paymentFilter,netHours,reportFromFinishedClock} from "./staff-dashboard.mjs";
+import {timeStatement,hours,overtimeText} from "./ops-timekeeping.mjs";
+import {receiptData,receiptHtml} from "./ops-receipt.mjs";
 const {auth,firestore:fs}=window.AGORA_FIREBASE||{};
 const $=id=>document.getElementById(id);
 const esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -221,7 +223,7 @@ function renderAttendance(){
   if($("end-note")&&existingNote)$("end-note").value=existingNote;
   if($("start-activity")&&existingActivity)$("start-activity").value=existingActivity;
   $("j-punches").innerHTML="";
-  $("live-location").disabled=busy||(!r&&!check.ok)||r?.status==="finalizada"||(remaining!==null&&remaining===0);
+  $("live-location").disabled=(!r&&!check.ok)||r?.status==="finalizada"||(remaining!==null&&remaining===0);
   if($("live-location").disabled&&geoWatch!==null)stopTracking();
 }
 function renderTrips(){
@@ -259,12 +261,14 @@ function renderPayments(events){
     unreported.map(e=>{
       const clock=records.get(key(user.uid,e.id));
       const total=elapsedMinutes(clock?.startedAt,clock?.endedAt)/60;
+      const planned=timeStatement({clock,event:e,personId}).plannedMinutes;
       return '<article class="staff-payment"><div class="pay-row"><div><h4>'+esc(e.title||"Actividad")+'</h4>'+
         '<span class="staff-status-tag">Sin reporte de horas</span></div></div>'+
         '<p>'+esc(dateLabel(eventStart(e,personId)))+' · '+esc(placeLabel(e))+'</p>'+
-        '<p>Entrada y salida confirmadas · '+esc(total.toFixed(2))+' h registradas</p>'+
-        '<div class="pay-row"><button type="button" class="primary" data-create-report="'+esc(e.id)+'" '+(busy?"disabled":"")+'>Crear reporte con mis horas</button></div>'+
-        '<p>Se copiarán las horas oficiales de tu marcaje. Podrás solicitar su revisión después.</p></article>';
+        '<p>Entrada y salida confirmadas · '+esc(total.toFixed(2))+' h transcurridas · '+esc(hours(planned))+' programadas</p>'+
+        '<label class="staff-break-declaration">Descanso realizado (minutos, declaración del integrante)<input type="number" data-break-for="'+esc(e.id)+'" min="0" max="'+Math.max(0,Math.floor(total*60))+'" step="1" value="0"></label>'+
+        '<div class="pay-row"><button type="button" class="primary" data-create-report="'+esc(e.id)+'" '+(busy?"disabled":"")+'>Crear comprobante de horas</button></div>'+
+        '<p>La entrada y salida provienen de Firebase. El descanso se declara aquí y queda sujeto a revisión. Las horas extras no se aprueban automáticamente.</p></article>';
     }).join(""):"";
   const existingHtml=own.filter(l=>paymentFilter(l.paymentStatus||"capturado",payFilter)).map(l=>{
     const state=l.paymentStatus||"capturado";
@@ -274,15 +278,22 @@ function renderPayments(events){
       !hasPriorApproved;
     const approved=["validado","programado","pagado"].includes(state)&&
       typeof l.approvedAmount==="number"&&Number.isFinite(l.approvedAmount);
+    const e=events.find(x=>x.id===l.eventId);
+    const clock=e?records.get(key(user.uid,e.id)):null;
+    const summary=(e&&clock?.status==="finalizada")?
+      timeStatement({clock,event:e,personId,breakMins:l.breakMins||0}):null;
     const money=approved?" · Importe validado: "+new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(l.approvedAmount):
       " · Importe pendiente de validación";
     const tagClass=state==="pagado"?"done":["solicitado","validado","programado"].includes(state)?"review":"";
     return '<article class="staff-payment"><div class="pay-row"><div><h4>'+esc(events.find(e=>e.id===l.eventId)?.title||"Registro de jornada")+'</h4>'+
       '<span class="staff-status-tag '+tagClass+'">'+esc(payLabel[state]||"Pendiente")+'</span></div></div>'+
       '<p>'+esc(dateLabel(l.start))+' · '+esc(logHoursText(l))+' h netas'+esc(money)+'</p>'+
+      (summary?'<p><b>'+esc(summary.mode)+'</b> · Programadas '+esc(hours(summary.plannedMinutes))+
+        ' · Descanso '+esc(summary.breakMinutes)+' min · '+esc(overtimeText(summary))+'</p>':'')+
       '<p>'+esc(l.activity||l.notes||"Actividad sin descripción")+'</p>'+
       (l.returnNote?'<p><b>Comentario de coordinación:</b> '+esc(l.returnNote)+'</p>':"")+
       (state==="pagado"?'<p>Coordinación registró el pago como realizado. Este estado no es un comprobante bancario.</p>':"")+
+      (summary?'<button type="button" data-print-report="'+esc(l.id)+'">Ver comprobante / Guardar PDF</button>':'')+
       (action?(hasPriorApproved?
         '<p>Este registro contiene una validación anterior y requiere revisión de coordinación para reenviarse.</p>':
         '<button type="button" class="primary" data-request-payment="'+esc(l.id)+'" '+(busy||!canRequest?"disabled":"")+'>Enviar solicitud de pago</button>'):"")+
@@ -327,7 +338,7 @@ function render(){
   renderPayments(events);
   setTab(staffTab);
 }
-async function createReport(eventId){
+async function createReport(eventId,declaredBreakMins=0){
   if(!user||!personId||!staff||!logsLoaded)return;
   const event=(staff.events||[]).find(e=>e.id===eventId);
   const clock=records.get(key(user.uid,eventId));
@@ -339,10 +350,27 @@ async function createReport(eventId){
   }
   const id="j_"+user.uid+"_"+eventId;
   await action(async()=>{
-    const docValue=reportFromFinishedClock({clock,event,uid:user.uid,personId,id});
+    const docValue=reportFromFinishedClock({clock,event,uid:user.uid,personId,id,breakMins:declaredBreakMins});
     await setDoc(doc(fs,"agora_ops_logs",id),{...docValue,updatedAt:serverTimestamp()});
     setTab("pagos");
   },"Creando un reporte de horas basado en tu marcaje oficial…");
+}
+function printWorkReceipt(id){
+  const record=logs.get(id);
+  if(!record||!user||record.ownerUid!==user.uid||record.personId!==personId)return;
+  const event=(staff?.events||[]).find(e=>e.id===record.eventId);
+  const clock=event?records.get(key(user.uid,event.id)):null;
+  try{
+    const content=receiptHtml(receiptData({log:record,event,clock,person:staff.person,personId}));
+    // Sin URL pública ni datos enviados a terceros: el propio navegador abre
+    // una copia imprimible. «Guardar como PDF» utiliza su diálogo de impresión.
+    const url=URL.createObjectURL(new Blob([content],{type:"text/html;charset=utf-8"}));
+    const a=document.createElement("a");
+    a.href=url;a.target="_blank";a.rel="noopener noreferrer";
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+    status("Comprobante abierto. Selecciona «Imprimir / Guardar como PDF» en la nueva pestaña.","ok");
+  }catch(error){status("No se pudo abrir el comprobante: "+errorMessage(error),"error")}
 }
 async function requestPayment(id){
   if(!user||!personId)return;
@@ -408,7 +436,24 @@ async function markEnd(){
   const r=currentClock();if(!r||r.status!=="en_curso")return;
   const note=$("end-note")?.value.trim()||"Actividad terminada según la programación.";
   await action(async()=>{
-    const geo=await locSnapshot();
+    // La geolocalización continua puede bloquear una segunda lectura en
+    // navegadores móviles. Reutilizar exclusivamente el último GPS realmente
+    // recibido dentro de los últimos 30 segundos; nunca inventar ubicación.
+    const last=r.lastGeo||{},at=instant(r.lastGeoAt);
+    const recent=gpsValid({latitude:last.lat,longitude:last.lng,accuracy:last.accuracy})&&
+      Number.isFinite(at)&&Date.now()-at>=0&&Date.now()-at<=30000;
+    let geo;
+    if(recent)geo={lat:last.lat,lng:last.lng,accuracy:last.accuracy};
+    else{
+      if(geoWatch!==null&&navigator.geolocation){
+        navigator.geolocation.clearWatch(geoWatch);geoWatch=null;
+      }
+      try{geo=await locSnapshot()}
+      catch(error){
+        if($("live-location").checked&&currentClock()?.status==="en_curso")startTracking();
+        throw error;
+      }
+    }
     await updateDoc(clockRef(selected),{
       status:"finalizada",endGeo:geo,endNote:note.slice(0,240),
       endedAt:serverTimestamp(),updatedAt:serverTimestamp()
@@ -560,7 +605,14 @@ $("staff-board").addEventListener("click",event=>{
   const mode=event.target.closest("[data-calendar-mode]");
   if(mode){calendarMode=mode.dataset.calendarMode;render();return}
   const report=event.target.closest("[data-create-report]");
-  if(report){createReport(report.dataset.createReport);return}
+  if(report){
+    const field=report.closest(".staff-payment")?.querySelector("[data-break-for]");
+    const n=Number(field?.value||0);
+    if(!Number.isInteger(n)||n<0){status("El descanso debe indicarse en minutos completos.","error");return}
+    createReport(report.dataset.createReport,n);return
+  }
+  const receipt=event.target.closest("[data-print-report]");
+  if(receipt){printWorkReceipt(receipt.dataset.printReport);return}
   const request=event.target.closest("[data-request-payment]");
   if(request){requestPayment(request.dataset.requestPayment);return}
 });
