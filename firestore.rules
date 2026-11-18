@@ -1137,7 +1137,8 @@ match /agora_finance_requests/{requestId} {
 
     match /agora_identity_registry/{agoraId} {
       allow get: if identityRh() || identityOwnerOf(agoraId) || identityAssigned(resource.data);
-      allow list: if identityRh() || identityAssigned(resource.data);
+      allow list: if identityRh() ||
+        (identityCoordinator() && request.auth.uid in resource.data.coordinatorUids);
       allow create: if identityRh() && request.resource.data.agoraId == agoraId &&
         validIdentityRegistry() && request.resource.data.createdAt == request.time &&
         request.resource.data.createdBy == request.auth.uid &&
