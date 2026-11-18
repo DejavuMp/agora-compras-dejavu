@@ -1,6 +1,6 @@
 import {JOBS,JOB_NAMES,csvCell,projectTodayAssignments} from "./domain.mjs";
 import {
-  approveRegistration,auth,listDirectory,listPendingRegistrations,loadOwnIdentity,login,logout,
+  approveRegistration,assignCoordinator,auth,listActiveCoordinators,listDirectory,listPendingRegistrations,loadOwnIdentity,login,logout,
   requestRegistration,saveFinancial,saveProfile,updateCredential,watchSession
 } from "./firebase-identity.js";
 
@@ -9,7 +9,7 @@ const statusBox=document.querySelector("#system-status");
 const loginButton=document.querySelector("#login-button");
 const logoutButton=document.querySelector("#logout-button");
 const sessionLabel=document.querySelector("#session-label");
-const state={user:null,workspace:null,pending:[],directory:[],busy:false};
+const state={user:null,workspace:null,pending:[],directory:[],coordinators:[],busy:false};
 const tools=[
   ["Compras y Producción","https://dejavump.github.io/agora-compras-dejavu/"],
   ["Archivos","https://dejavump.github.io/agora-compras-dejavu/archivos/"],
@@ -74,6 +74,23 @@ function hero(){
   document.querySelector("#hero-login").addEventListener("click",()=>run(login));
 }
 
+function registrationFormMarkup(){
+  return `<form id="registration-form" class="form-grid">
+      ${field("name","Nombre completo",state.user.displayName||"")}
+      ${field("email","Correo",state.user.email||"","email","readonly")}
+      ${field("phone","Teléfono","","tel")}
+      <div class="field"><label for="jobTitle">Cargo operativo solicitado</label><select id="jobTitle" name="jobTitle">${jobs("Staff")}</select></div>
+      <label class="field full notice"><span><input name="privacy" type="checkbox"> Acepto el aviso de privacidad provisional para solicitar mi alta. Entiendo que requiere validación jurídica definitiva.</span></label>
+      <div class="actions field full"><button class="button primary" type="submit">Enviar solicitud</button></div>
+    </form>`;
+}
+function bindRegistrationForm(){
+  document.querySelector("#registration-form")?.addEventListener("submit",event=>{
+    event.preventDefault();const form=new FormData(event.currentTarget);
+    run(async()=>{await requestRegistration(state.user,{name:form.get("name"),phone:form.get("phone"),jobTitle:form.get("jobTitle"),privacyAccepted:form.get("privacy")==="on"});await refresh()},"Solicitud enviada sin duplicar tu identidad.");
+  });
+}
+
 function registration(workspace){
   const existing=workspace.registration;
   if(existing){
@@ -85,18 +102,8 @@ function registration(workspace){
   }
   app.innerHTML=`<section class="panel"><p class="eyebrow">Alta de colaborador</p><h1>Solicita tu ID ÁGORA</h1>
     <p class="muted">Tu cuenta Google está verificada, pero todavía no tiene identidad. RH revisará la solicitud.</p>
-    <form id="registration-form" class="form-grid">
-      ${field("name","Nombre completo",state.user.displayName||"")}
-      ${field("email","Correo",state.user.email||"","email","readonly")}
-      ${field("phone","Teléfono","","tel")}
-      <div class="field"><label for="jobTitle">Cargo operativo solicitado</label><select id="jobTitle" name="jobTitle">${jobs("Staff")}</select></div>
-      <label class="field full notice"><span><input name="privacy" type="checkbox"> Acepto el aviso de privacidad provisional para solicitar mi alta. Entiendo que requiere validación jurídica definitiva.</span></label>
-      <div class="actions field full"><button class="button primary" type="submit">Enviar solicitud</button></div>
-    </form></section>`;
-  document.querySelector("#registration-form").addEventListener("submit",event=>{
-    event.preventDefault();const form=new FormData(event.currentTarget);
-    run(async()=>{await requestRegistration(state.user,{name:form.get("name"),phone:form.get("phone"),jobTitle:form.get("jobTitle"),privacyAccepted:form.get("privacy")==="on"});await refresh()},"Solicitud enviada sin duplicar tu identidad.");
-  });
+    ${registrationFormMarkup()}</section>`;
+  bindRegistrationForm();
 }
 
 function credential(registry){
@@ -149,34 +156,54 @@ function privateModules(workspace){
   </section>`;
 }
 
+function coordinatorOptions(){
+  return '<option value="">Sin coordinador por ahora</option>'+state.coordinators.map(item=>
+    `<option value="${esc(item.uid)}">${esc(item.name)} · ${esc(item.email)}</option>`).join("");
+}
+
 function management(workspace){
   const account=workspace.account;
   if(!["admin","coordinador"].includes(account?.role))return "";
   const pending=account.role==="admin"?`<section class="panel span-12"><h2>Solicitudes pendientes</h2>${state.pending.length?state.pending.map(item=>`
     <article class="pending-card"><h3>${esc(item.displayName)}</h3><p>${esc(item.email)} · solicita ${esc(item.requestedJobTitle)}</p>
       <div class="row"><select aria-label="Cargo a aprobar" data-job-for="${esc(item.uid)}">${jobs(item.requestedJobTitle)}</select>
+      ${state.coordinators.length?`<select aria-label="Coordinador para ${esc(item.displayName)}" data-coord-for="${esc(item.uid)}">${coordinatorOptions()}</select>`:""}
       <button class="button primary" data-approve="${esc(item.uid)}" type="button">Emitir ID</button></div></article>`).join(""):'<p class="muted">No hay solicitudes pendientes.</p>'}</section>`:"";
   const rows=state.directory.map(item=>`<tr><td><b>${esc(item.agoraId)}</b><br><small>${esc(item.displayName)}</small></td>
     <td><select aria-label="Cargo de ${esc(item.displayName)}" data-directory-job="${esc(item.agoraId)}">${jobs(item.jobTitle)}</select></td>
     <td>${item.credentialActive?"Vigente":"Bloqueada"}</td><td>
       <button class="button ${item.credentialActive?"danger":"secondary"}" data-toggle="${esc(item.agoraId)}" type="button">${item.credentialActive?"Bloquear":"Activar"}</button>
-    </td></tr>`).join("");
+    </td>${account.role==="admin"?`<td>
+      <small>${Array.isArray(item.coordinatorUids)&&item.coordinatorUids.length?"Asignados: "+esc(item.coordinatorUids.map(uid=>state.coordinators.find(c=>c.uid===uid)?.name||uid).join(", ")):"Sin coordinación asignada"}</small>
+      ${state.coordinators.length?`<div class="row"><select aria-label="Asignar coordinación a ${esc(item.displayName)}" data-coordinator-for="${esc(item.agoraId)}">${coordinatorOptions()}</select>
+      <button type="button" class="button secondary" data-assign-coordinator="${esc(item.agoraId)}">Asignar</button></div>`:""}
+    </td>`:""}</tr>`).join("");
   return `${pending}<section class="panel span-12"><div class="row"><div><h2>Directorio operativo</h2><p class="muted">${account.role==="admin"?"Vista RH":"Solo colaboradores asignados"}</p></div>
     <button id="export-directory" class="button secondary" type="button">Exportar CSV operativo</button></div>
-    <div class="table-wrap"><table><thead><tr><th>Identidad</th><th>Cargo</th><th>Credencial</th><th>Acción</th></tr></thead><tbody>${rows||'<tr><td colspan="4">Sin registros disponibles.</td></tr>'}</tbody></table></div></section>`;
+    <div class="table-wrap"><table><thead><tr><th>Identidad</th><th>Cargo</th><th>Credencial</th><th>Acción</th>${account.role==="admin"?"<th>Coordinación</th>":""}</tr></thead><tbody>${rows||`<tr><td colspan="${account.role==="admin"?5:4}">Sin registros disponibles.</td></tr>`}</tbody></table></div></section>`;
 }
 
 function bindManagementActions(){
   document.querySelectorAll("[data-approve]").forEach(button=>button.addEventListener("click",()=>{
     const item=state.pending.find(row=>row.uid===button.dataset.approve);
     const select=document.querySelector(`[data-job-for="${CSS.escape(item.uid)}"]`);
-    run(async()=>{await approveRegistration(state.user,item,{jobTitle:select.value});await refresh()},"ID emitido con transacción y auditoría.");
+    const coordinator=document.querySelector(`[data-coord-for="${CSS.escape(item.uid)}"]`);
+    run(async()=>{await approveRegistration(state.user,item,{jobTitle:select.value,coordinatorUid:coordinator?.value||""});await refresh()},"ID emitido con transacción y auditoría.");
   }));
   document.querySelectorAll("[data-toggle]").forEach(button=>button.addEventListener("click",()=>{
     const item=state.directory.find(row=>row.agoraId===button.dataset.toggle);
     const select=document.querySelector(`[data-directory-job="${CSS.escape(item.agoraId)}"]`);
     let reason="";if(item.credentialActive)reason=prompt("Motivo del bloqueo (mínimo 5 caracteres):","Fin de turno / acceso suspendido")||"";
     run(async()=>{await updateCredential(state.user,item,{active:!item.credentialActive,reason,jobTitle:select.value});await refresh()},"Credencial actualizada y auditada.");
+  }));
+  document.querySelectorAll("[data-assign-coordinator]").forEach(button=>button.addEventListener("click",()=>{
+    const item=state.directory.find(row=>row.agoraId===button.dataset.assignCoordinator);
+    const select=document.querySelector(`[data-coordinator-for="${CSS.escape(item.agoraId)}"]`);
+    run(async()=>{
+      if(!select?.value)throw Error("Selecciona una persona de coordinación activa.");
+      await assignCoordinator(state.user,item,select.value);
+      await refresh();
+    },"Coordinación asignada con auditoría.");
   }));
   document.querySelector("#export-directory")?.addEventListener("click",exportDirectory);
 }
@@ -185,7 +212,9 @@ function managementDashboard(workspace){
   const request=workspace.registration
     ? `<p>Tu solicitud personal está en estado <b>${esc(workspace.registration.status)}</b>. Esto no impide administrar RH con tu permiso técnico actual.</p>`
     : `<p>Tu cuenta administrativa todavía no tiene un ID personal. Puedes administrar RH y solicitar tu alta por el flujo normal.</p>`;
-  app.innerHTML=`<div class="grid"><section class="panel span-12"><p class="eyebrow">Acceso administrativo</p><h1>Identidad Única y RH</h1>${request}</section>${management(workspace)}</div>`;
+  const signup=workspace.registration?"":`<section class="panel span-12"><h2>Solicita tu propio ID</h2>${registrationFormMarkup()}</section>`;
+  app.innerHTML=`<div class="grid"><section class="panel span-12"><p class="eyebrow">Acceso administrativo</p><h1>Identidad Única y RH</h1>${request}</section>${management(workspace)}${signup}</div>`;
+  bindRegistrationForm();
   bindManagementActions();
 }
 
@@ -216,9 +245,10 @@ async function refresh(){
   state.workspace=await loadOwnIdentity(state.user);
   if(["admin","coordinador"].includes(state.workspace.account?.role)){
     const tasks=[listDirectory(state.workspace.account,state.user.uid)];
-    if(state.workspace.account.role==="admin")tasks.push(listPendingRegistrations());else tasks.push(Promise.resolve([]));
-    [state.directory,state.pending]=await Promise.all(tasks);
-  }else{state.directory=[];state.pending=[]}
+    if(state.workspace.account.role==="admin")tasks.push(listPendingRegistrations(),listActiveCoordinators());
+    else tasks.push(Promise.resolve([]),Promise.resolve([]));
+    [state.directory,state.pending,state.coordinators]=await Promise.all(tasks);
+  }else{state.directory=[];state.pending=[];state.coordinators=[]}
   if(state.workspace.registry)dashboard(state.workspace);
   else if(["admin","coordinador"].includes(state.workspace.account?.role))managementDashboard(state.workspace);
   else registration(state.workspace);
