@@ -81,6 +81,8 @@ try{
   await page.locator("#start-activity").fill("Volanteo y entrega de cupones de prueba");
   await page.locator("#start-shift").click();
   await page.waitForFunction(()=>document.querySelector("#j-active")?.textContent.includes("Entrada oficial:"));
+  // Simular una jornada ficticia de una hora en Firestore mock (sin modificar reloj real).
+  await page.evaluate(()=>{window.__mockRecords.clock.get("staff-qa_evento1").startedAt=new Date(Date.now()-60*60000)});
   await page.locator("#end-note").fill("Jornada realizada sin incidencias");
   await page.locator("#end-shift").click();
   await page.waitForFunction(()=>document.querySelector("#j-active")?.textContent.includes("Salida oficial:"));
