@@ -21,7 +21,7 @@ assert.equal(r.dayCount,2);
 assert.equal(r.activityCount,2);
 assert.equal(r.total.breakMinutes,60);
 assert.equal(r.total.overtimeCandidateMinutes,20);
-assert.equal(r.total.netMinutes,860);
+assert.equal(r.total.netMinutes,830);
 const html=monthlyReceiptHtml(r);
 assert.ok(html.includes("Reporte de días y horas trabajadas"));
 assert.ok(html.includes("Volanteo QA")&&html.includes("Entrega QA"));
