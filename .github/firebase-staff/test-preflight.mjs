@@ -10,7 +10,7 @@ import {fileURLToPath} from "node:url";
 // La copia previa debe publicarse, incluso dentro de un directorio oculto,
 // y la ausencia del artefacto no puede considerarse una ejecución exitosa.
 const workflow=readFileSync(".github/workflows/dejavu-staff-firebase-rules.yml","utf8");
-assert.match(workflow,/name: respaldo-reglas-agora-antes-dejavu-staff[\\s\\S]*?include-hidden-files: true[\\s\\S]*?if-no-files-found: error/,
+assert.match(workflow,/name: respaldo-reglas-agora-antes-dejavu-staff[\s\S]*?include-hidden-files: true[\s\S]*?if-no-files-found: error/,
   "El respaldo real es obligatorio antes de cualquier despliegue");
 const candidate=readFileSync("firestore.rules","utf8");
 const opsMarker="    // ÁGORA · Centro de Operaciones V4 (aislado de Compras y Finanzas).";
