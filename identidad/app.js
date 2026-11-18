@@ -9,7 +9,7 @@ const statusBox=document.querySelector("#system-status");
 const loginButton=document.querySelector("#login-button");
 const logoutButton=document.querySelector("#logout-button");
 const sessionLabel=document.querySelector("#session-label");
-const state={user:null,workspace:null,pending:[],directory:[],coordinators:[],busy:false};
+const state={user:null,workspace:null,pending:[],directory:[],coordinators:[],managementWarnings:[],busy:false};
 const tools=[
   ["Compras y Producción","https://dejavump.github.io/agora-compras-dejavu/"],
   ["Archivos","https://dejavump.github.io/agora-compras-dejavu/archivos/"],
@@ -178,12 +178,19 @@ function management(workspace){
       ${state.coordinators.length?`<div class="row"><select aria-label="Asignar coordinación a ${esc(item.displayName)}" data-coordinator-for="${esc(item.agoraId)}">${coordinatorOptions()}</select>
       <button type="button" class="button secondary" data-assign-coordinator="${esc(item.agoraId)}">Asignar</button></div>`:""}
     </td>`:""}</tr>`).join("");
-  return `${pending}<section class="panel span-12"><div class="row"><div><h2>Directorio operativo</h2><p class="muted">${account.role==="admin"?"Vista RH":"Solo colaboradores asignados"}</p></div>
+  const alerts=state.managementWarnings.length
+    ? `<section class="panel span-12"><h2>Consultas de RH por revisar</h2>
+       <p class="notice">Tu acceso personal sigue disponible. Algunas consultas administrativas fueron rechazadas y no se mostrarán como listas completas.</p>
+       <ul>${state.managementWarnings.map(w=>`<li>${esc(w)}</li>`).join("")}</ul>
+       <button type="button" class="button secondary" id="retry-management">Reintentar consultas de RH</button>
+       </section>`:"";
+  return `${alerts}${pending}<section class="panel span-12"><div class="row"><div><h2>Directorio operativo</h2><p class="muted">${account.role==="admin"?"Vista RH":"Solo colaboradores asignados"}</p></div>
     <button id="export-directory" class="button secondary" type="button">Exportar CSV operativo</button></div>
     <div class="table-wrap"><table><thead><tr><th>Identidad</th><th>Cargo</th><th>Credencial</th><th>Acción</th>${account.role==="admin"?"<th>Coordinación</th>":""}</tr></thead><tbody>${rows||`<tr><td colspan="${account.role==="admin"?5:4}">Sin registros disponibles.</td></tr>`}</tbody></table></div></section>`;
 }
 
 function bindManagementActions(){
+  document.querySelector("#retry-management")?.addEventListener("click",()=>run(safeRefresh));
   document.querySelectorAll("[data-approve]").forEach(button=>button.addEventListener("click",()=>{
     const item=state.pending.find(row=>row.uid===button.dataset.approve);
     const select=document.querySelector(`[data-job-for="${CSS.escape(item.uid)}"]`);
@@ -243,22 +250,45 @@ async function refresh(){
   if(!state.user){state.workspace=null;hero();return}
   setStatus("Consultando permisos y expediente…");
   state.workspace=await loadOwnIdentity(state.user);
+  state.directory=[];state.pending=[];state.coordinators=[];state.managementWarnings=[];
   if(["admin","coordinador"].includes(state.workspace.account?.role)){
-    const tasks=[listDirectory(state.workspace.account,state.user.uid)];
-    if(state.workspace.account.role==="admin")tasks.push(listPendingRegistrations(),listActiveCoordinators());
-    else tasks.push(Promise.resolve([]),Promise.resolve([]));
-    [state.directory,state.pending,state.coordinators]=await Promise.all(tasks);
-  }else{state.directory=[];state.pending=[];state.coordinators=[]}
+    const admin=state.workspace.account.role==="admin";
+    const jobs=[
+      ["Directorio de identidades",()=>listDirectory(state.workspace.account,state.user.uid)],
+      ...(admin?[
+        ["Solicitudes pendientes",listPendingRegistrations],
+        ["Coordinadores",listActiveCoordinators]
+      ]:[])
+    ];
+    // Los errores de consultas de gestión no impiden que el usuario vea
+    // su identidad, sus jornadas ni su propio expediente.
+    const results=await Promise.allSettled(jobs.map(([,get])=>get()));
+    results.forEach((result,index)=>{
+      if(result.status==="rejected"){
+        const error=result.reason;
+        console.warn("Consulta administrativa rechazada:",jobs[index][0],error?.code||"error");
+        const suffix=error?.collection?" ("+error.collection+")":"";
+        state.managementWarnings.push(jobs[index][0]+suffix+": "+(
+          error?.code==="permission-denied"?"permisos insuficientes":
+          error?.code==="failed-precondition"?"requiere revisar índices de Firestore":
+          "consulta no disponible"));
+        return;
+      }
+      if(index===0)state.directory=result.value;
+      else if(index===1)state.pending=result.value;
+      else if(index===2)state.coordinators=result.value;
+    });
+  }
   if(state.workspace.registry)dashboard(state.workspace);
   else if(["admin","coordinador"].includes(state.workspace.account?.role))managementDashboard(state.workspace);
   else registration(state.workspace);
-  setStatus("Sesión protegida activa.","ok");
+  setStatus(state.managementWarnings.length?"Sesión activa. Algunas consultas de RH requieren revisión.":"Sesión protegida activa.",state.managementWarnings.length?"error":"ok");
 }
 
 function renderAccessFailure(error){
   const denied=String(error?.code||"").includes("permission-denied");
   const detail=denied
-    ? "La sesión de Google está abierta, pero Firestore no autorizó la lectura del expediente. Puede faltar la activación de las reglas de Identidad o el permiso de esta cuenta."
+    ? "Google inició sesión, pero Firestore rechazó una consulta necesaria para mostrar tu identidad. Las reglas ya se desplegaron; ahora debe revisarse el permiso de esta cuenta o la colección indicada."
     : "No se pudo consultar el expediente. Comprueba tu conexión e intenta nuevamente.";
   const collection=denied&&error?.collection
     ? `<p class="muted">Consulta rechazada: <code>${esc(error.collection)}</code>.</p>` : "";
@@ -267,7 +297,7 @@ function renderAccessFailure(error){
     <h1>${denied?"Acceso a datos pendiente de activación":"No fue posible cargar tu identidad"}</h1>
     <p>${detail}</p>
     ${collection}
-    <p class="notice">No se generó ningún ID ni se modificó tu expediente. No es necesario crear otra cuenta. Administración debe comprobar las reglas de Firestore del proyecto <b>agora-dejavu-38b8c</b> antes de registrar información personal.</p>
+    <p class="notice">Esta consulta no generó ningún ID ni modificó tu expediente. No necesitas otra cuenta. Si el problema continúa, administración debe revisar el acceso de tu usuario a la colección indicada en el proyecto <b>agora-dejavu-38b8c</b>.</p>
     <div class="actions"><button class="button primary" id="retry-identity" type="button">Reintentar conexión</button>
     <a class="button secondary" href="./">Recargar portal</a></div>
   </section>`;
