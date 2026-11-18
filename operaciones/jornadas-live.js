@@ -29,7 +29,7 @@ const errorMessage=e=>e?.code==="permission-denied"?"El servidor rechazó la ope
 let user=null,personId="",access=new Map(),records=new Map(),trips=new Map(),
   staff=null,selected="",authEpoch=0,unsubs=[],geoWatch=null,lastLiveUpdate=0,busy=false,
   logs=new Map(),logsLoaded=false,breaks=new Map(),breaksReady=false,staffTab="inicio",calendarMode="timeline",
-  calendarDay=localDay(Date.now()),calendarDays=7,payFilter="todos",remindersEnabled=false,remindersSeen=new Set();
+  calendarDay=localDay(Date.now()),calendarDays=7,payFilter="todos",remindersEnabled=false,remindersSeen=new Set(),tripDefaultsFor="";
 const key=(uid,eventId)=>uid+"_"+eventId;
 const accessRef=(id)=>doc(fs,"agora_ops_shift_access",key(user.uid,id));
 const clockRef=(id)=>doc(fs,"agora_ops_clock",key(user.uid,id));
@@ -41,7 +41,7 @@ function status(msg,kind=""){
 function clearSubscriptions(){
   for(const off of unsubs.splice(0))try{off()}catch(_){}
   stopTracking();
-  access.clear();records.clear();trips.clear();logs.clear();breaks.clear();breaksReady=false;logsLoaded=false;remindersSeen.clear();remindersEnabled=false;staff=null;selected="";personId="";
+  access.clear();records.clear();trips.clear();logs.clear();breaks.clear();breaksReady=false;logsLoaded=false;remindersSeen.clear();remindersEnabled=false;staff=null;selected="";personId="";tripDefaultsFor="";
   $("j-reminders-enable").disabled=false;
   $("j-reminders-enable").textContent="Activar avisos";
   $("j-reminders-status").textContent="Los avisos se muestran únicamente mientras tengas ÁGORA abierta.";
@@ -249,13 +249,20 @@ function renderAttendance(){
 }
 function renderTrips(){
   const e=currentEvent(),p=currentPolicy(),t=currentTrip();
+  if(e&&tripDefaultsFor!==e.id){
+    // Son sugerencias de coordinación, no mediciones en tiempo real.
+    $("trip-origin").value=e.origin||"";
+    $("trip-minutes").value=String(Number.isFinite(Number(e.travelMin))&&Number(e.travelMin)>0?Number(e.travelMin):30);
+    $("trip-buffer").value=String(Number.isFinite(Number(e.routeBufferMin))&&Number(e.routeBufferMin)>=0?Number(e.routeBufferMin):15);
+    tripDefaultsFor=e.id;
+  }
   $("trip-start").disabled=busy||!e||!allowedByPolicy(p).ok||!!t;
   $("trip-arrive").disabled=busy||!t||t.status!=="en_ruta";
   const link=$("j-route"),url=e?mapsUrl($("trip-origin").value.trim(),destination(e)):"";
   link.hidden=!url;if(url)link.href=url;
   $("j-trips").innerHTML=t?
     '<div class="card"><b>'+(t.status==="llegue"?"Llegada registrada":"Traslado en curso")+'</b>'+
-    '<p>Salida oficial: '+esc(when(t.startedAt))+'<br>ETA estimada: '+esc(when(estimatedArrival(t.startedAt,t.travelMin,t.bufferMin)))+
+    '<p>Salida oficial: '+esc(when(t.startedAt))+'<br>Llegada aproximada (según minutos previstos): '+esc(when(estimatedArrival(t.startedAt,t.travelMin,t.bufferMin)))+
     (t.status==="llegue"?'<br>Arribo real: '+esc(when(t.arrivedAt)):"")+'</p>'+
     '<p>'+esc(t.origin)+' → '+esc(t.destination)+'</p>'+
     (t.arrivalGeo?linkGeo(t.arrivalGeo,"Ubicación de llegada"):"")+'</div>':
