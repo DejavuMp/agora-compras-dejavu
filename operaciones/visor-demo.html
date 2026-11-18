@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ÁGORA · Visor de Operación · Dejavú Marketing</title>
+<meta name="theme-color" content="#151719">
+<style>
+:root{--ink:#1c1e20;--dark:#151719;--gold:#bc9a5d;--muted:#727983;--border:#e7e8e8;--bg:#f5f5f3;--red:#a94745}
+*{box-sizing:border-box}body{font-family:Arial,sans-serif;background:var(--bg);color:var(--ink);margin:0}button,a{font:inherit}a{text-decoration:none}
+header{background:var(--dark);color:white;padding:17px clamp(18px,3vw,48px);display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.monogram{width:48px;height:48px;border:1px solid #816c49;color:#dec48c;border-radius:11px;display:grid;place-items:center;font-size:27px;font-weight:900}
+.identity{flex:1;min-width:220px}.identity small{display:block;color:var(--gold);letter-spacing:1.2px;font-weight:700;font-size:10px;margin-bottom:5px}.identity strong{font-size:19px}
+.clock{text-align:right;font-size:20px;font-weight:700}.clock small{display:block;font-size:11px;font-weight:400;color:#ddd}
+.editlink{border:1px solid #76694f;border-radius:10px;color:#f4e6c8;padding:11px 14px;font-size:12px;font-weight:700}
+main{max-width:1660px;margin:auto;padding:28px clamp(16px,3vw,48px)}
+.hero{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.overline{font-size:10px;letter-spacing:1.3px;font-weight:800;color:#9a7b49}
+h1{font-size:clamp(24px,3vw,35px);margin:7px 0}.desc{margin:0;color:var(--muted);font-size:13px;line-height:1.5}
+.controls{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.controls button,.weektools button{background:white;border:1px solid #dedfdf;border-radius:9px;padding:10px 13px;font-size:12px;font-weight:700;cursor:pointer}
+.controls .active{background:#242525;border-color:#242525;color:white}
+.message{margin:20px 0 17px;background:#fffbf0;border:1px solid #e8ddc7;color:#645537;border-radius:11px;padding:13px 16px;font-size:12px;line-height:1.6}
+.cards{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:17px}.card{background:white;border:1px solid var(--border);padding:18px;border-radius:14px;min-height:115px}.card small{display:block;color:#6e7478;font-weight:700;font-size:11px}.card strong{display:block;font-size:34px;margin:7px 0}.card span{color:#8b8f96;font-size:11px}
+.layout{display:grid;grid-template-columns:minmax(0,2.1fr) minmax(280px,.9fr);gap:16px}.panel{background:white;border:1px solid var(--border);border-radius:15px;overflow:hidden}
+.panelhead{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;padding:18px 20px;border-bottom:1px solid var(--border)}
+h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);font-size:11px;margin-top:6px}
+.weektools{display:flex;gap:6px;align-items:center}.weektools span{font-size:11px;white-space:nowrap;margin:0 4px;font-weight:700}
+.week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));min-height:330px}
+.day{min-width:0;border-right:1px solid var(--border)}.day:last-child{border:0}.daytitle{text-align:center;background:#fafaf9;padding:12px 6px;border-bottom:1px solid var(--border)}.daytitle small{font-size:10px;color:var(--muted);display:block}.daytitle b{font-size:19px}
+.day.today .daytitle{box-shadow:inset 0 3px var(--gold)}
+.dayevents{display:grid;gap:8px;align-content:start;padding:8px}.event{border:1px solid #e4e4e4;border-left:3px solid var(--gold);background:#fff;border-radius:9px;padding:10px 8px;overflow-wrap:anywhere}.event.conflict{border-left-color:var(--red);background:#fff9f8}
+.event .time{color:#8f6f35;font-weight:800;font-size:11px;margin-bottom:7px}.type{display:inline-block;font-size:9px;background:#f8f0e2;color:#7c653e;padding:4px 6px;border-radius:5px;font-weight:700;text-transform:uppercase;margin-bottom:8px}
+.event b{display:block;font-size:12px;line-height:1.3}.event p{font-size:10px;line-height:1.45;color:#6e7478;margin:7px 0 0}.event .person{color:#303336}
+.none{font-size:11px;color:#aaa;text-align:center;padding:20px 3px}
+.side{display:grid;gap:16px;align-content:start}.sidebody{padding:12px 18px}.upnext{padding:12px 0;border-bottom:1px solid #eee;font-size:11px}.upnext:last-child{border:0}.upnext b{font-size:12px;display:block;margin-bottom:5px}.upnext span{color:#72777d;line-height:1.5}.alert{padding:10px 12px;border:1px solid #f1dfdb;border-radius:9px;background:#fff7f5;color:#884c42;font-size:11px;line-height:1.5;margin-bottom:8px}
+.muted{color:#86888a;font-size:12px;line-height:1.6}footer{font-size:11px;line-height:1.6;color:#858b8b;margin-top:20px}
+@media(max-width:1180px){.layout{grid-template-columns:1fr}.cards{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:760px){.cards{grid-template-columns:repeat(2,1fr)}.card:last-child{grid-column:span 2}.week{display:flex;overflow-x:auto;max-width:calc(100vw - 36px)}.day{min-width:180px;flex:1}.clock{font-size:16px}main{padding-top:20px}}
+@media print{.controls,.editlink,.message,.weektools,footer{display:none!important}main{padding:14px}.layout{display:block}.side{margin-top:15px}.week{min-height:250px}}
+
+/* Agenda diaria: una ficha completa por jornada, no siete columnas apretadas. */
+.week{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));min-height:0;padding:16px;gap:12px;align-content:start}
+.event{padding:17px 16px;border-left-width:4px;min-width:0}
+.event .time{font-size:14px;margin-bottom:8px}.event b{font-size:16px;line-height:1.35}
+.event p{font-size:12px;line-height:1.5;margin-top:8px}
+.event .person{color:#323a40}
+.event .route-plan{background:#f8f5ef;border-radius:9px;padding:12px;margin-top:12px}
+.event .route-plan strong{display:block;color:#665438;margin-bottom:6px;font-size:12px}
+.event .route-plan p{font-size:11px;margin:4px 0}
+.event a{display:inline-block;margin-top:8px;padding:7px 10px;border:1px solid #c2a978;border-radius:7px;color:#66502c;font-weight:700;font-size:11px;background:white}
+.event a:hover{background:#f4ead5}.event .series{float:right;font-size:10px;padding:5px 8px;border-radius:8px;background:#f0f0ee;color:#59616b}
+.empty-daily{grid-column:1/-1;padding:55px 25px;text-align:center;color:#757b81;font-size:13px;line-height:1.7}
+#focusdate:focus,#typefilter:focus{outline:2px solid #aa864d}
+.weektools{flex-wrap:wrap}.weektools span{max-width:150px;white-space:normal;text-align:center}
+@media(max-width:900px){.week{grid-template-columns:1fr}}
+@media(max-width:760px){.week{display:grid;overflow:visible;max-width:none;grid-template-columns:1fr;padding:10px}.event{min-height:0}.panelhead{padding:14px}}
+
+.viewer-toggle{display:inline-flex;gap:5px;background:#eeede9;padding:4px;border-radius:11px}
+.viewer-toggle button{background:transparent;border:0;border-radius:8px;padding:10px 15px;font-size:12px;font-weight:700;cursor:pointer;color:#56595d}
+.viewer-toggle button.active{background:#242525;color:white}
+#days-control{border:1px solid #dedfdf;border-radius:9px;padding:9px 10px;background:#fff;font-size:12px}
+#days-control[hidden]{display:none!important}
+.week.schedule-mode{display:block;padding:10px 17px;min-height:160px}
+.schedule-day{padding:15px 0;border-bottom:1px solid #e6e7e8}
+.schedule-day:last-child{border:0}
+.schedule-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.schedule-header b{font-size:13px}
+.schedule-header small{color:#7a8086;font-size:11px}
+.schedule-row{display:grid;grid-template-columns:100px minmax(125px,1.3fr) minmax(110px,1fr) minmax(130px,1.4fr) minmax(85px,.85fr);gap:10px;align-items:center;padding:11px 9px;border:1px solid #f0f0ef;border-left:3px solid var(--gold);border-radius:7px;margin:5px 0}
+.schedule-row.conflict{border-left-color:#b04e4d;background:#fffafa}
+.schedule-row .when{font-weight:800;font-size:12px}
+.schedule-row b{font-size:12px;line-height:1.4}
+.schedule-row p{font-size:10px;color:#6d747b;line-height:1.5;margin:4px 0}
+.schedule-row a{font-size:11px;font-weight:700;color:#806134;text-decoration:underline}
+@media(max-width:850px){.schedule-row{grid-template-columns:80px minmax(0,1fr) minmax(0,1fr)}.schedule-row .long{grid-column:2/4}}
+@media(max-width:610px){.week.schedule-mode{padding:8px}.schedule-row{grid-template-columns:75px 1fr}.schedule-row .long{grid-column:2}.schedule-row .links{grid-column:2}}
+@media print{.viewer-toggle,#days-control{display:none!important}.week.schedule-mode{display:block}}
+</style>
+</head>
+<body>
+<header><div class="monogram">D</div><div class="identity"><small>DEJAVÚ MARKETING · ÁGORA</small><strong>Centro de Operaciones / Visor</strong></div><div id="clock" class="clock">--:--</div><a class="editlink" href="./demo.html">Abrir editor de prueba</a></header>
+<main>
+<div class="hero"><div><div class="overline">AGENDA OPERATIVA · SOLO LECTURA</div><h1>Operación de la agencia</h1><p class="desc">Consulta las jornadas de una fecha o todo el cronograma en orden de operación.</p></div><div class="controls"><button id="local" class="active">Mis datos</button><button id="sample">Ver ejemplo</button><button id="refresh">Actualizar</button><button id="print">Imprimir</button></div></div>
+<div id="message" class="message"></div><div class="viewer-toggle" role="group" aria-label="Tipo de vista"><button type="button" id="show-day" class="active">Por día</button><button type="button" id="show-schedule">Cronograma</button></div><select id="days-control" aria-label="Días del cronograma" hidden><option value="7">Próximos 7 días</option><option value="14">Próximos 14 días</option><option value="30">Próximos 30 días</option></select>
+<div id="metrics" class="cards"></div>
+<div style="display:flex;justify-content:flex-end;margin:0 0 12px"><label style="font-size:12px;color:#555;display:flex;align-items:center;gap:8px">Tipo de actividad <select id="typefilter" style="border:1px solid #dedfdf;border-radius:9px;padding:10px;background:white"><option value="todos">Todas</option><option>Volanteo</option><option>Activación</option><option>Apertura</option><option>Reapertura</option><option>En vivo</option><option>Sampling</option><option>Promotoría</option><option>Montaje</option><option>Desmontaje</option><option>Otro</option></select></label></div><div class="layout"><section class="panel"><div class="panelhead"><div><h2 id="view-heading">Actividades del día</h2><small id="view-subheading">Una ficha por jornada: horario, personal y ruta</small></div><div class="weektools"><button id="prev" aria-label="Anterior">‹</button><button id="today">Hoy</button><span id="weektitle">—</span><input type="date" id="focusdate" aria-label="Elegir día" style="border:1px solid #dedfdf;border-radius:8px;padding:8px;max-width:140px"><button id="next" aria-label="Siguiente">›</button></div></div><div id="week" class="week"></div></section><aside class="side"><section class="panel"><div class="panelhead"><h2>Próximas actividades</h2></div><div id="upcoming" class="sidebody"></div></section><section class="panel"><div class="panelhead"><h2>Alertas de empalmes</h2></div><div id="alerts" class="sidebody"></div></section></aside></div>
+<footer>Vista de consulta que se actualiza automáticamente cada 5 segundos. Durante la prueba, muestra exclusivamente los datos locales guardados en este navegador mediante la demostración V3. No sincroniza dispositivos ni lee datos del Firebase de producción. No muestra sueldos, montos o detalles bancarios.</footer>
+</main>
+<script>
+(function(){
+"use strict";
+var KEY="agora_planeacion_recursos_v3",PREV=["agora_planeacion_recursos_v2","agora_planeacion_recursos_v1"];
+var mode="local",database=null,last="",focus=day(new Date()),typeFilter="todos",viewMode="dia",scheduleDays=7;
+function $(id){return document.getElementById(id)}
+function safe(x){return String(x==null?"":x).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+function day(d){return new Date(d.getFullYear(),d.getMonth(),d.getDate())}
+function plus(d,n){return new Date(d.getFullYear(),d.getMonth(),d.getDate()+n)}
+function ymd(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function stamp(d,h){return ymd(d)+"T"+String(h).padStart(2,"0")+":00"}
+function ms(t){return new Date(t).getTime()}
+function duration(a,b,c,d){return ms(a)<ms(d)&&ms(c)<ms(b)}
+function mins(t,n){return new Date(ms(t)+n*60000)}
+function formatTime(t){if(!Number.isFinite(ms(t)))return "--:--";return new Intl.DateTimeFormat("es-MX",{hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(t))}
+function formatDate(t){return new Intl.DateTimeFormat("es-MX",{weekday:"long",day:"numeric",month:"long",year:"numeric"}).format(new Date(t))}
+function shortDate(t){return new Intl.DateTimeFormat("es-MX",{day:"numeric",month:"short"}).format(new Date(t))}
+function read(){for(var names=[KEY].concat(PREV),i=0;i<names.length;i++){try{var raw=localStorage.getItem(names[i]);if(!raw)continue;var db=JSON.parse(raw);if(Array.isArray(db.events)&&Array.isArray(db.people)&&Array.isArray(db.vehicles))return {raw:raw,db:db}}catch(e){}}return {raw:"",db:{events:[],people:[],vehicles:[],blocks:[],sites:[]}}}
+function sample(){
+ var d=plus(day(new Date()),1),at=function(dayOffset,h,m){var x=plus(d,dayOffset);x.setHours(h,m||0,0,0);return ymd(x)+"T"+String(h).padStart(2,"0")+":"+String(m||0).padStart(2,"0")};
+ var people=[{id:"p1",name:"Andrea (ejemplo)"},{id:"p2",name:"Luis (ejemplo)"},{id:"p3",name:"María (ejemplo)"},{id:"p4",name:"Jorge (ejemplo)"}];
+ var staff=function(id,offset,st,en){return {personId:id,start:at(offset,st),end:at(offset,en)}};
+ return {people:people,vehicles:[{id:"v1",name:"Camioneta 01 (ejemplo)"},{id:"v2",name:"Camioneta 02 (ejemplo)"}],
+  sites:[{id:"s1",name:"Sucursal de ejemplo A",address:"Ciudad de México, México"},{id:"s2",name:"Sucursal de ejemplo B",address:"Naucalpan de Juárez, Estado de México, México"}],
+  blocks:[],events:[
+   {id:"e1",seriesId:"serie1",dayCount:2,dayIndex:1,title:"Volanteo y distribución",type:"Volanteo",campaign:"Campaña ilustrativa",siteId:"s1",origin:"Álvaro Obregón, Ciudad de México, México",travelMin:35,routeBufferMin:15,start:at(0,10),end:at(0,16),staff:[{personId:"p1",start:at(0,9,30),end:at(0,16,30)}],vehicles:["v1"],status:"confirmado"},
+   {id:"e2",seriesId:"serie1",dayCount:2,dayIndex:2,title:"Volanteo y distribución",type:"Volanteo",campaign:"Campaña ilustrativa",siteId:"s1",origin:"Álvaro Obregón, Ciudad de México, México",travelMin:35,routeBufferMin:15,start:at(1,10),end:at(1,16),staff:[{personId:"p1",start:at(1,9,30),end:at(1,16,30)}],vehicles:["v1"],status:"confirmado"},
+   {id:"e3",title:"Reapertura en sucursal",type:"Reapertura",siteId:"s2",origin:"Ciudad de México, México",travelMin:50,routeBufferMin:20,start:at(0,9),end:at(0,12),staff:[{personId:"p2",start:at(0,8,30),end:at(0,12,30)}],vehicles:["v2"],status:"confirmado"},
+   {id:"e4",title:"Sampling en punto de venta",type:"Sampling",siteId:"s2",origin:"Ciudad de México, México",travelMin:50,routeBufferMin:20,start:at(2,12),end:at(2,18),staff:[{personId:"p3",start:at(2,11,30),end:at(2,18,30)}],vehicles:["v2"],status:"programado"},
+   {id:"e5",title:"Evento en vivo",type:"En vivo",siteId:"s1",origin:"Ciudad de México, México",travelMin:35,routeBufferMin:15,start:at(3,14),end:at(3,20),staff:[{personId:"p4",start:at(3,13,30),end:at(3,20,30)}],vehicles:["v1"],status:"programado"}
+  ]};
+}
+function name(list,id,fallback){return ((list||[]).find(function(p){return p.id===id})||{}).name||fallback}
+function site(e){var s=(database.sites||[]).find(function(x){return x.id===e.siteId});return {name:e.venueName||s?.name||e.location||"Sede sin definir",address:e.venueAddress||s?.address||e.location||""}}
+function pathUrl(e){var origin=(e.origin||"").trim(),destination=(site(e).address||"").trim();
+ if(!origin||!destination)return "";
+ var p="https://www.google.com/maps/dir/?api=1&origin="+encodeURIComponent(origin)+"&destination="+encodeURIComponent(destination)+"&travelmode=driving";
+ var stops=(e.stops||"").split(";").map(function(s){return s.trim()}).filter(Boolean).slice(0,8);
+ return p+(stops.length?"&waypoints="+encodeURIComponent(stops.join("|")):"");
+}
+function relevant(e,chosen){return duration(e.start,e.end,stamp(chosen,0),stamp(plus(chosen,1),0))}
+function errors(events){
+ var arr=[];
+ for(var i=0;i<events.length;i++)for(var j=i+1;j<events.length;j++){
+  var a=events[i],b=events[j];if(a.status==="cancelado"||b.status==="cancelado"||a.status==="borrador"||b.status==="borrador")continue;
+  for(var x of a.staff||[])for(var y of b.staff||[])if(x.personId&&x.personId===y.personId){
+   if(duration(x.start,x.end,y.start,y.end))arr.push({ids:[a.id,b.id],text:name(database.people,x.personId,"Personal")+" tiene dos turnos que se empalman."});
+   else if(a.siteId!==b.siteId||!a.siteId){
+    var gap=ms(y.start)-ms(x.end),planned=Number(b.travelMin||0)+Number(b.routeBufferMin||0);
+    if(gap<0){gap=ms(x.start)-ms(y.end);planned=Number(a.travelMin||0)+Number(a.routeBufferMin||0)}
+    if(gap>=0&&planned>0&&gap/60000<planned)arr.push({ids:[a.id,b.id],text:name(database.people,x.personId,"Personal")+": solo "+Math.floor(gap/60000)+" min entre "+a.title+" y "+b.title+"; ruta prevista "+planned+" min (valor manual)."});
+   }
+  }
+  var shared=(a.vehicles||[]).filter(function(id){return (b.vehicles||[]).includes(id)});
+  if(shared.length){
+   var firstA=Math.min(ms(a.start)-Number(a.before??30)*60000,...(a.staff||[]).map(function(p){return ms(p.start)}).filter(Number.isFinite));
+   var lastA=Math.max(ms(a.end)+Number(a.after??30)*60000,...(a.staff||[]).map(function(p){return ms(p.end)}).filter(Number.isFinite));
+   var firstB=Math.min(ms(b.start)-Number(b.before??30)*60000,...(b.staff||[]).map(function(p){return ms(p.start)}).filter(Number.isFinite));
+   var lastB=Math.max(ms(b.end)+Number(b.after??30)*60000,...(b.staff||[]).map(function(p){return ms(p.end)}).filter(Number.isFinite));
+   if(firstA-(Number(a.travelMin||0)+Number(a.routeBufferMin||0))*60000<lastB+Number(b.travelMin||0)*60000&&firstB-(Number(b.travelMin||0)+Number(b.routeBufferMin||0))*60000<lastA+Number(a.travelMin||0)*60000)
+    arr.push({ids:[a.id,b.id],text:name(database.vehicles,shared[0],"Camioneta")+" aparece reservada en ambas jornadas, incluyendo traslado."});
+  }
+ }
+ for(var ev of events)for(var block of database.blocks||[]){
+  var hit=(ev.staff||[]).some(function(a){return block.resourceType==="personal"&&a.personId===block.resourceId&&duration(a.start,a.end,block.start,block.end)})
+   ||(block.resourceType==="vehiculo"&&(ev.vehicles||[]).includes(block.resourceId)&&duration(ev.start,ev.end,block.start,block.end));
+  if(hit)arr.push({ids:[ev.id],text:(ev.title||"Actividad")+": recurso no disponible por "+(block.reason||"bloqueo")});
+ }
+ return arr;
+}
+function eventCard(e,hasConflict){
+ var persons=(e.staff||[]).map(function(a){return '<p class="person">'+safe(name(database.people,a.personId,"Personal"))+' · '+safe(formatTime(a.start))+'–'+safe(formatTime(a.end))+'</p>'}).join("");
+ var cars=(e.vehicles||[]).map(function(id){return name(database.vehicles,id,"Vehículo")}).join(", ");
+ var loc=site(e),place=loc.name||e.location||"Sede pendiente";
+ var travel=Number(e.travelMin||0),buffer=Number(e.routeBufferMin||0),before=30;
+ var first=Math.min(ms(e.start)-Number(e.before??30)*60000,...(e.staff||[]).map(function(a){return ms(a.start)}).filter(Number.isFinite));
+ var departure=new Date(first-(travel+buffer)*60000);
+ var maps=pathUrl(e);
+ var routeText=travel>0?"Salida prevista: "+formatTime(departure)+" · "+travel+" min de camino + "+buffer+" min de margen":"Falta capturar el tiempo previsto del recorrido.";
+ return '<article class="event'+(hasConflict?' conflict':'')+'">'+
+ '<div class="time">'+safe(formatTime(e.start))+' – '+safe(formatTime(e.end))+'</div>'+
+ (Number(e.dayCount)>1?'<span class="series">Día '+Number(e.dayIndex||1)+' de '+Number(e.dayCount)+'</span>':'')+
+ '<span class="type">'+safe(e.type||"Actividad")+'</span><b>'+safe(e.title||"Actividad sin nombre")+'</b>'+
+ '<p><b style="font-size:12px">Sede:</b> '+safe(place)+'</p>'+
+ ((e.campaign||e.project)?'<p>'+safe(e.campaign||e.project)+'</p>':'')+
+ '<p><b style="font-size:12px">Personal:</b> '+(persons?'':'Pendiente de asignar')+'</p>'+persons+
+ '<p><b style="font-size:12px">Vehículo:</b> '+safe(cars||"No requerido")+'</p>'+
+ '<div class="route-plan"><strong>Ruta y traslado</strong><p>'+safe(routeText)+'</p>'+
+ '<p>'+safe(e.origin||"Sin origen definido")+' → '+safe(loc.address||place)+'</p>'+
+ (maps?'<a href="'+safe(maps)+'" target="_blank" rel="noopener noreferrer">Revisar trayecto en Maps</a>':'<p>Completa origen y dirección de sede para abrir Maps.</p>')+
+ '</div></article>';
+}
+
+function scheduleRows(events,flagged){
+ const output=[];
+ for(let i=0;i<scheduleDays;i++){
+  const date=plus(focus,i);
+  const dayStart=stamp(date,0),dayEnd=stamp(plus(date,1),0);
+  const list=events.filter(e=>duration(e.start,e.end,dayStart,dayEnd));
+  if(!list.length)continue;
+  output.push('<section class="schedule-day"><div class="schedule-header"><b>'+safe(formatDate(date))+'</b><small>'+list.length+' '+(list.length===1?'actividad':'actividades')+'</small></div>'+
+    list.map(e=>{
+      const people=(e.staff||[]).map(p=>name(database.people,p.personId,'Personal')+' '+formatTime(p.start)+'–'+formatTime(p.end));
+      const unit=(e.vehicles||[]).map(id=>name(database.vehicles,id,'Camioneta'));
+      const starts=ms(e.start)<ms(dayStart)?'00:00':formatTime(e.start);
+      const ends=ms(e.end)>ms(dayEnd)?'24:00':formatTime(e.end);
+      const series=Number(e.dayCount)>1?' · Día '+Number(e.dayIndex||1)+' de '+Number(e.dayCount):'';
+      const route=pathUrl(e);
+      return '<div class="schedule-row '+(flagged.has(e.id)?'conflict':'')+'"><span class="when">'+safe(starts)+'–'+safe(ends)+'</span>'+
+        '<div><b>'+safe(e.title||'Actividad')+'</b><p>'+safe(e.type||'Actividad')+safe(series)+'</p></div>'+
+        '<div><b>'+safe(site(e).name)+'</b><p>'+safe(e.campaign||e.project||'')+'</p></div>'+
+        '<div class="long"><p><strong>Personal:</strong> '+safe(people.join(', ')||'Pendiente')+'</p><p><strong>Unidad:</strong> '+safe(unit.join(', ')||'Sin camioneta')+'</p></div>'+
+        '<div class="links"><p>'+safe(Number(e.travelMin||0)>0?'Ruta '+Number(e.travelMin)+' min':'Traslado pendiente')+'</p>'+
+        (route?'<a href="'+safe(route)+'" target="_blank" rel="noopener noreferrer">Abrir ruta</a>':'')+'</div></div>';
+    }).join('')+'</section>');
+ }
+ return output.join('')||'<div class="empty-daily">Sin actividades en este período. Cambia la fecha o amplía el rango.</div>';
+}
+function paint(){
+ var all=(database.events||[]).filter(function(e){return e.status!=="cancelado"}).sort(function(a,b){return ms(a.start)-ms(b.start)});
+ var days=viewMode==="cronograma"?scheduleDays:1;var end=plus(focus,days);var visible=all.filter(function(e){return duration(e.start,e.end,stamp(focus,0),stamp(end,0))&&(typeFilter==="todos"||e.type===typeFilter)});
+ var warnings=errors(all),shown=warnings.filter(function(w){return w.ids.some(function(id){return visible.some(function(e){return e.id===id})})});
+ var flagged=new Set(shown.flatMap(function(w){return w.ids}));
+ var people=new Set(visible.flatMap(function(e){return (e.staff||[]).map(function(p){return p.personId})}));
+ var cars=new Set(visible.flatMap(function(e){return e.vehicles||[]}));
+ var multi=new Set(visible.filter(function(e){return Number(e.dayCount)>1}).map(function(e){return e.seriesId||e.id}));
+ var counts=[[viewMode==="dia"?"Jornadas del día":"Jornadas del período",visible.length,viewMode==="dia"?"Para la fecha elegida":"En los próximos "+scheduleDays+" días"],["Personal asignado",people.size,"Turnos programados"],["Camionetas",cars.size,"Unidades programadas"],["Campañas de varios días",multi.size,"Jornadas vinculadas"],["Alertas",shown.length,"Requieren revisión"]];
+ $("metrics").innerHTML=counts.map(function(x){return '<div class="card"><small>'+safe(x[0])+'</small><strong>'+x[1]+'</strong><span>'+safe(x[2])+'</span></div>'}).join("");
+ $("focusdate").value=ymd(focus);
+ $("weektitle").textContent=viewMode==="dia"?formatDate(focus):shortDate(focus)+" – "+shortDate(plus(focus,scheduleDays-1));
+ $("view-heading").textContent=viewMode==="dia"?"Actividades del día":"Cronograma operativo";
+ $("view-subheading").textContent=viewMode==="dia"?"Una ficha por jornada: horario, personal y ruta":"Actividades agrupadas por día, ordenadas por horario";
+ $("show-day").classList.toggle("active",viewMode==="dia");
+ $("show-schedule").classList.toggle("active",viewMode==="cronograma");
+ $("days-control").hidden=viewMode!=="cronograma";
+ $("week").classList.toggle("schedule-mode",viewMode==="cronograma");
+ $("week").innerHTML=viewMode==="cronograma"?scheduleRows(visible,flagged):visible.length?visible.map(function(e){return eventCard(e,flagged.has(e.id))}).join(""):
+ '<div class="empty-daily"><b>Sin jornadas para este día.</b><br>Elige otra fecha o agrega una actividad desde el editor.</div>';
+ var coming=all.filter(function(e){return ms(e.start)>=ms(stamp(focus,0))}).slice(0,6);
+ $("upcoming").innerHTML=coming.length?coming.map(function(e){return '<div class="upnext"><b>'+safe(e.title||"Actividad")+'</b><span>'+safe(shortDate(e.start))+' · '+safe(formatTime(e.start))+'–'+safe(formatTime(e.end))+'<br>'+safe(site(e).name||"Sede")+(Number(e.dayCount)>1?' · Día '+Number(e.dayIndex||1)+'/'+Number(e.dayCount):'')+'</span></div>'}).join(""):'<p class="muted">Sin más jornadas programadas.</p>';
+ $("alerts").innerHTML=shown.length?shown.slice(0,10).map(function(x){return '<div class="alert">'+safe(x.text)+'</div>'}).join(""):'<p class="muted">Sin empalmes detectados en este día.</p>';
+ var opts=new Set(all.map(function(e){return e.type}).filter(Boolean));
+ var sel=$("typefilter"),now=sel.value;
+ for(var opt of opts)if(!Array.from(sel.options).some(function(o){return o.value===opt})){var n=document.createElement("option");n.value=opt;n.textContent=opt;sel.append(n)}
+ sel.value=typeFilter;
+}
+function refresh(force){
+ var db=read(),key=mode==="sample"?"SAMPLE":db.raw;
+ if(!force&&key===last)return;
+ last=key;database=mode==="sample"?sample():db.db;
+ $("message").innerHTML=mode==="sample"?
+  '<b>Datos ilustrativos:</b> volanteo, reapertura, sampling y evento en vivo son ejemplos ficticios. No corresponden a operaciones reales.':
+  (database.events||[]).length?
+  '<b>Vista diaria local:</b> los cambios del editor V3 en este mismo navegador se reflejan automáticamente aquí. Cada jornada tiene horario y recursos propios. No se sincroniza entre teléfonos.':
+  '<b>Sin registros locales:</b> utiliza «Ver ejemplo» o agrega actividades desde el editor. Para ver información compartida de varios dispositivos se requiere Firebase.';
+ paint();
+}
+function clock(){var d=new Date();$("clock").innerHTML=safe(d.toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit",hour12:false}))+'<small>'+safe(d.toLocaleDateString("es-MX",{weekday:"short",day:"numeric",month:"short"}))+'</small>'}
+$("sample").onclick=function(){mode="sample";focus=plus(day(new Date()),1);$("sample").classList.add("active");$("local").classList.remove("active");last="";refresh(true)};
+$("local").onclick=function(){mode="local";focus=day(new Date());$("local").classList.add("active");$("sample").classList.remove("active");last="";refresh(true)};
+$("refresh").onclick=function(){refresh(true)};
+$("show-day").onclick=function(){viewMode="dia";paint()};
+$("show-schedule").onclick=function(){viewMode="cronograma";paint()};
+$("days-control").onchange=function(){scheduleDays=Number(this.value)||7;paint()};
+$("prev").onclick=function(){focus=plus(focus,-(viewMode==="cronograma"?scheduleDays:1));paint()};
+$("next").onclick=function(){focus=plus(focus,viewMode==="cronograma"?scheduleDays:1);paint()};
+$("today").onclick=function(){focus=day(new Date());paint()};
+$("focusdate").onchange=function(){if(/^\d{4}-\d{2}-\d{2}$/.test(this.value)){focus=new Date(this.value+"T12:00:00");paint()}};
+$("typefilter").onchange=function(){typeFilter=this.value;paint()};
+$("print").onclick=function(){window.print()};
+window.addEventListener("storage",function(e){if([KEY].concat(PREV).includes(e.key)&&mode==="local")refresh(true)});
+if(!(read().db.events||[]).length){mode="sample";focus=plus(day(new Date()),1);$("sample").classList.add("active");$("local").classList.remove("active")}
+clock();refresh(true);
+setInterval(function(){clock();if(mode==="local")refresh(false)},5000);
+})();
+</script>
+</body></html>

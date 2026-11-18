@@ -5,6 +5,7 @@
  * Sin reglas desplegadas, la app permanece cerrada.
  */
 import "../firebase-init.js";
+import {projectStaffView} from "./ops-safe-view.mjs";
 import {
   GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
@@ -66,18 +67,7 @@ function boardOnly(state){
   return output;
 }
 function viewFor(person, board){
-  const mine=board.events.filter(e=>(e.staff||[]).some(a=>a.personId===person.id))
-    .map(e=>({...e,staff:e.staff.filter(a=>a.personId===person.id)}));
-  const units=new Set(mine.flatMap(e=>e.vehicles||[]));
-  const sites=new Set(mine.map(e=>e.siteId).filter(Boolean));
-  const cleanPerson={id:person.id,name:person.name,role:person.role,
-    phone:person.phone||"",email:person.email||"",active:person.active!==false};
-  return {
-    personId:person.id,person:cleanPerson,events:mine,
-    vehicles:board.vehicles.filter(v=>units.has(v.id)).map(v=>({...v,plate:v.plate||""})),
-    sites:board.sites.filter(s=>sites.has(s.id)),
-    campaigns:[],settings:board.settings
-  };
+  return projectStaffView(person, board);
 }
 function boardMismatch(b,c){
   return keys.some(k=>canon(b?.[k]??blank()[k])!==canon(c?.[k]??blank()[k]));
@@ -341,10 +331,10 @@ async function store(next){
           for(const uid of uids){
             const person=newByUid.get(uid),ref=doc(fs,"agora_ops_staff",uid);
             if(!person){tx.delete(ref);continue}
-            const newView=viewFor(person,nextBoard),oldPerson=oldByUid.get(uid);
-            const oldView=oldPerson?viewFor(oldPerson,previous.payload):null;
-            if(!oldView||canon(oldView)!==canon(newView))
-              tx.set(ref,{...newView,uid,updatedAt:serverTimestamp()});
+            const newView=viewFor(person,nextBoard);
+            // Reescribir también fichas aparentemente iguales: versiones anteriores
+            // podían conservar campos privados que la proyección nueva elimina.
+            tx.set(ref,{...newView,uid,updatedAt:serverTimestamp()});
           }
         });
       }

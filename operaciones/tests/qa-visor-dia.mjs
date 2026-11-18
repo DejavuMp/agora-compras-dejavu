@@ -140,7 +140,7 @@ try{
   await commit('#event-form');
   assert.ok((await page.locator('#event-validation').innerText()).includes('tiempo insuficiente'),'Bloquea traslado insuficiente');
   assert.equal((await state()).sites.length,1,'No agrega sede si el formulario falla');
-  await page.goto(origin+'visor.html',{waitUntil:'domcontentloaded'});
+  await page.goto(origin+'visor-demo.html',{waitUntil:'domcontentloaded'});
   await page.locator('#local').click();
   await page.locator('#focusdate').fill(start.slice(0,10));
   assert.ok((await page.locator('#week').innerText()).includes('Volanteo de prueba QA'),'Visor diario muestra actividad');
