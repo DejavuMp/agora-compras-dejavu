@@ -198,6 +198,18 @@ function renderAttendance(){
     return;
   }
   const check=allowedByPolicy(p);
+  const shiftBreaks=currentBreaks(),currentRest=openBreak(shiftBreaks);
+  const restSummary=verifiedBreakSummary(r,shiftBreaks);
+  const pauseMarkup=!breaksReady?
+    '<div class="staff-break-zone"><p>El control de descansos no está habilitado en Firebase. Al terminar podrás declarar los minutos en tu comprobante.</p></div>':
+    currentRest?
+    '<div class="staff-break-zone"><strong>En descanso desde '+esc(when(currentRest.startedAt))+'</strong>'+
+    '<p>Tu jornada sigue abierta. Pulsa Reanudar para continuar.</p>'+
+    '<button type="button" id="j-break-resume" '+(busy?"disabled":"")+'>Reanudar jornada</button></div>':
+    '<div class="staff-break-zone"><p>Descansos: '+restSummary.minutes+' min · '+shiftBreaks.length+' pausa(s)</p>'+
+    (nextBreakSlot(shiftBreaks)?
+      '<button type="button" id="j-break-start" '+(busy?"disabled":"")+'>Iniciar descanso</button>':
+      '<small>Límite de ocho pausas alcanzado.</small>')+'</div>';
   $("policy-state").textContent=p?
     (p.enabled?"Acceso "+(check.ok?"habilitado":"fuera de horario")+" · "+(p.mode==="horas"?"Cupo de "+(p.maxMinutes/60).toFixed(1)+" horas":"Horario fijo")+
       " · "+when(p.startsAt)+" a "+when(p.endsAt):"Jornada bloqueada por coordinación"):
@@ -217,11 +229,12 @@ function renderAttendance(){
     (!r?'<p><b>Actividad asignada:</b> '+esc(e.type||"Actividad")+' · '+esc(e.title||"Operación programada")+'</p>'+
       (e.notes?'<p><b>Indicaciones:</b> '+esc(e.notes)+'</p>':"")+
       '<button class="primary" id="start-shift" '+(!canStart?"disabled":"")+'>Confirmar GPS e iniciar jornada</button>':"")+
-    (r?.status==="en_curso"?'<details class="staff-incidents"><summary>¿Hubo alguna incidencia? Agrega un comentario (opcional)</summary>'+
+    (r?.status==="en_curso"?pauseMarkup+'<details class="staff-incidents"><summary>¿Hubo alguna incidencia? Agrega un comentario (opcional)</summary>'+
       '<label>Comentario de cierre<textarea id="end-note" maxlength="240" placeholder="Incidencia, resultado u observación"></textarea></label></details>'+
-      '<button class="primary" id="end-shift" '+(busy?"disabled":"")+'>Confirmar GPS y finalizar jornada</button>':"")+
+      '<button class="primary" id="end-shift" '+(busy||!!currentRest?"disabled":"")+'>Confirmar GPS y finalizar jornada</button>':"")+
     (!check.ok&&!r?'<p class="notice">'+esc(check.reason)+'</p>':"")+
-    (ended?'<p><button type="button" class="staff-subtle" data-staff-tab="pagos">Ir a mis pagos y reportes</button></p>':"")+
+    (ended?'<p><button type="button" class="staff-subtle" data-staff-tab="pagos">Ver mis comprobantes</button></p>':"")+
+    (ended&&breaksReady&&shiftBreaks.length?'<p><b>Descanso con marcajes:</b> '+restSummary.minutes+' min en '+shiftBreaks.length+' pausa(s)</p>':"")+
     '</div>';
   if($("end-note")&&existingNote)$("end-note").value=existingNote;
   if($("start-activity")&&existingActivity)$("start-activity").value=existingActivity;
