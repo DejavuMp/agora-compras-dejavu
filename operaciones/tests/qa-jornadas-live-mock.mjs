@@ -29,7 +29,7 @@ const authJS=[
 const dbJS=[
   "const staff="+JSON.stringify(staff)+";",
   "const access="+JSON.stringify(policy)+";",
-  "const rec={clock:new Map(),trips:new Map(),logs:new Map()};",
+  "const rec={clock:new Map(),trips:new Map(),logs:new Map(),breaks:new Map()};",
   "window.__mockRecords=rec;",
   "const listeners={};",
   "export function doc(_db,...parts){return parts.join('/');}",
@@ -45,7 +45,7 @@ const dbJS=[
   "function snapshot(coll){",
   " if(coll==='agora_ops_staff/staff-qa')return {metadata:{fromCache:false},exists:()=>true,data:()=>staff};",
   " let map=coll==='agora_ops_shift_access'?new Map([['staff-qa_evento1',access]]):",
-  " (coll==='agora_ops_clock'?rec.clock:coll==='agora_ops_logs'?rec.logs:rec.trips);",
+  " (coll==='agora_ops_clock'?rec.clock:coll==='agora_ops_logs'?rec.logs:coll==='agora_ops_breaks'?rec.breaks:rec.trips);",
   " return {metadata:{fromCache:false},docs:[...map.entries()].map(([id,data])=>({id,data:()=>data}))};",
   "}",
   "export function onSnapshot(ref,_o,fn){",
@@ -53,9 +53,9 @@ const dbJS=[
   " (listeners[coll]??=[]).push(fn);queueMicrotask(()=>fn(snapshot(coll)));",
   " return ()=>{listeners[coll]=listeners[coll].filter(x=>x!==fn)};}",
   "export async function setDoc(ref,data){const [coll,id]=ref.split('/');",
-  " const row=rec[coll==='agora_ops_clock'?'clock':coll==='agora_ops_logs'?'logs':'trips'];row.set(id,data);emit(coll);}",
+  " const row=rec[coll==='agora_ops_clock'?'clock':coll==='agora_ops_logs'?'logs':coll==='agora_ops_breaks'?'breaks':'trips'];row.set(id,data);emit(coll);}",
   "export async function updateDoc(ref,data){const [coll,id]=ref.split('/');",
-  " const row=rec[coll==='agora_ops_clock'?'clock':coll==='agora_ops_logs'?'logs':'trips'];row.set(id,{...row.get(id),...data});emit(coll);}"
+  " const row=rec[coll==='agora_ops_clock'?'clock':coll==='agora_ops_logs'?'logs':coll==='agora_ops_breaks'?'breaks':'trips'];row.set(id,{...row.get(id),...data});emit(coll);}"
 ].join("\n");
 try{
   await c.route("**/firebase-init.js",r=>r.fulfill({status:200,headers,body:"window.AGORA_FIREBASE={auth:{},firestore:{}};"}));
@@ -91,6 +91,16 @@ try{
   // Simular una jornada ficticia de una hora en Firestore mock (sin modificar reloj real).
   await page.evaluate(()=>{window.__mockRecords.clock.get("staff-qa_evento1").startedAt=new Date(Date.now()-60*60000)});
   assert.ok((await page.locator("#j-operational-status").textContent()).includes("En jornada"));
+  await page.locator("#j-break-start").click();
+  await page.waitForFunction(()=>document.querySelector("#j-operational-status")?.textContent.includes("En descanso"));
+  assert.ok(await page.locator("#end-shift").isDisabled(),"Jornada no termina con descanso abierto");
+  await page.evaluate(()=>{
+    window.__mockRecords.breaks.get("staff-qa_evento1_1").startedAt=new Date(Date.now()-15*60000);
+  });
+  await page.locator("#j-break-resume").click();
+  await page.waitForFunction(()=>document.querySelector("#j-operational-status")?.textContent.includes("En jornada"));
+  assert.equal((await page.evaluate(()=>[...window.__mockRecords.breaks.values()]))[0].status,"reanudado");
+
   await page.locator("#end-shift").click();
   await page.waitForFunction(()=>document.querySelector("#j-active")?.textContent.includes("Salida oficial:"),{timeout:8000}).catch(async error=>{console.log("JORNADA END DEBUG",JSON.stringify({status:await page.locator("#auth-status").textContent(),body:await page.locator("#j-active").innerText(),checked:await page.locator("#live-location").isChecked(),clock:await page.evaluate(()=>[...window.__mockRecords.clock.values()])}));throw error;});
   await page.locator('#staff-tabs [data-staff-tab="traslados"]').click();
@@ -103,7 +113,7 @@ try{
   await page.waitForFunction(()=>document.querySelector("#j-trips")?.textContent.includes("Llegada registrada"));
 
   await page.locator('#staff-tabs [data-staff-tab="pagos"]').click();
-  await page.locator('[data-break-for="evento1"]').fill("15");
+  assert.equal(await page.locator('[data-break-for="evento1"]').count(),0,"Descansos verificados no permiten duplicación manual");
   await page.locator('[data-create-report="evento1"]').click();
   await page.waitForFunction(()=>document.querySelector("#j-payment-list")?.textContent.includes("Horas capturadas"));
   const receiptWindow=page.waitForEvent("popup");
@@ -119,7 +129,7 @@ try{
   const reports=await page.evaluate(()=>[...window.__mockRecords.logs.values()]);
   assert.equal(reports.length,1,"El reporte no debe duplicarse");
   assert.equal(reports[0].paymentStatus,"solicitado");
-  assert.equal(reports[0].breakMins,15,"El descanso declarado se registra en la ficha.");
+  assert.ok(reports[0].breakMins>=14&&reports[0].breakMins<=15,"Se descuenta la pausa con hora del servidor.");
   assert.equal(reports[0].requestedAmount,null,"El staff no define monto");
   assert.ok(reports[0].requestedHours>0);
   assert.ok(!(await page.locator("#j-payment-list").innerText()).includes("Tarifa por hora"));
