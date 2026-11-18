@@ -1,5 +1,6 @@
 /** Vista de staff: únicamente campos de su propia ficha y registros por UID. */
 import {instant,elapsedMinutes} from "./jornadas-logic.mjs";
+import {timeStatement,hours} from "./ops-timekeeping.mjs";
 const pad=n=>String(n).padStart(2,"0");
 export function localDay(value){
   const n=instant(value);
@@ -52,7 +53,7 @@ export function netHours(log){
   const minutes=elapsedMinutes(log?.start,log?.end);
   return Math.max(0,minutes-Math.max(0,Number(log?.breakMins)||0))/60;
 }
-export function reportFromFinishedClock({clock,event,uid,personId,id}){
+export function reportFromFinishedClock({clock,event,uid,personId,id,breakMins=0}){
   if(!clock||clock.status!=="finalizada"||!event)
     throw Error("Termina primero tu jornada para preparar el reporte.");
   const start=instant(clock.startedAt),end=instant(clock.endedAt);
@@ -60,14 +61,16 @@ export function reportFromFinishedClock({clock,event,uid,personId,id}){
     throw Error("La hora oficial no está disponible. Espera a que Firebase la confirme.");
   if(!id||id.length>100||id.includes("/"))
     throw Error("La jornada tiene un identificador no compatible. Consulta a coordinación.");
+  const summary=timeStatement({clock,event,personId,breakMins});
   const activity=String(clock.endNote||clock.activity||"").slice(0,240).trim();
   if(activity.length<4)throw Error("La jornada necesita una descripción de la actividad.");
   return {
     id,ownerUid:uid,personId,eventId:event.id,
     start:new Date(start).toISOString(),end:new Date(end).toISOString(),
-    breakMins:0,activity,
+    breakMins:summary.breakMinutes,activity,
     place:String(event.venueName||event.location||"Sede asignada").slice(0,240),
-    notes:"Registro basado en entrada y salida verificadas por Firebase.",
-    paymentBasis:"hora",paymentStatus:"capturado",revision:1
+    notes:"Entrada y salida registradas en Firebase. Descanso declarado por el integrante: "+summary.breakMinutes+" min. "+
+      (summary.reviewRequired?"Excedente a revisar: "+hours(summary.overtimeCandidateMinutes)+".":"Sin excedente detectado."),
+    paymentBasis:summary.paymentBasis,paymentStatus:"capturado",revision:1
   };
 }
