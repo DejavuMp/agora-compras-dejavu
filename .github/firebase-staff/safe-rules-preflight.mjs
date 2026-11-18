@@ -60,6 +60,14 @@ if(identityAt<=clockAt || identityAt>=financeEnd ||
  throw Error('Bloque de Identidad no delimitado exactamente; cancelar.');
 }
 const beforeIdentity=candidate.slice(0,identityAt)+candidate.slice(financeEnd);
+// También admitir EXACTAMENTE la última versión publicada, antes de corregir
+// la consulta de coordinación. Sin comodines ni relajación de otras reglas.
+const coordinatorListNew="      allow list: if identityRh() ||\n        (identityCoordinator() && request.auth.uid in resource.data.coordinatorUids);";
+const coordinatorListOld="      allow list: if identityRh() || identityAssigned(resource.data);";
+if(candidate.split(coordinatorListNew).length!==2){
+  throw Error('Regla de directorio de coordinación no coincide con la versión esperada');
+}
+const beforeCoordinatorListFix=candidate.replace(coordinatorListNew,coordinatorListOld);
 const evidenceMarker='        // Fotos de evidencia compartidas: acceso a fichas publicadas.';
 function normalize(s){return String(s).replace(/\r\n?/g,'\n').trim()}
 function safeVariants(text){
@@ -96,7 +104,7 @@ mkdirSync('.github/firebase-staff/.preflight',{recursive:true});
 writeFileSync('.github/firebase-staff/.preflight/antes-dejavu.rules',live,'utf8');
 writeFileSync('.github/firebase-staff/.preflight/ruleset-name.txt',release.rulesetName+'\n','utf8');
 // Conservar el respaldo antes incluso si fallan los chequeos de variantes.
-const allowed=new Set([...safeVariants(candidate),...safeVariants(beforeIdentity),...safeVariants(oldOps),...safeVariants(withoutOps),...safeVariants(legacy)].map(normalize));
+const allowed=new Set([...safeVariants(candidate),...safeVariants(beforeCoordinatorListFix),...safeVariants(beforeIdentity),...safeVariants(oldOps),...safeVariants(withoutOps),...safeVariants(legacy)].map(normalize));
 if(!allowed.has(normalize(live))){
  throw Error('REGLAS DISTINTAS EN PRODUCCIÓN. Se guardó respaldo. Se detiene para NO modificar permisos de Ágora Compras, Archivos u otros módulos.');
 }

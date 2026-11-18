@@ -6,7 +6,7 @@ import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {initializeTestEnvironment,assertFails,assertSucceeds} from '@firebase/rules-unit-testing';
 import {
-  collection,doc,getDoc,getDocs,setDoc,serverTimestamp,Timestamp,writeBatch
+  collection,doc,getDoc,getDocs,limit,query,setDoc,serverTimestamp,Timestamp,where,writeBatch
 } from 'firebase/firestore';
 
 const env=await initializeTestEnvironment({
@@ -77,6 +77,11 @@ try{
 
   await yes('titular lee su registro de identidad',getDoc(doc(staff,'agora_identity_registry',agoraId)));
   await yes('coordinacion asignada lee el registro operativo',getDoc(doc(coord,'agora_identity_registry',agoraId)));
+  await yes('RH lista registros del directorio',getDocs(query(collection(admin,'agora_identity_registry'),limit(200))));
+  await yes('RH lista solicitudes pendientes',getDocs(query(collection(admin,'agora_identity_registrations'),where('status','==','pending'),limit(100))));
+  await yes('RH lista usuarios con rol coordinador',getDocs(query(collection(admin,'agora_users'),where('role','==','coordinador'),limit(200))));
+  await yes('coordinacion lista solo registros asignados',getDocs(query(collection(coord,'agora_identity_registry'),where('coordinatorUids','array-contains',coordId),limit(200))));
+  await no('coordinacion no puede enumerar el directorio completo',getDocs(query(collection(coord,'agora_identity_registry'),limit(200))));
   await no('persona ajena no lee el registro interno',getDoc(doc(other,'agora_identity_registry',agoraId)));
   await yes('verificacion publica lee solo la proyeccion de credencial',getDoc(doc(anon,'agora_identity_credentials',credentialId)));
   await no('visitante no puede enumerar credenciales',getDocs(collection(anon,'agora_identity_credentials')));
