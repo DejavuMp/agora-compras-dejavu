@@ -7,6 +7,7 @@ on:
       - "operaciones/index.html"
       - "operaciones/cloud-v4.js"
       - "operaciones/access-link-model.mjs"
+      - "operaciones/editor-jornadas-control.mjs"
       - "operaciones/visor.html"
       - "operaciones/jornadas*"
       - "operaciones/staff-dashboard.mjs"
@@ -45,6 +46,10 @@ jobs:
           node --check operaciones/jornadas-live.js
           node operaciones/tests/qa-staff-dashboard.mjs
 
+      - name: Validar control por actividad y cálculo de horarios
+        run: |
+          node --check operaciones/editor-jornadas-control.mjs
+          node operaciones/tests/qa-editor-event-control.mjs
       - name: Validar lógica de vinculación individual y edición de fichas
         run: |
           node --check operaciones/cloud-v4.js
@@ -73,6 +78,8 @@ jobs:
         run: node operaciones/tests/qa-jornadas-live-mock.mjs
       - name: Verificar solicitud inicial de acceso y privacidad del visor
         run: node operaciones/tests/qa-visor-authorization-mock.mjs
+      - name: Probar matriz de cronograma, control de evento y autocompletado
+        run: node operaciones/tests/qa-editor-matrix-browser.mjs
       - name: Probar vinculación de solicitudes desde el editor, sin Firebase real
         run: node operaciones/tests/qa-access-link-browser.mjs
 
