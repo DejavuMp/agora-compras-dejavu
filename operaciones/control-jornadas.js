@@ -132,6 +132,7 @@ $("roster").addEventListener("click",async e=>{
 });
 $("search").oninput=renderRoster;
 $("logout").onclick=()=>signOut(auth);
+$("login-switch").onclick=()=>signOut(auth);
 $("login-google").onclick=async()=>{
   try{await signInWithPopup(auth,new GoogleAuthProvider())}
   catch(e){
@@ -144,12 +145,12 @@ async function session(u){
   const version=++epoch;stop();user=u;
   $("login").hidden=!!u;$("control").hidden=true;
   if(!u){status("Inicia sesión como administrador o coordinador.");return}
-  if(!u.emailVerified){status("Se requiere correo verificado.","error");return}
+  if(!u.emailVerified){$("login").hidden=false;status("Se requiere correo verificado.","error");return}
   try{
     const snap=await getDocFromServer(doc(fs,"agora_users",u.uid));
     if(version!==epoch)return;
     if(!snap.exists()||snap.data()?.active!==true||!["admin","coordinador"].includes(snap.data().role)){
-      status("No tienes permisos administrativos para controlar jornadas.","error");return}
+      $("login").hidden=false;status("No tienes permisos administrativos para controlar jornadas.","error");return}
     $("control").hidden=false;status("Coordinación autorizada · sincronización en tiempo real","ok");
     listen(doc(fs,"agora_ops_control","schedule"),snap=>{board=snap.data()?.payload||null});
     listen(collection(fs,"agora_ops_shift_access"),snap=>{
