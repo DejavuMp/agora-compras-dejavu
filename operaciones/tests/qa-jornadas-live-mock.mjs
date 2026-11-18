@@ -116,6 +116,16 @@ try{
   assert.equal(await page.locator('[data-break-for="evento1"]').count(),0,"Descansos verificados no permiten duplicación manual");
   await page.locator('[data-create-report="evento1"]').click();
   await page.waitForFunction(()=>document.querySelector("#j-payment-list")?.textContent.includes("Horas capturadas"));
+  const monthWindow=page.waitForEvent("popup");
+  await page.locator("#j-print-month").click();
+  const monthPage=await monthWindow;
+  await monthPage.waitForLoadState("domcontentloaded");
+  const monthText=await monthPage.locator("body").innerText();
+  assert.ok(monthText.includes("Reporte de días y horas trabajadas"));
+  assert.ok(monthText.includes("Volanteo de prueba"));
+  assert.ok(monthText.includes("Días distintos con reporte"));
+  assert.ok(!monthText.includes("NOMINA_PRIVADA"));
+  await monthPage.close();
   const receiptWindow=page.waitForEvent("popup");
   await page.locator('[data-print-report]').click();
   const receiptPage=await receiptWindow;
