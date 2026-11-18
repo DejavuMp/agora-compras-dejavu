@@ -20,6 +20,6 @@ assert.ok(!JSON.stringify(projected).includes("p2"));
 assert.equal(projectTodayAssignments({personId:"p1",events}, new Date("2026-11-19T12:00:00-06:00")).length, 0);
 
 assert.deepEqual(publicCredential({agoraId:"DJV-2026-001",displayName:"Persona Demo",jobTitle:"Staff",credentialActive:false,blockReason:"Fin de turno"}), {
-  agoraId:"DJV-2026-001",displayName:"Persona Demo",jobTitle:"Staff",active:false,status:"bloqueada",blockReason:"Fin de turno"
+  agoraId:"DJV-2026-001",displayName:"Persona Demo",jobTitle:"Staff",active:false,status:"bloqueada",blockReason:"Credencial suspendida"
 });
 console.log("OK identidad: ocho cargos, ID, CSV seguro, credencial y asignaciones propias.");
