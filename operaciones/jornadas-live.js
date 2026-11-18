@@ -267,9 +267,9 @@ function renderPayments(events){
   const existingHtml=own.filter(l=>paymentFilter(l.paymentStatus||"capturado",payFilter)).map(l=>{
     const state=l.paymentStatus||"capturado";
     const action=["capturado","revision"].includes(state);
-    const canRequest=action&&events.some(e=>e.id===l.eventId)&&String(l.activity||"").trim().length>=4&&
-      !("approvedAmount" in l)||false;
     const hasPriorApproved="approvedAmount" in l||"approvedHours" in l;
+    const canRequest=action&&events.some(e=>e.id===l.eventId)&&String(l.activity||"").trim().length>=4&&
+      !hasPriorApproved;
     const approved=["validado","programado","pagado"].includes(state)&&
       typeof l.approvedAmount==="number"&&Number.isFinite(l.approvedAmount);
     const money=approved?" · Importe validado: "+new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(l.approvedAmount):
@@ -307,6 +307,49 @@ function render(){
   renderTrips();
   renderPayments(events);
   setTab(staffTab);
+}
+async function createReport(eventId){
+  if(!user||!personId||!staff||!logsLoaded)return;
+  const event=(staff.events||[]).find(e=>e.id===eventId);
+  const clock=records.get(key(user.uid,eventId));
+  if(!event||!clock||clock.status!=="finalizada"){
+    status("Termina y confirma tu jornada antes de crear el reporte.","error");return;
+  }
+  if([...logs.values()].some(l=>l.ownerUid===user.uid&&l.eventId===eventId)){
+    status("Ya existe un reporte para esta jornada. Revísalo en Mis pagos.","error");return;
+  }
+  const id="j_"+user.uid+"_"+eventId;
+  await action(async()=>{
+    const docValue=reportFromFinishedClock({clock,event,uid:user.uid,personId,id});
+    await setDoc(doc(fs,"agora_ops_logs",id),{...docValue,updatedAt:serverTimestamp()});
+    setTab("pagos");
+  },"Creando un reporte de horas basado en tu marcaje oficial…");
+}
+async function requestPayment(id){
+  if(!user||!personId)return;
+  const log=logs.get(id);
+  if(!log||log.ownerUid!==user.uid||log.personId!==personId)return;
+  if(!["capturado","revision"].includes(log.paymentStatus||"capturado")){
+    status("La solicitud ya está siendo revisada o fue validada.","error");return;
+  }
+  const activity=(staff?.events||[]).find(e=>e.id===log.eventId);
+  if(!activity||!String(log.activity||"").trim()){
+    status("El reporte debe corresponder a tu jornada e incluir la actividad realizada.","error");return;
+  }
+  if("approvedHours" in log||"approvedAmount" in log){
+    status("Este registro ya tuvo una validación. Solicita su corrección a coordinación.","error");return;
+  }
+  const hours=netHours(log);
+  if(!(hours>0)){status("El reporte todavía no tiene horas válidas.","error");return}
+  await action(async()=>{
+    await updateDoc(doc(fs,"agora_ops_logs",id),{
+      paymentStatus:"solicitado",
+      requestedHours:Number(hours.toFixed(2)),
+      requestedRate:null,requestedAmount:null,
+      revision:Number(log.revision||1)+1,updatedAt:serverTimestamp()
+    });
+    setTab("pagos");
+  },"Enviando tu reporte a revisión de pagos…");
 }
 function locSnapshot(){
   return new Promise((resolve,reject)=>{
@@ -454,6 +497,10 @@ async function session(u){
     watch(query(collection(fs,"agora_ops_trips"),where("ownerUid","==",u.uid)),snap=>{
       trips=new Map(snap.docs.map(d=>[d.id,d.data()]));
     });
+    watch(query(collection(fs,"agora_ops_logs"),where("ownerUid","==",u.uid)),snap=>{
+      logs=new Map(snap.docs.map(d=>[d.id,{...d.data(),id:d.id}]));
+      logsLoaded=true;
+    });
   }catch(e){if(version===authEpoch)status("No se pudo comprobar el acceso: "+errorMessage(e),"error")}
 }
 async function googleLogin(){
@@ -486,10 +533,45 @@ $("verify").onclick=async()=>{
   catch(e){status(errorMessage(e),"error")}
 };
 $("logout").onclick=()=>signOut(auth);
-$("j-events").addEventListener("click",e=>{
-  const el=e.target.closest("[data-select]");if(!el)return;
-  selected=el.dataset.select;stopTracking();render();
+$("staff-board").addEventListener("click",event=>{
+  const tab=event.target.closest("[data-staff-tab]");
+  if(tab){setTab(tab.dataset.staffTab);return}
+  const opened=event.target.closest("[data-open-event]");
+  if(opened){chooseEvent(opened.dataset.openEvent,opened.dataset.openTab||"asistencia");return}
+  const mode=event.target.closest("[data-calendar-mode]");
+  if(mode){calendarMode=mode.dataset.calendarMode;render();return}
+  const report=event.target.closest("[data-create-report]");
+  if(report){createReport(report.dataset.createReport);return}
+  const request=event.target.closest("[data-request-payment]");
+  if(request){requestPayment(request.dataset.requestPayment);return}
 });
+document.querySelectorAll("#viewer-staff [data-choose-event]").forEach(select=>{
+  select.addEventListener("change",()=>chooseEvent(select.value));
+});
+$("j-date").addEventListener("change",()=>{
+  if(Number.isFinite(atLocalDay($("j-date").value))){
+    calendarDay=$("j-date").value;render();
+  }
+});
+$("j-period").addEventListener("change",()=>{
+  calendarDays=[7,14,30].includes(Number($("j-period").value))?Number($("j-period").value):7;
+  render();
+});
+$("j-pay-filter").addEventListener("change",()=>{payFilter=$("j-pay-filter").value;render()});
+function changeCalendar(direction){
+  const base=new Date(atLocalDay(calendarDay));
+  if(!Number.isFinite(base.getTime()))return;
+  base.setDate(base.getDate()+direction*(calendarMode==="dia"?1:calendarDays));
+  calendarDay=localDay(base);render();
+}
+$("j-prev").onclick=()=>changeCalendar(-1);
+$("j-next").onclick=()=>changeCalendar(1);
+$("j-now").onclick=()=>{calendarDay=localDay(Date.now());render()};
+$("trip-origin").addEventListener("input",()=>{
+  const e=currentEvent(),origin=$("trip-origin").value.trim(),url=e?mapsUrl(origin,destination(e)):"";
+  const link=$("j-route");link.hidden=!url;if(url)link.href=url;
+});
+
 $("j-active").addEventListener("click",e=>{
   if(e.target.id==="start-shift")markStart();
   if(e.target.id==="end-shift")markEnd();
