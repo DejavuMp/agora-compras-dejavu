@@ -2,7 +2,7 @@
  * No usa almacenamiento local ni lee fichas individuales, Finanzas o nómina.
  */
 import "../firebase-init.js";
-import {GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signInWithRedirect,signOut}
+import {GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signInWithRedirect,signInWithEmailAndPassword,signOut}
   from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
 import {doc,getDocFromServer,onSnapshot}
   from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
@@ -109,6 +109,7 @@ function render(){
 }
 async function session(user){
   const version=++authEpoch;clearSchedule();
+  $("viewer-credentials").hidden=!!user;
   if(!user){
     $("local").hidden=false;$("sample").hidden=true;
     message("Este visor requiere inicio de sesión con Google y permisos de coordinación. No se publican datos administrativos de forma abierta.");
@@ -122,7 +123,13 @@ async function session(user){
     if(version!==authEpoch)return;
     const profile=userSnap.data()||{};
     if(!userSnap.exists()||profile.active!==true||!["admin","coordinador"].includes(profile.role)){
-      message("Esta cuenta no tiene acceso al visor general. El personal consulta únicamente sus jornadas desde Mi espacio.","error");
+      const member=await getDocFromServer(doc(db,"agora_ops_members",user.uid));
+      if(version!==authEpoch)return;
+      if(member.exists()&&member.data()?.active===true&&member.data()?.role==="staff"){
+        window.location.replace("./jornadas.html");
+        return;
+      }
+      message("Esta cuenta no tiene acceso al visor general. Para registrar tu turno entra a Mis jornadas.","error");
       return;
     }
     permission=true;
@@ -147,6 +154,14 @@ async function login(){
     }else message(String(e?.message||e),"error")
   }
 }
+$("viewer-credentials").addEventListener("submit",async event=>{
+  event.preventDefault();
+  const email=$("viewer-email").value.trim(),password=$("viewer-password").value;
+  if(!email||!password)return;
+  try{await signInWithEmailAndPassword(auth,email,password)}
+  catch(e){message("No fue posible iniciar con contraseña. Comprueba el correo, contraseña y proveedor habilitado.","error")}
+  finally{$("viewer-password").value=""}
+});
 $("local").textContent="Entrar con Google";
 $("sample").textContent="Cerrar sesión";
 $("local").onclick=login;
