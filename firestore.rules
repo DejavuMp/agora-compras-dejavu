@@ -953,9 +953,314 @@ match /agora_finance_requests/{requestId} {
       allow delete: if false;
     }
 
+    // AGORA - Identidad Unica y RH. Fragmento para insertar dentro de
+    // match /databases/{database}/documents. No reemplaza reglas existentes.
+    function identityRh() {
+      return isAdmin();
+    }
+    function identityCoordinator() {
+      return activeStaff() && role() == 'coordinador';
+    }
+    function identityJob(job) {
+      return job in [
+        'Coordinador','Subcoordinador de cuenta','Supervisor','Staff',
+        'Staff de montaje','Staff de desmontaje','Volanteero','Runner'
+      ];
+    }
+    function identityLinkPath(uid) {
+      return /databases/$(database)/documents/agora_identity_links/$(uid);
+    }
+    function identityRegistryPath(agoraId) {
+      return /databases/$(database)/documents/agora_identity_registry/$(agoraId);
+    }
+    function identityCredentialPath(credentialId) {
+      return /databases/$(database)/documents/agora_identity_credentials/$(credentialId);
+    }
+    function identityAuditPath(auditId) {
+      return /databases/$(database)/documents/agora_identity_audit/$(auditId);
+    }
+    function identityOwnerOf(agoraId) {
+      return signedIn() && exists(identityLinkPath(request.auth.uid)) &&
+        get(identityLinkPath(request.auth.uid)).data.agoraId == agoraId;
+    }
+    function identityAssigned(record) {
+      return identityCoordinator() && record.coordinatorUids is list &&
+        request.auth.uid in record.coordinatorUids;
+    }
+    function validIdentityAuditAfter(auditId,targetUid,agoraId) {
+      return auditId is string && auditId.size() >= 24 && auditId.size() <= 64 &&
+        existsAfter(identityAuditPath(auditId)) &&
+        getAfter(identityAuditPath(auditId)).data.actorUid == request.auth.uid &&
+        getAfter(identityAuditPath(auditId)).data.targetUid == targetUid &&
+        getAfter(identityAuditPath(auditId)).data.agoraId == agoraId;
+    }
+    function validIdentityRegistry() {
+      return request.resource.data.keys().hasOnly([
+          'uid','agoraId','displayName','email','jobTitle','rhStatus',
+          'credentialId','credentialActive','credentialStatus','blockReason',
+          'coordinatorUids','createdAt','updatedAt','createdBy','updatedBy','lastAuditId'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'uid','agoraId','displayName','email','jobTitle','rhStatus',
+          'credentialId','credentialActive','credentialStatus','blockReason',
+          'coordinatorUids','createdAt','updatedAt','createdBy','updatedBy','lastAuditId'
+        ]) &&
+        request.resource.data.uid is string && request.resource.data.uid.size() >= 1 &&
+        request.resource.data.uid.size() <= 128 &&
+        request.resource.data.agoraId is string &&
+        request.resource.data.agoraId.matches('^DJV-[0-9]{4}-[0-9]{3,6}$') &&
+        request.resource.data.displayName is string && request.resource.data.displayName.size() >= 3 &&
+        request.resource.data.displayName.size() <= 140 &&
+        request.resource.data.email is string && request.resource.data.email.size() <= 240 &&
+        identityJob(request.resource.data.jobTitle) &&
+        request.resource.data.rhStatus in ['pending','verified','suspended','inactive'] &&
+        request.resource.data.credentialId is string &&
+        request.resource.data.credentialId.size() >= 24 && request.resource.data.credentialId.size() <= 64 &&
+        request.resource.data.credentialActive is bool &&
+        request.resource.data.credentialStatus in ['vigente','bloqueada','suspendida'] &&
+        request.resource.data.blockReason is string && request.resource.data.blockReason.size() <= 240 &&
+        (request.resource.data.credentialActive == true ||
+          request.resource.data.blockReason.size() >= 5) &&
+        request.resource.data.coordinatorUids is list &&
+        request.resource.data.coordinatorUids.size() <= 50 &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.updatedBy == request.auth.uid;
+    }
+    function validIdentityCredential() {
+      return request.resource.data.keys().hasOnly([
+          'credentialId','agoraId','displayName','jobTitle','active','status',
+          'blockReason','updatedAt','updatedBy','lastAuditId'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'credentialId','agoraId','displayName','jobTitle','active','status',
+          'blockReason','updatedAt','updatedBy','lastAuditId'
+        ]) &&
+        request.resource.data.credentialId is string &&
+        request.resource.data.credentialId.size() >= 24 && request.resource.data.credentialId.size() <= 64 &&
+        request.resource.data.agoraId.matches('^DJV-[0-9]{4}-[0-9]{3,6}$') &&
+        request.resource.data.displayName is string && request.resource.data.displayName.size() >= 3 &&
+        request.resource.data.displayName.size() <= 140 &&
+        identityJob(request.resource.data.jobTitle) &&
+        request.resource.data.active is bool &&
+        request.resource.data.status in ['vigente','bloqueada','suspendida'] &&
+        request.resource.data.blockReason is string && request.resource.data.blockReason.size() <= 240 &&
+        (request.resource.data.active == true || request.resource.data.blockReason.size() >= 5) &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.updatedBy == request.auth.uid;
+    }
+    function identityPublicMatchesRegistry(registry) {
+      return existsAfter(identityCredentialPath(registry.credentialId)) &&
+        getAfter(identityCredentialPath(registry.credentialId)).data.agoraId == registry.agoraId &&
+        getAfter(identityCredentialPath(registry.credentialId)).data.displayName == registry.displayName &&
+        getAfter(identityCredentialPath(registry.credentialId)).data.jobTitle == registry.jobTitle &&
+        getAfter(identityCredentialPath(registry.credentialId)).data.active == registry.credentialActive &&
+        getAfter(identityCredentialPath(registry.credentialId)).data.status == registry.credentialStatus &&
+        getAfter(identityCredentialPath(registry.credentialId)).data.blockReason == registry.blockReason &&
+        getAfter(identityCredentialPath(registry.credentialId)).data.lastAuditId == registry.lastAuditId;
+    }
+
+    match /agora_identity_registrations/{uid} {
+      allow get: if (signedIn() && request.auth.uid == uid) || identityRh();
+      allow list: if identityRh();
+      allow create: if signedIn() && request.auth.uid == uid &&
+        request.resource.data.keys().hasOnly([
+          'uid','email','displayName','telephone','requestedJobTitle','status',
+          'privacyAccepted','privacyVersion','createdAt','updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'uid','email','displayName','telephone','requestedJobTitle','status',
+          'privacyAccepted','privacyVersion','createdAt','updatedAt'
+        ]) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.displayName is string && request.resource.data.displayName.size() >= 3 &&
+        request.resource.data.displayName.size() <= 140 &&
+        request.resource.data.telephone is string && request.resource.data.telephone.size() <= 30 &&
+        identityJob(request.resource.data.requestedJobTitle) &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.privacyAccepted == true &&
+        request.resource.data.privacyVersion == 'provisional-2026-11-18' &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time;
+      allow update: if identityRh() && resource.data.status == 'pending' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status','agoraId','approvedAt','approvedBy','updatedAt'
+        ]) &&
+        request.resource.data.status == 'approved' &&
+        request.resource.data.agoraId.matches('^DJV-[0-9]{4}-[0-9]{3,6}$') &&
+        request.resource.data.approvedAt == request.time &&
+        request.resource.data.approvedBy == request.auth.uid &&
+        request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    match /agora_identity_counters/{yearId} {
+      allow get: if identityRh();
+      allow list: if false;
+      allow create: if identityRh() &&
+        request.resource.data.keys().hasOnly(['year','nextSequence','updatedAt','updatedBy']) &&
+        yearId.matches('^[0-9]{4}$') &&
+        request.resource.data.year is int &&
+        request.resource.data.nextSequence is int &&
+        request.resource.data.nextSequence >= 2 && request.resource.data.nextSequence <= 1000000 &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.updatedBy == request.auth.uid;
+      allow update: if identityRh() &&
+        request.resource.data.keys().hasOnly(['year','nextSequence','updatedAt','updatedBy']) &&
+        request.resource.data.year == resource.data.year &&
+        request.resource.data.nextSequence > resource.data.nextSequence &&
+        request.resource.data.nextSequence <= resource.data.nextSequence + 25 &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /agora_identity_links/{uid} {
+      allow get: if (signedIn() && request.auth.uid == uid) || identityRh();
+      allow list: if identityRh();
+      allow create: if identityRh() &&
+        request.resource.data.keys().hasOnly([
+          'uid','agoraId','credentialId','active','createdAt','createdBy'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'uid','agoraId','credentialId','active','createdAt','createdBy'
+        ]) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.agoraId.matches('^DJV-[0-9]{4}-[0-9]{3,6}$') &&
+        request.resource.data.credentialId.size() >= 24 &&
+        request.resource.data.active == true &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /agora_identity_registry/{agoraId} {
+      allow get: if identityRh() || identityOwnerOf(agoraId) || identityAssigned(resource.data);
+      allow list: if identityRh() || identityAssigned(resource.data);
+      allow create: if identityRh() && request.resource.data.agoraId == agoraId &&
+        validIdentityRegistry() && request.resource.data.createdAt == request.time &&
+        request.resource.data.createdBy == request.auth.uid &&
+        validIdentityAuditAfter(request.resource.data.lastAuditId,request.resource.data.uid,agoraId) &&
+        identityPublicMatchesRegistry(request.resource.data) &&
+        existsAfter(identityLinkPath(request.resource.data.uid)) &&
+        getAfter(identityLinkPath(request.resource.data.uid)).data.agoraId == agoraId;
+      allow update: if validIdentityRegistry() &&
+        request.resource.data.uid == resource.data.uid &&
+        request.resource.data.agoraId == resource.data.agoraId &&
+        request.resource.data.email == resource.data.email &&
+        request.resource.data.credentialId == resource.data.credentialId &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.lastAuditId != resource.data.lastAuditId &&
+        validIdentityAuditAfter(request.resource.data.lastAuditId,resource.data.uid,agoraId) &&
+        identityPublicMatchesRegistry(request.resource.data) && (
+          identityRh() ||
+          (identityAssigned(resource.data) &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'jobTitle','credentialActive','credentialStatus','blockReason',
+              'updatedAt','updatedBy','lastAuditId'
+            ]))
+        );
+      allow delete: if false;
+    }
+
+    match /agora_identity_profiles/{uid} {
+      allow get: if identityRh() || (signedIn() && request.auth.uid == uid);
+      allow list: if identityRh();
+      allow create, update: if (identityRh() || (signedIn() && request.auth.uid == uid)) &&
+        request.resource.data.keys().hasOnly([
+          'uid','telephone','address','shirtSize','pantSize','shoeSize',
+          'emergencyName','emergencyRelation','emergencyPhone','medicalNotes','updatedAt'
+        ]) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.telephone is string && request.resource.data.telephone.size() <= 30 &&
+        request.resource.data.address is string && request.resource.data.address.size() <= 300 &&
+        request.resource.data.medicalNotes is string && request.resource.data.medicalNotes.size() <= 300 &&
+        request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    match /agora_identity_financial/{uid} {
+      allow get: if identityRh() || (signedIn() && request.auth.uid == uid);
+      allow list: if identityRh();
+      allow create: if (identityRh() || (signedIn() && request.auth.uid == uid)) &&
+        request.resource.data.keys().hasOnly([
+          'uid','rfc','curp','nss','bank','clabe','taxRegime','lockedByRH','updatedAt'
+        ]) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.lockedByRH == false &&
+        request.resource.data.updatedAt == request.time;
+      allow update: if request.resource.data.uid == uid &&
+        request.resource.data.keys().hasOnly([
+          'uid','rfc','curp','nss','bank','clabe','taxRegime','lockedByRH','updatedAt'
+        ]) &&
+        request.resource.data.updatedAt == request.time && (
+          identityRh() ||
+          (signedIn() && request.auth.uid == uid &&
+            resource.data.lockedByRH == false &&
+            request.resource.data.lockedByRH == false)
+        );
+      allow delete: if false;
+    }
+
+    match /agora_identity_credentials/{credentialId} {
+      allow get: if credentialId.size() >= 24 && credentialId.size() <= 64;
+      allow list: if false;
+      allow create: if identityRh() &&
+        request.resource.data.credentialId == credentialId &&
+        validIdentityCredential() &&
+        existsAfter(identityRegistryPath(request.resource.data.agoraId)) &&
+        getAfter(identityRegistryPath(request.resource.data.agoraId)).data.credentialId == credentialId &&
+        validIdentityAuditAfter(
+          request.resource.data.lastAuditId,
+          getAfter(identityRegistryPath(request.resource.data.agoraId)).data.uid,
+          request.resource.data.agoraId
+        );
+      allow update: if validIdentityCredential() &&
+        request.resource.data.credentialId == resource.data.credentialId &&
+        request.resource.data.agoraId == resource.data.agoraId &&
+        request.resource.data.displayName == resource.data.displayName &&
+        request.resource.data.lastAuditId != resource.data.lastAuditId &&
+        existsAfter(identityRegistryPath(resource.data.agoraId)) &&
+        getAfter(identityRegistryPath(resource.data.agoraId)).data.credentialId == credentialId &&
+        getAfter(identityRegistryPath(resource.data.agoraId)).data.lastAuditId == request.resource.data.lastAuditId &&
+        validIdentityAuditAfter(
+          request.resource.data.lastAuditId,
+          getAfter(identityRegistryPath(resource.data.agoraId)).data.uid,
+          resource.data.agoraId
+        ) && (
+          identityRh() ||
+          identityAssigned(get(identityRegistryPath(resource.data.agoraId)).data)
+        );
+      allow delete: if false;
+    }
+
+    match /agora_identity_audit/{auditId} {
+      allow get, list: if identityRh();
+      allow create: if (identityRh() || identityCoordinator()) &&
+        auditId.size() >= 24 && auditId.size() <= 64 &&
+        request.resource.data.keys().hasOnly([
+          'actorUid','targetUid','agoraId','action','createdAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'actorUid','targetUid','agoraId','action','createdAt'
+        ]) &&
+        request.resource.data.actorUid == request.auth.uid &&
+        request.resource.data.targetUid is string &&
+        request.resource.data.agoraId.matches('^DJV-[0-9]{4}-[0-9]{3,6}$') &&
+        request.resource.data.action in [
+          'identity_approved','credential_activated','credential_blocked',
+          'coordinator_assigned','job_changed','rh_status_changed'
+        ] &&
+        request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+
     // Todas las demás colecciones permanecen cerradas.
     match /{document=**} {
       allow read, write: if false;
     }
   }
 }
+

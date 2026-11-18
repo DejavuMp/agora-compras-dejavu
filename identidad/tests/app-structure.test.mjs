@@ -1,0 +1,19 @@
+import assert from "node:assert/strict";
+import {readFile} from "node:fs/promises";
+
+const app=await readFile(new URL("../app.js",import.meta.url),"utf8");
+const firebase=await readFile(new URL("../firebase-identity.js",import.meta.url),"utf8");
+const verify=await readFile(new URL("../verify.js",import.meta.url),"utf8");
+const html=await readFile(new URL("../index.html",import.meta.url),"utf8");
+
+assert.match(app,/projectTodayAssignments\(workspace\.operations/);
+assert.match(firebase,/agora_ops_staff/);
+assert.match(firebase,/runTransaction\(db/);
+assert.match(firebase,/agora_identity_audit/);
+assert.match(firebase,/agora_identity_credentials/);
+assert.match(verify,/readPublicCredential/);
+assert.match(html,/noindex,nofollow/);
+assert.match(app,/Carga deshabilitada/);
+assert.doesNotMatch(app,/\b(?:POS|CRM|Wallet|SSO)\b/);
+assert.doesNotMatch(app,/datos demo|simulad[oa]/i);
+console.log("OK aplicación estructural: datos reales, transacción, QR público y bóveda no simulada.");
