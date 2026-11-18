@@ -7,6 +7,7 @@
 import "../firebase-init.js";
 import {projectStaffView} from "./ops-safe-view.mjs";
 import {availablePeople,personForLink} from "./access-link-model.mjs";
+import {createEventControl} from "./editor-jornadas-control.mjs";
 import {
   GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
@@ -33,6 +34,8 @@ let linkingUid=null;
 let unwatches=[],dirtyWaiting=false,authVersion=0,view=null;
 const root=document.getElementById("ops-gate");
 const app=window.AGORA_OPS_APP;
+const opsJornadas=createEventControl({getBoard:()=>baseBoard?.payload,getUser:()=>account,
+  isCoordinator:()=>ready&&role==="coordinador",fs,doc,collection,onSnapshot,runTransaction,serverTimestamp});
 const clone=x=>JSON.parse(JSON.stringify(x));
 const canon=x=>JSON.stringify(x);
 const h=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -57,6 +60,7 @@ function show(){
 function fail(msg){notice("No sincronizado · "+msg,"error");loading("Conexión no disponible",msg,
   '<button class="ops-login" id="ops-retry">Reintentar</button> <button class="ops-plain" id="ops-logout">Salir</button>');}
 function stop(){
+  opsJornadas.stop();
   for(const off of unwatches.splice(0))try{off()}catch(_){}
   role=null;personId="";baseBoard=null;logs.clear();incidents.clear();requests.clear();
   saving=false;ready=false;dirtyWaiting=false;
@@ -80,6 +84,7 @@ function emit(){
     {...blank(),...(baseBoard?.payload||{}),logs:[...logs.values()].map(x=>clone(x)),incidents:[...incidents.values()].map(x=>clone(x))}:
     {...blank(),...view,people:view?.person?[view.person]:[],logs:[...logs.values()].map(x=>clone(x)),incidents:[...incidents.values()].map(x=>clone(x))};
   app?.apply?.({db:data,role:role==="coordinador"?"coordinador":"personal",personId});
+  opsJornadas.render();
 }
 function listen(s,ok){
   const off=onSnapshot(s,{includeMetadataChanges:true},ok,error=>fail(err(error)));
@@ -448,6 +453,7 @@ window.AGORA_OPS_BRIDGE={
   get ready(){return ready},get role(){return role},
   get personId(){return personId},
   save:store,
+  openJornadasControl:()=>{if(role==="coordinador"&&ready)opsJornadas.open()},
   guardAction(action){
     if(!ready||saving){notice("La sincronización está ocupada.","pending");return false;}
     if(["import-json","clear-data","load-demo"].includes(action)){
