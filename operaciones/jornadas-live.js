@@ -16,6 +16,7 @@ import {
 import {localDay,atLocalDay,shiftOf,eventStart,eventEnd,myEvents,filteredEvents,payLabel,paymentFilter,netHours,reportFromFinishedClock} from "./staff-dashboard.mjs";
 import {timeStatement,hours,overtimeText} from "./ops-timekeeping.mjs";
 import {receiptData,receiptHtml} from "./ops-receipt.mjs";
+import {ownMonthReport,monthlyReceiptHtml} from "./ops-monthly-receipt.mjs";
 import {ownBreaks,openBreak,nextBreakSlot,verifiedBreakSummary} from "./ops-breaks.mjs";
 import {eligibleNotices} from "./ops-reminders.mjs";
 const {auth,firestore:fs}=window.AGORA_FIREBASE||{};
@@ -383,6 +384,27 @@ async function createReport(eventId,declaredBreakMins=0){
     setTab("pagos");
   },"Creando un reporte de horas basado en tu marcaje oficial…");
 }
+function printMonthReport(){
+  if(!user||!personId||!staff||!logsLoaded)return;
+  const month=$("j-month-report").value;
+  try{
+    const clocks=new Map((staff.events||[]).map(e=>[e.id,records.get(key(user.uid,e.id))]));
+    const report=ownMonthReport({
+      logs:[...logs.values()],events:staff.events,clocks,
+      uid:user.uid,personId,person:staff.person,month
+    });
+    if(!report.activityCount){
+      status("No hay reportes finalizados de horas para ese mes. Selecciona otro periodo.","error");return;
+    }
+    const content=monthlyReceiptHtml(report);
+    const url=URL.createObjectURL(new Blob([content],{type:"text/html;charset=utf-8"}));
+    const link=document.createElement("a");
+    link.href=url;link.target="_blank";link.rel="noopener noreferrer";
+    document.body.appendChild(link);link.click();link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+    status("Se abrió tu resumen del mes. Selecciona «Imprimir / Guardar como PDF» en la nueva pestaña.","ok");
+  }catch(error){status("No se pudo generar el resumen: "+errorMessage(error),"error")}
+}
 function printWorkReceipt(id){
   const record=logs.get(id);
   if(!record||!user||record.ownerUid!==user.uid||record.personId!==personId)return;
@@ -728,6 +750,8 @@ $("j-period").addEventListener("change",()=>{
   render();
 });
 $("j-pay-filter").addEventListener("change",()=>{payFilter=$("j-pay-filter").value;render()});
+$("j-month-report").value=localDay(Date.now()).slice(0,7);
+$("j-print-month").onclick=printMonthReport;
 function changeCalendar(direction){
   const base=new Date(atLocalDay(calendarDay));
   if(!Number.isFinite(base.getTime()))return;
