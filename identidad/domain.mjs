@@ -77,6 +77,6 @@ export function publicCredential(registry) {
     jobTitle: registry.jobTitle,
     active: registry.credentialActive === true,
     status: registry.credentialActive === true ? "vigente" : "bloqueada",
-    blockReason: registry.credentialActive === true ? "" : normalizeText(registry.blockReason, 240)
+    blockReason: registry.credentialActive === true ? "" : "Credencial suspendida"
   };
 }
