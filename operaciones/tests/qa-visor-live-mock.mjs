@@ -23,6 +23,8 @@ const authModule=[
  "export async function signInWithPopup(){}",
  "export async function signInWithRedirect(){}",
  "export async function signInWithEmailAndPassword(){}",
+ "export async function sendPasswordResetEmail(){}",
+ "export async function sendEmailVerification(){}",
  "export async function signOut(){}"
 ].join("\n");
 const dbModule=[
@@ -30,6 +32,8 @@ const dbModule=[
  "let listener=null,revision=1;",
  "const snapshot=()=>({metadata:{fromCache:false},data:()=>({revision,payload:board}),exists:()=>true});",
  "export function doc(_db,...args){return args.join('/');}",
+ "export function serverTimestamp(){return new Date()}",
+ "export async function setDoc(){}",
  "export async function getDocFromServer(ref){if(ref==='agora_users/coord-qa')return {exists:()=>true,data:()=>({active:true,role:'coordinador'})};return snapshot();}",
  "export function onSnapshot(_doc,_settings,callback){listener=callback;queueMicrotask(()=>callback(snapshot()));return ()=>{listener=null}}",
  "window.__qaEmitTitle=(title)=>{board.events[0].title=title;revision++;if(listener)listener(snapshot())};"
