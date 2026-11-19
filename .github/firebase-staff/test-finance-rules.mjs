@@ -16,7 +16,7 @@ const environment=await initializeTestEnvironment({
 const COLL='agora_finance_requests';
 const baseHistory={kind:'solicitud',by:'coordinacion@example.invalid',at:'2026-11-15T10:00:00.000Z',note:'Solicitud creada'};
 const baseRequest=id=>({
- schema:1,id,folio:'RF-2026-'+id,category:'materiales',
+ schema:1,id,folio:'RF-2026-'+id,agoraId:'DJV-2026-001',projectId:'KFC-PROJ-001',category:'materiales',
  project:'Proyecto de prueba',client:'Cliente ficticio',requester:'Coordinación',
  dateNeeded:'2026-12-01',priority:'normal',reason:'Insumos para producción',
  paymentType:'entrega',paymentMethod:'transferencia',beneficiary:'Beneficiario ficticio',
@@ -41,6 +41,9 @@ try{
   ])await setDoc(doc(d,'agora_users',id),{
    active:true,role,name:id,email,createdAt:Timestamp.now(),updatedAt:Timestamp.now()
   });
+  for(const [uid,agoraId] of [['coord','DJV-2026-001'],['otro','DJV-2026-002'],['admin','DJV-2026-003'],['consulta','DJV-2026-004'],['staff','DJV-2026-005']]){
+   await setDoc(doc(d,'agora_identity_links',uid),{uid,agoraId,active:true,credentialId:'credential-'+uid,createdBy:'admin',createdAt:Timestamp.now()});
+  }
  });
  const anon=environment.unauthenticatedContext().firestore();
  const outsider=environment.authenticatedContext('no-registrado',{email:'externo@example.invalid',email_verified:true}).firestore();
@@ -48,13 +51,19 @@ try{
  const coord=environment.authenticatedContext('coord',{email:'coordinacion@example.invalid',email_verified:true}).firestore();
  const other=environment.authenticatedContext('otro',{email:'otro@example.invalid',email_verified:true}).firestore();
  const admin=environment.authenticatedContext('admin',{email:'admin@example.invalid',email_verified:true}).firestore();
+ const staff=environment.authenticatedContext('staff',{email:'staff@example.invalid',email_verified:true}).firestore();
  const id='test-finance-01',ref=db=>doc(db,COLL,id);
  const request=baseRequest(id);
  await no('visitante no puede listar solicitudes',getDocs(collection(anon,COLL)));
  await no('visitante no puede crear solicitudes',setDoc(ref(anon),request));
  await no('usuario sin perfil no puede crear',setDoc(ref(outsider),request));
- await no('rol consulta no puede crear',setDoc(ref(consult),request));
+ await no('rol consulta no puede crear',setDoc(ref(consult),{...request,createdBy:'consulta',createdByEmail:'consulta@example.invalid',agoraId:'DJV-2026-004',updatedBy:'consulta'}));
+ await no('coordinación no puede suplantar ID ajeno',setDoc(doc(coord,COLL,'id-suplanto'),{...baseRequest('id-suplanto'),agoraId:'DJV-2026-003'}));
+ await no('el solicitante sin ID no puede guardar en nube',setDoc(doc(outsider,COLL,'sin-id'),{...baseRequest('sin-id'),createdBy:'no-registrado',createdByEmail:'externo@example.invalid',updatedBy:'no-registrado',agoraId:''}));
  await yes('coordinación crea su propia solicitud',setDoc(ref(coord),request));
+ await yes('staff con ID Dejavú puede crear su propia solicitud',setDoc(doc(staff,COLL,'staff-01'),{...baseRequest('staff-01'),createdBy:'staff',createdByEmail:'staff@example.invalid',updatedBy:'staff',agoraId:'DJV-2026-005'}));
+ await yes('staff puede leer su solicitud',getDoc(doc(staff,COLL,'staff-01')));
+ await no('staff no puede leer el expediente bancario de otro',getDoc(ref(staff)));
  await yes('creador puede leer su solicitud',getDoc(ref(coord)));
  await yes('creador puede listar las suyas',getDocs(query(collection(coord,COLL),where('createdBy','==','coord'))));
  await no('coordinación no puede listar todo el archivo',getDocs(collection(coord,COLL)));
