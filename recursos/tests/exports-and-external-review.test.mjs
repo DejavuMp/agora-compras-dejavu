@@ -34,14 +34,14 @@ const actual=new URL(url);
 assert.equal(actual.pathname,'/agora-compras-dejavu/recursos/aprobar.html');
 const encoded=actual.searchParams.get('d').replace(/-/g,'+').replace(/_/g,'/');
 const data=JSON.parse(Buffer.from(encoded,'base64').toString('utf8'));
-assert.equal(data.folio,sample.folio);
-assert.equal(data.project,sample.project);
-assert.equal(data.total,12345.5);
+assert.equal(data.f,sample.folio);
+assert.equal(data.p,sample.project);
+assert.equal(data.t,12345.5);
 for(const secret of ['BANCO PRIVADO','123456789012345678','NOMBRE CONFIDENCIAL','NOTAS SECRETAS']){
  assert.ok(!url.includes(secret),'El enlace no expone '+secret);
  assert.ok(!JSON.stringify(data).includes(secret),'El resumen no exporta '+secret);
 }
-assert.deepEqual(Object.keys(data).sort(),['category','client','dateNeeded','folio','project','total','v'].sort());
+assert.deepEqual(Object.keys(data).sort(),['c','d','f','p','t','v'].sort());
 
 assert.match(html,/id="approve"/);
 assert.match(html,/id="reject"/);
