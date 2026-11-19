@@ -360,10 +360,49 @@ function docHost(r){
  return host;
 }
 function removeDoc(host){host?.remove();}
+async function ensureExportLibrary(){
+ if(window.html2canvas)return;
+ if(!ensureExportLibrary.promise){
+  ensureExportLibrary.promise=(async()=>{
+   for(const url of [
+    'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js',
+    'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js'
+   ]){
+    try{
+     await new Promise((resolve,reject)=>{
+      const script=document.createElement('script');script.src=url;script.onload=resolve;
+      script.onerror=()=>reject(Error('No cargó la biblioteca de imagen.'));
+      document.head.appendChild(script);
+     });
+     if(window.html2canvas)return;
+    }catch(error){console.warn('Biblioteca de imagen no disponible:',url,error);}
+   }
+   throw Error('No se pudo cargar el generador PNG. Comprueba internet o habilita los dominios de bibliotecas en el navegador.');
+  })().finally(()=>{ensureExportLibrary.promise=null;});
+ }
+ await ensureExportLibrary.promise;
+}
 async function makeCanvas(host){
- if(!window.html2canvas)throw Error('No se cargó la biblioteca para generar imagen. Revisa la conexión a internet y vuelve a intentar.');
- await Promise.all(Array.from(host.querySelectorAll('img')).map(i=>i.complete?Promise.resolve():new Promise(resolve=>{i.onload=resolve;i.onerror=resolve;})));
- return await window.html2canvas($('.document-sheet',host),{scale:2,backgroundColor:'#fff',useCORS:false,logging:false,windowWidth:850});
+ await ensureExportLibrary();
+ const imgs=Array.from(host.querySelectorAll('img'));
+ await Promise.all(imgs.map(i=>i.complete?Promise.resolve():new Promise(resolve=>{i.onload=resolve;i.onerror=resolve;})));
+ const sheet=host.querySelector('.document-sheet');
+ if(!sheet)throw Error('No se encontró la hoja para exportar.');
+ // La captura se hace sobre un clon VISIBLE: el CSS ocultaba el host con z-index:-1.
+ const canvas=await window.html2canvas(sheet,{
+  scale:2,backgroundColor:'#ffffff',useCORS:false,logging:false,
+  scrollX:0,scrollY:0,windowWidth:Math.max(850,window.innerWidth),
+  onclone:copy=>{
+   const cloneHost=copy.querySelector('.doc-print-host');
+   if(cloneHost){
+    cloneHost.style.cssText='display:block!important;position:absolute!important;left:0!important;top:0!important;z-index:100!important;visibility:visible!important;opacity:1!important;pointer-events:none!important;transform:none!important';
+   }
+   const cloneSheet=copy.getElementById('document-sheet');
+   if(cloneSheet)cloneSheet.style.cssText+=';display:block!important;visibility:visible!important;opacity:1!important;transform:none!important';
+  }
+ });
+ if(!canvas.width||!canvas.height)throw Error('La imagen quedó vacía; vuelve a intentar la descarga.');
+ return canvas;
 }
 function downloadBlob(blob,name){const url=URL.createObjectURL(blob),a=el('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);}
 async function downloadPNG(r){
@@ -385,32 +424,22 @@ async function downloadPDF(r){
  }finally{removeDoc(host);}
 }
 function printDoc(r){
- // El CSS general oculta documentos no marcados .print-view al imprimir.
- // Abrimos la ventana directamente desde el clic para evitar el bloqueo de popups.
- const pop=window.open('','_blank');
- if(!pop){showToast('El navegador bloqueó la ventana. Permite ventanas emergentes para imprimir.');return;}
- pop.opener=null;
+ // Impresión directa en la pestaña actual: no requiere autorizar ventanas emergentes.
+ if(printDoc.host){printDoc.host.remove();printDoc.host=null;}
  const host=docHost(r);
- const content=host.innerHTML.replace('class="document-sheet"','class="document-sheet print-view"');
- removeDoc(host);
- const css='<style>body{background:#fff!important;margin:0!important}.document-sheet{margin:0 auto!important;border:0!important;min-height:0!important;width:190mm!important;padding:9mm!important;font-size:12px!important;box-shadow:none!important}.document-sheet img{max-width:100%!important}@page{size:A4;margin:8mm}@media print{body>article.document-sheet.print-view{display:block!important}body{background:#fff!important}}</style>';
- pop.document.open();
- pop.document.write('<!doctype html><html lang="es-MX"><head><meta charset="utf-8"><title>'+esc(r.folio)+'</title><link rel="stylesheet" href="'+new URL('./style.css',location.href).href+'">'+css+'</head><body>'+content+'</body></html>');
- pop.document.close();
- let started=false;
- const go=async()=>{
-  if(started)return;
-  started=true;
-  try{
-   await Promise.all(Array.from(pop.document.images).map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;})));
-   if(pop.document.fonts?.ready)await pop.document.fonts.ready;
-  }catch{}
-  if(pop.closed)return;
-  pop.focus();pop.print();
+ host.classList.add('print-view');
+ host.setAttribute('aria-hidden','true');
+ printDoc.host=host;
+ const close=()=>{
+  if(printDoc.host===host){host.remove();printDoc.host=null;}
+  window.removeEventListener('afterprint',close);
  };
- pop.addEventListener('load',go,{once:true});
- // Si el evento load ya ocurrió, este respaldo también activa el diálogo.
- setTimeout(go,1000);
+ window.addEventListener('afterprint',close,{once:true});
+ try{
+  window.print();
+  // Respaldo para navegadores que no generan afterprint.
+  setTimeout(close,120000);
+ }catch(error){close();throw Error('No se pudo abrir el diálogo de impresión: '+error.message);}
 }
 function previewDoc(r){
  const host=docHost(r);$('#modal-body').innerHTML='<div class="action-bar"><button class="btn btn-outline" data-action="back">← Volver al expediente</button><button class="btn btn-gold" data-action="pdf">↓ PDF</button><button class="btn btn-outline" data-action="png">↓ PNG</button></div><div class="doc-preview">'+host.innerHTML+'</div>';removeDoc(host);
