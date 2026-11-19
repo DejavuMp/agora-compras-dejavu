@@ -1,7 +1,7 @@
 import {buildPayroll,payrollHtml,payrollXlsx,payrollEmail} from "./ops-payroll-preview.mjs";
 const safe=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let root=null,report=null,month="",dueDate="";
-const isAdmin=()=>!window.AGORA_OPS_BRIDGE||(window.AGORA_OPS_BRIDGE.role==="coordinador"&&window.AGORA_OPS_BRIDGE.ready);
+const isAdmin=()=>window.AGORA_OPS_BRIDGE?(window.AGORA_OPS_BRIDGE.role==="coordinador"&&window.AGORA_OPS_BRIDGE.ready):(window.AGORA_OPS_APP?.getRole?.()==="coordinador");
 const state=()=>window.AGORA_OPS_APP?.snapshot?.()||window.AGORA_TEST?.getState?.();
 const pad=x=>String(x).padStart(2,"0");
 const currentMonth=()=>{const d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)};
