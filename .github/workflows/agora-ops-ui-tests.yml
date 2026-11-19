@@ -110,6 +110,8 @@ jobs:
           python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/agora-http.log 2>&1 &
           echo $! >/tmp/agora-http.pid
           sleep 2
+      - name: Comprobar validación manual, nómina Excel y PDF imprimible en navegador
+        run: TZ=America/Mexico_City node operaciones/tests/qa-attendance-payroll-browser.mjs
       - name: Probar volanteo por jornada, horarios, empalmes y visor
         run: node operaciones/tests/qa-visor-dia.mjs
       - name: Simular visor con dos navegadores separados (no Firebase real)
