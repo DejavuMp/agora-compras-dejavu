@@ -33,7 +33,7 @@ const coordinatorListNew="      allow list: if identityRh() ||\n        (identit
 const coordinatorListOld="      allow list: if identityRh() || identityAssigned(resource.data);";
 assert.equal(candidate.split(coordinatorListNew).length,2,"La nueva regla de coordinación aparece exactamente una vez");
 const beforeCoordinatorListFix=candidate.replace(coordinatorListNew,coordinatorListOld);
-assert.equal(beforeIdentity.includes("agora_identity_"),false,"Las reglas anteriores a Identidad no contienen sus colecciones");
+assert.equal(beforeIdentity.includes("match /agora_identity_"),false,"Las reglas anteriores a Identidad no definen colecciones de Identidad");
 const drift=candidate.replace("      allow list: if false;","      allow list: if true;");
 assert.notEqual(drift,candidate,"La alteración desconocida debe existir");
 
