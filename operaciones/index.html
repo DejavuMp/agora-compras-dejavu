@@ -162,10 +162,11 @@ const monday=(d)=>plusDays(startOfDay(d),-(d.getDay()+6)%7);
 // A date-only string is UTC in JavaScript. Parse it as a local calendar day so
 // Mexico City users do not see an event shifted into the following column.
 const toDate=(s)=>{if(typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)}return new Date(s)};
-const dateMs=(s)=>new Date(s).getTime();
-const fmtDate=(s,opts={day:'2-digit',month:'short'})=>new Intl.DateTimeFormat('es-MX',opts).format(new Date(s));
-const fmtLong=(s)=>new Intl.DateTimeFormat('es-MX',{day:'numeric',month:'long',year:'numeric'}).format(new Date(s));
-const fmtTime=(s)=>new Intl.DateTimeFormat('es-MX',{hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(s));
+const dateObj=s=>s?.toDate?.()||(typeof s?.seconds==='number'?new Date(s.seconds*1000):new Date(s));
+const dateMs=(s)=>dateObj(s).getTime();
+const fmtDate=(s,opts={day:'2-digit',month:'short'})=>new Intl.DateTimeFormat('es-MX',opts).format(dateObj(s));
+const fmtLong=(s)=>new Intl.DateTimeFormat('es-MX',{day:'numeric',month:'long',year:'numeric'}).format(dateObj(s));
+const fmtTime=(s)=>new Intl.DateTimeFormat('es-MX',{hour:'2-digit',minute:'2-digit',hour12:false}).format(dateObj(s));
 const fmtHours=(n)=>Number(n||0).toLocaleString('es-MX',{minimumFractionDigits:1,maximumFractionDigits:1});
 const esc=(s)=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid=()=> 'id_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);
