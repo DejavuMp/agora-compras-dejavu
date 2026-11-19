@@ -31,7 +31,7 @@ const localDate=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezon
 const dateOnly=v=>v?String(v).slice(0,10):'';
 const asDate=v=>v?.toDate?.()?.toLocaleString('es-MX')||String(v||'');
 const el=(tag,cls='',txt='')=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt)e.textContent=txt;return e;};
-const state={view:'dashboard',records:[],selected:'',user:null,role:'',fb:null,cloud:false,loading:false,mode:'local',editingId:'',forceLocal:false};
+const state={view:'dashboard',records:[],selected:'',user:null,role:'',fb:null,cloud:false,loading:false,mode:'local',editingId:'',forceLocal:false,agoraId:'',agoraName:''};
 let idbPromise;
 function dbOpen(){
  if(idbPromise)return idbPromise;
@@ -76,19 +76,45 @@ async function loadRecords(){
   else banner('No se pudo cargar la información local: '+readable(error),'error');
  }finally{state.loading=false;render();}
 }
+function updateIdentityForm(){
+ const id=$('#agora-id-field'),note=$('#agora-id-note');
+ if(id)id.value=state.agoraId||'Sin ID asignado';
+ if(note)note.innerHTML=state.agoraId
+   ?'Identidad verificada con tu sesión ÁGORA. Este ID se asociará a la solicitud.'
+   :'No hay un ID Dejavú activo vinculado a esta cuenta. Puedes crear una solicitud local; para guardar en nube, tramita tu ID en <a href="../identidad/" target="_blank" rel="noopener noreferrer">Identidad ÁGORA</a>.';
+ if(state.agoraName&&!state.editingId){
+  const requester=$('#request-form')?.elements?.namedItem('requester');
+  if(requester&&!requester.value.trim())requester.value=state.agoraName;
+ }
+}
+async function loadLinkedIdentity(){
+ state.agoraId='';
+ if(state.user&&state.fb&&dbSdk){
+  try{
+   const snap=await dbSdk.getDoc(dbSdk.doc(state.fb.firestore,'agora_identity_links',state.user.uid));
+   const link=snap.data();
+   if(link?.active===true&&/^DJV-\d{4}-\d{3,6}$/.test(link.agoraId))state.agoraId=link.agoraId;
+  }catch(error){console.warn('No se pudo consultar el ID Dejavú de la sesión.',error);}
+ }
+ updateIdentityForm();
+}
 async function refreshCloudUser(user){
- state.user=user;state.role='';state.cloud=false;
+ state.user=user;state.role='';state.cloud=false;state.agoraName=user?.displayName||'';
  if(user&&!state.forceLocal){
   try{
-   const staff=await dbSdk.getDoc(dbSdk.doc(state.fb.firestore,'agora_users',user.uid));
-   const profile=staff.data();
+   const snap=await dbSdk.getDoc(dbSdk.doc(state.fb.firestore,'agora_users',user.uid));
+   const profile=snap.data();
    if(profile?.active===true&&['admin','coordinador','consulta'].includes(profile.role)){
     state.role=profile.role;state.cloud=true;
-   }else{
-    showToast('Tu cuenta no tiene un perfil activo en ÁGORA. Puedes trabajar localmente.');
+    state.agoraName=profile.name||user.displayName||'';
    }
-  }catch(error){showToast('Nube no disponible: '+readable(error));}
+  }catch(error){showToast('No se pudo verificar el perfil ÁGORA: '+readable(error));}
  }
+ await loadLinkedIdentity();
+ if(user&&!state.forceLocal&&state.agoraId&&!state.cloud){
+  state.role='solicitante';state.cloud=true;
+ }
+ updateIdentityForm();
  await loadRecords();
  if(location.search.includes('id='))openQueryDetail();
 }
@@ -152,6 +178,7 @@ function render(){
  const filtered=rows.filter(r=>(!s||r.status===s)&&(!q||[r.folio,r.project,r.client,r.beneficiary,r.category,r.requester].join(' ').toLowerCase().includes(q)));
  $('#all-list').innerHTML=filtered.length?filtered.map(card).join(''):emptyHtml();
  $('#mode-pill').textContent=state.cloud?'Nube · '+state.role:'Solo local';
+ updateIdentityForm();
  $('#mode-pill').style.background=state.cloud?'#e9f7ed':'#fcf7ec';
  $('#login-btn').textContent=state.user?'Salir de Google':'Conectar Google';
  $('#work-local-btn').textContent=state.forceLocal?'Reintentar nube':'Trabajar localmente';
@@ -187,15 +214,16 @@ function getFormData(){
  const paymentMethod=String(fd.get('paymentMethod')||'');
  const account=String(fd.get('account')||'').trim().replace(/[\s-]/g,'');
  if(account&&!/^[0-9]{10,18}$/.test(account))throw Error('La cuenta debe contener solo 10 a 18 dígitos. Revisa CLABE o número de cuenta.');
- if(paymentMethod==='transferencia'&&!account)showToast('Aviso: no agregaste CLABE ni cuenta; puedes completarlo después en una nueva solicitud.');
+ if(paymentMethod==='transferencia'&&!account)throw Error('Para una transferencia debes indicar una CLABE o cuenta de 10 a 18 dígitos.');
  const id=crypto.randomUUID?.()||('r'+Date.now()+Math.random().toString(36).slice(2));
- const folio='RF-'+new Date().getFullYear()+'-'+Date.now().toString(36).slice(-6).toUpperCase();
+ const folio='RF-'+new Date().getFullYear()+'-'+Date.now().toString(36).slice(-5).toUpperCase()+'-'+id.replaceAll('-','').slice(0,4).toUpperCase();
  const date=iso(),creator=state.cloud?state.user.uid:'local';
- return {schema:1,id,folio,category,project:String(fd.get('project')||'').trim(),client:String(fd.get('client')||'').trim(),requester:String(fd.get('requester')||'').trim(),dateNeeded:String(fd.get('dateNeeded')||''),priority:String(fd.get('priority')||'normal'),reason:String(fd.get('reason')||'').trim(),paymentType:String(fd.get('paymentType')||'entrega'),paymentMethod,beneficiary:String(fd.get('beneficiary')||'').trim(),beneficiaryEmail:String(fd.get('beneficiaryEmail')||'').trim(),bank:String(fd.get('bank')||'').trim(),account,notes:String(fd.get('notes')||'').trim(),attachments:validHttps(fd.get('attachments')),items,total,status:'pendiente',approvedAmount:0,paidAmount:0,payments:[],decisionNote:'',decisionBy:'',history:[{kind:'solicitud',by:state.user?.email||'Operador local',at:date,note:'Solicitud creada'}],createdBy:creator,createdByEmail:state.user?.email||'',createdAt:state.cloud?dbSdk.serverTimestamp():date,updatedAt:state.cloud?dbSdk.serverTimestamp():date,updatedBy:creator};
+ return {schema:1,id,folio,agoraId:state.agoraId||'',projectId:String(fd.get('projectId')||'').trim(),category,project:String(fd.get('project')||'').trim(),client:String(fd.get('client')||'').trim(),requester:String(fd.get('requester')||'').trim(),dateNeeded:String(fd.get('dateNeeded')||''),priority:String(fd.get('priority')||'normal'),reason:String(fd.get('reason')||'').trim(),paymentType:String(fd.get('paymentType')||'entrega'),paymentMethod,beneficiary:String(fd.get('beneficiary')||'').trim(),beneficiaryEmail:String(fd.get('beneficiaryEmail')||'').trim(),bank:String(fd.get('bank')||'').trim(),account,notes:String(fd.get('notes')||'').trim(),attachments:validHttps(fd.get('attachments')),items,total,status:'pendiente',approvedAmount:0,paidAmount:0,payments:[],decisionNote:'',decisionBy:'',history:[{kind:'solicitud',by:state.user?.email||'Operador local',at:date,note:'Solicitud creada'}],createdBy:creator,createdByEmail:state.user?.email||'',createdAt:state.cloud?dbSdk.serverTimestamp():date,updatedAt:state.cloud?dbSdk.serverTimestamp():date,updatedBy:creator};
 }
 async function saveRequest(e){
  e.preventDefault();
  if(state.cloud&&state.role==='consulta')return showToast('Tu perfil no puede crear solicitudes.');
+ if(state.cloud&&!state.agoraId)return showToast('Necesitas vincular tu ID Dejavú antes de guardar en nube. Abre Identidad ÁGORA o trabaja localmente.');
  try{
   const row=getFormData();$('#submit-request').disabled=true;
   let savedId=row.id,folio=row.folio;
@@ -203,7 +231,7 @@ async function saveRequest(e){
    const existing=state.records.find(x=>x.id===state.editingId);
    if(!existing||!canEditRequest(existing))throw Error('Esta solicitud ya no admite cambios o no es tuya.');
    savedId=existing.id;folio=existing.folio;
-   const editableFields=['category','project','client','requester','dateNeeded','priority','reason','paymentType','paymentMethod','beneficiary','beneficiaryEmail','bank','account','notes','attachments','items','total'];
+   const editableFields=['category','project','projectId','client','requester','dateNeeded','priority','reason','paymentType','paymentMethod','beneficiary','beneficiaryEmail','bank','account','notes','attachments','items','total'];
    const patch=Object.fromEntries(editableFields.map(key=>[key,row[key]]));
    patch.status='pendiente';
    patch.updatedBy=state.cloud?state.user.uid:'local';
@@ -216,7 +244,7 @@ async function saveRequest(e){
    else await dbPut(row);
   }
   state.editingId='';$('#submit-request').textContent='Guardar solicitud →';
-  $('#request-form').reset();$('#line-items').innerHTML='';addLine();
+  $('#request-form').reset();updateIdentityForm();$('#line-items').innerHTML='';addLine();
   await loadRecords();view('history');showToast('Solicitud '+folio+' guardada '+(state.cloud?'en Firebase.':'en este navegador.'));
   openDetail(savedId);
  }catch(err){showToast('No se guardó: '+readable(err));}
@@ -246,10 +274,10 @@ function detailHtml(r){
  const safeLinks=(r.attachments||[]).filter(u=>typeof u==='string'&&/^https:\/\//i.test(u));
  const links=safeLinks.length?'<div class="detail-card detail-full"><b>Documentos de soporte</b>'+safeLinks.map(u=>'<div><a target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">'+esc(u)+'</a></div>').join('')+'</div>':'';
  let result='<div class="detail-head"><div><small>'+esc(r.folio)+'</small><h3>'+esc(r.project)+'</h3><span>'+esc(CATEGORIES[r.category]||r.category)+'</span></div>'+badge(r.status)+'</div>';
- result+='<div class="action-bar">'+(canEditRequest(r)?'<button class="btn btn-outline" data-action="edit">✎ Editar solicitud</button>':'')+'<button class="btn btn-gold" data-action="pdf">↓ PDF</button><button class="btn btn-outline" data-action="png">↓ Imagen PNG</button><button class="btn btn-outline" data-action="print">⎙ Imprimir</button><button class="btn btn-outline" data-action="preview">Vista previa</button><button class="btn btn-outline" data-action="share">Compartir referencia</button></div>';
+ result+='<div class="action-bar">'+(canEditRequest(r)?'<button class="btn btn-outline" data-action="edit">✎ Editar solicitud</button>':'')+'<button class="btn btn-gold" data-action="pdf">↓ PDF</button><button class="btn btn-outline" data-action="png">↓ Imagen PNG</button><button class="btn btn-outline" data-action="print">⎙ Imprimir</button><button class="btn btn-outline" data-action="preview">Vista previa</button><button class="btn btn-outline" data-action="share">Copiar mensaje</button><button class="btn btn-outline" data-action="whatsapp">WhatsApp</button><button class="btn btn-outline" data-action="email">Correo</button></div>';
  result+='<div class="detail-grid">'+[
  ['Solicitado',money(r.total)],['Autorizado',money(r.approvedAmount)],['Pagado',money(r.paidAmount)],['Por pagar',money(outstanding)],
- ['Solicitante',r.requester||'—'],['Beneficiario',r.beneficiary||'—'],['Fecha requerida',r.dateNeeded||'—'],['Modalidad',r.paymentType==='directo'?'Pago directo':'Entrega de recursos'],
+ ['Solicitante',r.requester||'—'],['ID Dejavú',r.agoraId||'Sin vincular'],['ID del proyecto',r.projectId||'—'],['Beneficiario',r.beneficiary||'—'],['Fecha requerida',r.dateNeeded||'—'],['Modalidad',r.paymentType==='directo'?'Pago directo':'Entrega de recursos'],
  ['Cliente',r.client||'—'],['Forma de pago',r.paymentMethod||'—'],['Banco',r.bank||'—'],['Cuenta / CLABE',r.account||'No registrada']
  ].map(([k,v])=>'<div class="detail-card"><b>'+esc(k)+'</b><span>'+esc(v)+'</span></div>').join('')+
  '<div class="detail-card detail-full"><b>Justificación</b><span>'+esc(r.reason||'—')+'</span></div>'+
@@ -309,7 +337,7 @@ function htmlDoc(r){
  const list=r.items.map(i=>'<tr><td>'+esc(i.description)+'</td><td>'+esc(i.quantity)+'</td><td>'+money(i.unitPrice)+'</td><td>'+money(i.unitPrice*i.quantity)+'</td></tr>').join('');
  const payment=r.payments?.length?'<div class="doc-desc"><b>Pagos registrados:</b> '+r.payments.map(p=>esc(p.date)+' · '+money(p.amount)+' ('+esc(p.method)+')').join('; ')+'</div>':'';
  return '<article class="document-sheet" id="document-sheet"><div class="doc-brand"><div><img src="' + esc(LOGO_URL) + '" style="width:165px;height:65px;object-fit:contain;object-position:left center" alt="Dejavú Marketing"><br><em>MARKETING · ÁGORA</em></div><div style="text-align:right"><b>'+esc(r.folio)+'</b><br><span style="font-size:11px;color:#8b8174">'+esc(STATUS[r.status]||r.status)+'</span></div></div><h2>SOLICITUD DE RECURSOS Y PAGOS</h2><p class="doc-desc">'+esc(CATEGORIES[r.category]||r.category)+'</p><div class="doc-meta">'+[
- ['Proyecto / campaña',r.project],['Cliente',r.client||'—'],['Solicitante',r.requester],['Fecha requerida',r.dateNeeded],['Beneficiario',r.beneficiary],['Entrega / pago',r.paymentType==='directo'?'Pago directo':'Recursos al responsable'],['Forma de pago',r.paymentMethod],['Banco y cuenta',(r.bank||'—')+' · '+(r.account||'Sin registrar')]
+ ['Proyecto / campaña',r.project],['Referencia del proyecto',r.projectId||'—'],['Cliente',r.client||'—'],['Solicitante',r.requester],['ID Dejavú',r.agoraId||'Sin vincular'],['Fecha requerida',r.dateNeeded],['Beneficiario',r.beneficiary],['Entrega / pago',r.paymentType==='directo'?'Pago directo':'Recursos al responsable'],['Forma de pago',r.paymentMethod],['Banco y cuenta',(r.bank||'—')+' · '+(r.account||'Sin registrar')]
  ].map(x=>'<div><span>'+esc(x[0])+'</span>'+esc(x[1]||'—')+'</div>').join('')+'</div><div class="doc-desc"><b>Justificación:</b> '+esc(r.reason)+'</div><table><thead><tr><th>Concepto</th><th>Cantidad</th><th>Precio unit.</th><th>Subtotal</th></tr></thead><tbody>'+list+'</tbody></table><div class="doc-total">TOTAL SOLICITADO: '+money(r.total)+'</div><p class="doc-desc"><b>Autorizado:</b> '+money(r.approvedAmount)+' &nbsp; <b>Pagado:</b> '+money(r.paidAmount)+'</p><p class="doc-desc"><b>Observaciones:</b> '+esc(r.notes||'Sin observaciones')+'</p>'+payment+'<div class="doc-foot"><div><b>DEJAVÚ MARKETING</b><br>Expediente '+esc(r.folio)+'<br>Generado el '+new Date().toLocaleString('es-MX')+'<br>'+(link?'<span class="doc-url">'+esc(link)+'</span>':'<span>Documento generado desde registro local. Sin enlace remoto.</span>')+'<br><span>La autorización requiere verificación de identidad en ÁGORA.</span></div>'+code+'</div></article>';
 }
 function docHost(r){
@@ -321,7 +349,7 @@ function docHost(r){
 function removeDoc(host){host?.remove();}
 async function makeCanvas(host){
  if(!window.html2canvas)throw Error('No se cargó la biblioteca para generar imagen. Revisa la conexión a internet y vuelve a intentar.');
- await Promise.all($('img',host).map(i=>i.complete?Promise.resolve():new Promise(resolve=>{i.onload=resolve;i.onerror=resolve;})));
+ await Promise.all(Array.from(host.querySelectorAll('img')).map(i=>i.complete?Promise.resolve():new Promise(resolve=>{i.onload=resolve;i.onerror=resolve;})));
  return await window.html2canvas($('.document-sheet',host),{scale:2,backgroundColor:'#fff',useCORS:false,logging:false,windowWidth:850});
 }
 function downloadBlob(blob,name){const url=URL.createObjectURL(blob),a=el('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);}
@@ -356,9 +384,10 @@ function previewDoc(r){
 function clearRequestForm(){
  state.editingId='';$('#submit-request').textContent='Guardar solicitud →';
  const form=$('#request-form');
- for(const e of $('input,textarea',form)){if(!e.closest('#line-items'))e.value='';}
+ for(const e of form.querySelectorAll('input,textarea')){if(!e.closest('#line-items')&&!e.readOnly)e.value='';}
  for(const e of $('select',form))e.selectedIndex=0;
  form.elements.namedItem('dateNeeded').value=localDate();
+ updateIdentityForm();
  $('#line-items').innerHTML='';addLine();
 }
 function editRequest(r){
@@ -366,7 +395,7 @@ function editRequest(r){
  modalClose();view('new');
  state.editingId=r.id;
  const form=$('#request-form');
- const keys=['category','project','client','requester','dateNeeded','priority','reason','paymentType','paymentMethod','beneficiary','beneficiaryEmail','bank','account','notes'];
+ const keys=['category','project','projectId','client','requester','dateNeeded','priority','reason','paymentType','paymentMethod','beneficiary','beneficiaryEmail','bank','account','notes'];
  for(const name of keys){const field=form.elements.namedItem(name);if(field)field.value=r[name]||'';}
  form.elements.namedItem('attachments').value=(r.attachments||[]).join('\n');
  $('#line-items').innerHTML='';for(const i of r.items||[])addLine(i.description,i.quantity,i.unitPrice);
@@ -374,11 +403,35 @@ function editRequest(r){
  $('#page-title').textContent='Editar '+r.folio;
 }
 
-async function shareReference(r){
+function shareText(r){
  const link=visibleLink(r);
- const message='DEJAVÚ MARKETING · '+r.folio+'\nProyecto: '+r.project+'\nConcepto: '+(CATEGORIES[r.category]||r.category)+'\nImporte solicitado: '+money(r.total)+'\nEstado: '+(STATUS[r.status]||r.status)+(link?'\nConsultar y responder (requiere acceso ÁGORA): '+link:'\nAdjunto PDF o PNG de esta solicitud.');
- try{await navigator.clipboard.writeText(message);showToast('Referencia copiada. Puedes pegarla en WhatsApp o Gmail.');}
- catch{const textArea=el('textarea');textArea.value=message;document.body.appendChild(textArea);textArea.select();document.execCommand('copy');textArea.remove();showToast('Referencia copiada.');}
+ return 'DEJAVÚ MARKETING · SOLICITUD DE DINERO'
+  +'\nFolio: '+r.folio
+  +'\nID Dejavú: '+(r.agoraId||'No vinculado')
+  +'\nProyecto: '+r.project+(r.projectId?' ('+r.projectId+')':'')
+  +'\nConcepto: '+(CATEGORIES[r.category]||r.category)
+  +'\nImporte solicitado: '+money(r.total)
+  +'\nEstado: '+(STATUS[r.status]||r.status)
+  +(link?'\nConsultar / revisar solicitud (acceso privado ÁGORA): '+link:
+    '\nAdjunto solicitud en PDF o PNG para revisión.')
+  +'\nLos datos bancarios se encuentran en el expediente privado, no en este mensaje.';
+}
+async function shareReference(r){
+ const message=shareText(r);
+ try{await navigator.clipboard.writeText(message);showToast('Mensaje copiado. Pégalo en WhatsApp o correo.');}
+ catch{
+  const box=el('textarea');box.value=message;document.body.appendChild(box);
+  box.select();document.execCommand('copy');box.remove();showToast('Mensaje copiado.');
+ }
+}
+function shareWhatsApp(r){
+ const url='https://wa.me/?text='+encodeURIComponent(shareText(r));
+ window.open(url,'_blank','noopener,noreferrer');
+}
+function shareEmail(r){
+ const url='mailto:?subject='+encodeURIComponent('Solicitud Dejavú '+r.folio+' · '+r.project)
+  +'&body='+encodeURIComponent(shareText(r));
+ window.location.href=url;
 }
 async function exportBackup(){
  try{
@@ -439,7 +492,7 @@ function setup(){
  $('#footer-date').textContent=new Date().getFullYear();
  $('#request-form').querySelector('[name="dateNeeded"]').value=localDate();
  addLine();
- $$('#line-items').length;
+ if(!new URLSearchParams(location.search).has('id'))view('new');
  document.addEventListener('click',async e=>{
   const v=e.target.closest('[data-view]');if(v){if(v.dataset.view==='new')clearRequestForm();view(v.dataset.view);return;}
   const target=e.target.closest('[data-open]');if(target){openDetail(target.dataset.open);return;}
@@ -460,12 +513,14 @@ function setup(){
    if(action==='png')await downloadPNG(r);
    if(action==='print')printDoc(r);
    if(action==='share')await shareReference(r);
+    if(action==='whatsapp')shareWhatsApp(r);
+    if(action==='email')shareEmail(r);
    if(action==='preview')previewDoc(r);
    if(action==='back')openDetail(r.id);
   }catch(error){showToast(readable(error));}
  });
  $('#request-form').addEventListener('submit',saveRequest);
- $('#request-form').addEventListener('reset',()=>setTimeout(()=>{state.editingId='';$('#submit-request').textContent='Guardar solicitud →';$('#line-items').innerHTML='';addLine();$('#request-form').querySelector('[name="dateNeeded"]').value=localDate();},0));
+ $('#request-form').addEventListener('reset',()=>setTimeout(()=>{state.editingId='';$('#submit-request').textContent='Guardar solicitud →';$('#line-items').innerHTML='';addLine();$('#request-form').querySelector('[name="dateNeeded"]').value=localDate();updateIdentityForm();},0));
  $('#line-items').addEventListener('input',calc);
  $('#search').addEventListener('input',render);
  $('#status-filter').addEventListener('change',render);

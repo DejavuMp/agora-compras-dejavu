@@ -5,6 +5,7 @@
  * el despliegue para evitar sobrescribir cambios de Compras / Archivos.
  */
 import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {resolve} from 'node:path';
 const project=process.env.FIREBASE_PROJECT_ID;
 const token=process.env.FIREBASE_ACCESS_TOKEN;
@@ -105,7 +106,13 @@ writeFileSync('.github/firebase-staff/.preflight/antes-dejavu.rules',live,'utf8'
 writeFileSync('.github/firebase-staff/.preflight/ruleset-name.txt',release.rulesetName+'\n','utf8');
 // Conservar el respaldo antes incluso si fallan los chequeos de variantes.
 const allowed=new Set([...safeVariants(candidate),...safeVariants(beforeCoordinatorListFix),...safeVariants(beforeIdentity),...safeVariants(oldOps),...safeVariants(withoutOps),...safeVariants(legacy)].map(normalize));
-if(!allowed.has(normalize(live))){
+// Versión íntegra conocida de main anterior a añadir campos de ID en Finanzas.
+// Se compara el hash Git blob EXACTO; no se admite ningún cambio externo.
+const prevMainFinanceBlob='e04be5c105f33f8fc1fc150d91951ee0db59f17b';
+const liveGitBlob=createHash('sha1')
+ .update('blob '+Buffer.byteLength(live,'utf8')+'\0')
+ .update(live,'utf8').digest('hex');
+if(!allowed.has(normalize(live)) && liveGitBlob!==prevMainFinanceBlob){
  throw Error('REGLAS DISTINTAS EN PRODUCCIÓN. Se guardó respaldo. Se detiene para NO modificar permisos de Ágora Compras, Archivos u otros módulos.');
 }
 if(normalize(live)===normalize(candidate)){

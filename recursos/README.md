@@ -20,6 +20,16 @@ Solicitudes de recursos para materiales, insumos, productos para clientes/revent
 - En Firebase, QR y enlace privado a solicitud (requiere login y permiso). En modo local no muestra enlaces falsamente funcionales.
 - Respaldo JSON local e importación sin sobrescribir registros existentes.
 
+## Integración con ID Dejavú (rama en revisión)
+
+- El ID permanente se obtiene de la colección real agora_identity_links/{uid}, no se inventa ni se captura manualmente.
+- Cada solicitud conserva un folio RF independiente y una referencia opcional al ID de proyecto.
+- Los usuarios con ID vinculado pueden solicitar y leer sus expedientes; administración es quien autoriza y registra pagos. Los usuarios del rol consulta no pueden crear.
+- El PDF y el PNG incluyen folio, ID, proyecto, beneficiario y datos bancarios. Solo el enlace/QR del modo nube abre el expediente privado previa autenticación.
+- Botones: PDF, PNG, imprimir, copiar mensaje, WhatsApp y correo. WhatsApp/correo no incluyen cuentas ni adjuntan automáticamente archivos.
+- Sin ID, se permite trabajar localmente sin afirmar que la solicitud está sincronizada.
+- PENDIENTE: pasar las pruebas de reglas en emulador, revisar diferencias contra reglas activas, respaldar reglas y desplegarlas de forma controlada antes de activar la nueva versión.
+
 ## URL cuando se integre a main
 
 https://dejavump.github.io/agora-compras-dejavu/recursos/

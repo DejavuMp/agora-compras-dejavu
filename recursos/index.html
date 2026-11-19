@@ -44,8 +44,11 @@
  <div class="panel form-section">
   <div class="form-heading"><span class="step">01</span><div><h3>Información general</h3><p>Ubicación del gasto y motivo de la solicitud.</p></div></div>
   <div class="fields">
+   <label class="wide">ID único Dejavú <input id="agora-id-field" type="text" readonly value="Sin ID asignado" aria-label="ID único Dejavú" style="background:#f4f3ee;font-weight:700"></label>
+   <div class="wide privacy-tip" id="agora-id-note">Conecta tu cuenta de Google para consultar tu ID Dejavú. <a href="../identidad/" target="_blank" rel="noopener">Abrir identidad ÁGORA</a></div>
    <label>Tipo de solicitud <select name="category" required><option value="materiales">Compra de materiales e insumos</option><option value="productos">Productos para cliente o reventa</option><option value="proveedor">Pago o anticipo a proveedor</option><option value="nomina">Nómina, staff u honorarios</option><option value="otro">Otro pago operativo</option></select></label>
    <label>Proyecto / campaña <input name="project" list="agora-projects" maxlength="130" required placeholder="Ej. KFC · Desayunos"></label>
+   <label>Referencia / ID del proyecto (opcional) <input name="projectId" maxlength="80" placeholder="ID del proyecto en ÁGORA, si ya existe"></label>
    <label>Cliente <input name="client" maxlength="100" placeholder="Ej. KFC México"></label>
    <label>Fecha en que se necesita <input name="dateNeeded" type="date" required></label>
    <label>Prioridad <select name="priority"><option value="normal">Normal</option><option value="urgente">Urgente</option></select></label>
@@ -71,7 +74,7 @@
    <label class="wide">Enlaces de cotizaciones, facturas o soporte <textarea name="attachments" rows="2" maxlength="2000" placeholder="Un enlace HTTPS por línea (Drive u otra ubicación autorizada)"></textarea></label>
    <label class="wide">Indicaciones adicionales <textarea name="notes" rows="2" maxlength="2000" placeholder="Por ejemplo: pago en dos exhibiciones o fecha de entrega"></textarea></label>
   </div>
-  <div class="privacy-tip">Los datos bancarios son sensibles. En modo local quedan guardados únicamente en este navegador. No distribuyas documentos financieros fuera del personal autorizado.</div>
+  <div class="privacy-tip">Los datos bancarios son sensibles. Solo se incluirán en documentos descargables y en la vista privada del expediente; los mensajes para WhatsApp y correo no mostrarán números de cuenta. En modo local se guardan únicamente en este navegador.</div>
  </div>
  <div class="form-actions"><button type="reset" class="btn btn-outline">Limpiar</button><button type="submit" class="btn btn-gold large" id="submit-request">Guardar solicitud →</button></div>
  </form>
@@ -86,7 +89,7 @@
  <div class="panel gastos-panel"><div class="big-icon">◫</div><h3>Dejavú · Comprobación de Gastos</h3><p>Una vez entregado un anticipo para comprar, conserva el folio de la solicitud y registra los tickets y evidencias en la aplicación que ya utilizas. Los pagos directos a proveedores no necesitan duplicarse como gastos de caja.</p><a class="btn btn-gold" href="https://gastosdvm.netlify.app/" target="_blank" rel="noopener noreferrer">Abrir herramienta existente ↗</a><p class="small-note">La sincronización automática de comprobaciones se realizará en una etapa posterior, después de respaldar y validar los registros actuales.</p></div>
 </section>
 </main>
-<footer class="footer">ÁGORA · Dejavú Marketing <span id="footer-date"></span> · Sin envío automático de correo</footer>
+<footer class="footer">ÁGORA · Dejavú Marketing <span id="footer-date"></span> · Envíos manuales por WhatsApp y correo</footer>
 </div>
 </div>
 <div id="modal" class="modal" hidden><div class="backdrop" data-close="true"></div><div class="modal-card"><div class="modal-head"><h2 id="modal-title">Detalle de solicitud</h2><button class="icon-btn" id="modal-close" aria-label="Cerrar">×</button></div><div id="modal-body" class="modal-body"></div></div></div>

@@ -401,9 +401,21 @@ service cloud.firestore {
 // Reutiliza signedIn(), activeStaff(), canEdit(), isAdmin() de firestore.rules.
 // Nunca abre lectura ni aprobación anónimas de datos bancarios o nóminas.
 
+function financeIdentityPath() {
+  return /databases/$(database)/documents/agora_identity_links/$(request.auth.uid);
+}
+function financeHasActiveId() {
+  return signedIn() &&
+    exists(financeIdentityPath()) &&
+    get(financeIdentityPath()).data.active == true &&
+    get(financeIdentityPath()).data.agoraId.matches('^DJV-[0-9]{4}-[0-9]{3,6}$');
+}
+function financeCanSubmit() {
+  return financeHasActiveId() && !(activeStaff() && role() == 'consulta');
+}
 function financeBaseValid() {
   return request.resource.data.keys().hasOnly([
-    'schema','id','folio','category','project','client','requester','dateNeeded',
+    'schema','id','folio','agoraId','projectId','category','project','client','requester','dateNeeded',
     'priority','reason','paymentType','paymentMethod','beneficiary','beneficiaryEmail',
     'bank','account','notes','attachments','items','total','status','approvedAmount',
     'paidAmount','payments','decisionNote','decisionBy','history',
@@ -415,6 +427,10 @@ function financeBaseValid() {
     'createdBy','createdAt','updatedAt','updatedBy','history'
   ]) &&
   request.resource.data.schema == 1 &&
+   request.resource.data.get('agoraId', '') is string &&
+   request.resource.data.get('agoraId', '').matches('^$|^DJV-[0-9]{4}-[0-9]{3,6}$') &&
+   request.resource.data.get('projectId', '') is string &&
+   request.resource.data.get('projectId', '').size() <= 80 &&
   request.resource.data.id is string && request.resource.data.id.size() <= 80 &&
   request.resource.data.folio is string && request.resource.data.folio.size() <= 35 &&
   request.resource.data.category in ['materiales','productos','proveedor','nomina','otro'] &&
@@ -496,7 +512,7 @@ function financeCorrection() {
     request.resource.data.payments.size() == 0 &&
     request.resource.data.history.size() == resource.data.history.size() + 1 &&
     request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-      'category','project','client','requester','dateNeeded','priority','reason',
+      'category','project','projectId','client','requester','dateNeeded','priority','reason',
       'paymentType','paymentMethod','beneficiary','beneficiaryEmail','bank','account',
       'notes','attachments','items','total','status','history','updatedBy','updatedAt'
     ]);
@@ -506,8 +522,9 @@ match /agora_finance_requests/{requestId} {
   // Los administradores pueden revisar, decidir y registrar pagos.
   // Consultas para coordinador: where('createdBy','==',auth.uid).
   allow get, list: if isAdmin() ||
-    (activeStaff() && resource.data.createdBy == request.auth.uid);
-  allow create: if canEdit() &&
+    ((activeStaff() || financeHasActiveId()) && resource.data.createdBy == request.auth.uid);
+  allow create: if financeCanSubmit() &&
+    request.resource.data.agoraId == get(financeIdentityPath()).data.agoraId &&
     financeBaseValid() &&
     request.resource.data.id == requestId &&
     request.resource.data.createdBy == request.auth.uid &&
@@ -522,10 +539,11 @@ match /agora_finance_requests/{requestId} {
   allow update: if financeBaseValid() &&
     request.resource.data.id == resource.data.id &&
     request.resource.data.folio == resource.data.folio &&
+    request.resource.data.get('agoraId','') == resource.data.get('agoraId','') &&
     request.resource.data.createdBy == resource.data.createdBy &&
     request.resource.data.createdAt == resource.data.createdAt &&
     ((isAdmin() && (financeDecision() || financePay())) ||
-     (canEdit() && financeCorrection()));
+     ((canEdit() || financeHasActiveId()) && financeCorrection()));
   allow delete: if false;
 }
 
