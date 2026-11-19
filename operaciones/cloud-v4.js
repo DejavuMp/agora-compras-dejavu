@@ -22,6 +22,7 @@ const fs = fb?.firestore;
 const base = "../";
 const SCHEDULE = doc(fs, "agora_ops_control", "schedule");
 const LOGLIST = collection(fs, "agora_ops_logs");
+const CLOCKLIST = collection(fs, "agora_ops_clock");
 const INCIDENTLIST = collection(fs, "agora_ops_incidents");
 const REQUESTS = collection(fs, "agora_ops_access_requests");
 const keys = ["people","vehicles","events","blocks","sites","campaigns","settings","audit"];
@@ -29,7 +30,7 @@ const blank = () => ({people:[],vehicles:[],events:[],blocks:[],sites:[],campaig
   dailyLimit:8,weeklyLimit:48,prepDefault:30,afterDefault:30,notificationMinutes:60,lateGraceMinutes:10,earlyGraceMinutes:10
 },audit:[],logs:[],incidents:[]});
 let account=null,role=null,personId="",baseBoard=null,saving=false,ready=false;
-let logs = new Map(),incidents = new Map(),requests = new Map();
+let logs = new Map(),incidents = new Map(),requests = new Map(),clocks = new Map();
 let linkingUid=null,autoPoliciesChecked=false;
 let unwatches=[],dirtyWaiting=false,authVersion=0,view=null;
 const root=document.getElementById("ops-gate");
@@ -62,7 +63,7 @@ function fail(msg){notice("No sincronizado · "+msg,"error");loading("Conexión 
 function stop(){
   opsJornadas.stop();
   for(const off of unwatches.splice(0))try{off()}catch(_){}
-  role=null;personId="";baseBoard=null;logs.clear();incidents.clear();requests.clear();
+  role=null;personId="";baseBoard=null;logs.clear();incidents.clear();requests.clear();clocks.clear();
   saving=false;ready=false;dirtyWaiting=false;autoPoliciesChecked=false;
   app?.reset?.();
 }
@@ -81,7 +82,7 @@ function boardMismatch(b,c){
 function emit(){
   if(!ready || saving)return;
   const data=role==="coordinador"?
-    {...blank(),...(baseBoard?.payload||{}),logs:[...logs.values()].map(x=>clone(x)),incidents:[...incidents.values()].map(x=>clone(x))}:
+    {...blank(),...(baseBoard?.payload||{}),logs:[...logs.values()].map(x=>clone(x)),incidents:[...incidents.values()].map(x=>clone(x)),clocks:[...clocks.values()].map(x=>clone(x))}:
     {...blank(),...view,people:view?.person?[view.person]:[],logs:[...logs.values()].map(x=>clone(x)),incidents:[...incidents.values()].map(x=>clone(x))};
   app?.apply?.({db:data,role:role==="coordinador"?"coordinador":"personal",personId});
   opsJornadas.render();
@@ -155,6 +156,7 @@ function loadCoordinator(){
     incidents=new Map(snap.docs.map(d=>[d.id,{...d.data(),id:d.id}]));
     if(initialized)emit();
   });
+  listen(CLOCKLIST,snap=>{clocks=new Map(snap.docs.map(d=>[d.id,{...d.data(),id:d.id}]));if(initialized)emit();});
   listen(REQUESTS,snap=>{requests=new Map(snap.docs.map(d=>[d.id,{...d.data(),id:d.id}]));renderRequests()});
 }
 function loadStaff(uid,id){
