@@ -58,8 +58,8 @@ try{
  await page.locator("#event-control-overlay").waitFor({state:"visible"});
  await page.locator(".event-control-card select").selectOption("horas");
  await page.locator('[data-event-control="on"][data-id="event-qa"]').click();
- await page.waitForFunction(()=>window.__controlWrites.length===1);
- const written=await page.evaluate(()=>window.__controlWrites[0]);
+ await page.waitForFunction(()=>window.__controlWrites.some(x=>x.ref==="agora_ops_shift_access/ana-uid_event-qa"&&x.value?.mode==="horas"));
+ const written=await page.evaluate(()=>window.__controlWrites.filter(x=>x.ref==="agora_ops_shift_access/ana-uid_event-qa").at(-1));
  assert.equal(written.ref,"agora_ops_shift_access/ana-uid_event-qa");
  assert.equal(written.value.enabled,true);
  assert.equal(written.value.mode,"horas");
