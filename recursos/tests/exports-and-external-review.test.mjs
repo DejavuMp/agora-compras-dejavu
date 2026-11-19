@@ -12,6 +12,9 @@ assert.ok(app.includes('document-sheet print-view'),'Impresión no queda oculta 
 assert.ok(app.includes('const host=docHost(r);'),'La ventana de impresión conserva QR');
 assert.ok(app.includes('data-action="copy-email"'),'Hay acción para copiar correo');
 assert.ok(app.includes('data-action="whatsapp"'),'Hay acceso a WhatsApp');
+assert.ok(app.includes('data-action="copy-email-bank"'),'Existe copiado explícito con banco y cuenta');
+assert.ok(app.includes('function emailBody(r,includeBank=false)'),'Correo normal no incluye banco por defecto');
+assert.ok(app.includes('emailBody(r,true)'),'Solo la acción especial añade banco');
 assert.ok(app.includes('data-action="approval-link"'),'Hay acceso de revisión externo');
 assert.ok(css.includes('.doc-print-host{position:fixed;left:0'),'Captura sin posición extrema');
 
