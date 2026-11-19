@@ -15,6 +15,7 @@ on:
       - "operaciones/staff-dashboard.mjs"
       - "operaciones/ops-timekeeping.mjs"
       - "operaciones/ops-receipt.mjs"
+      - "operaciones/ops-jornada-sheet*.mjs"
       - "operaciones/ops-monthly-receipt.mjs"
       - "operaciones/ops-breaks.mjs"
       - "operaciones/ops-reminders.mjs"
@@ -80,6 +81,12 @@ jobs:
           TZ=America/Mexico_City node operaciones/tests/qa-payroll-preview.mjs
           python3 -c "import zipfile; p='/tmp/agora-prenomina-qa.xlsx'; z=zipfile.ZipFile(p); assert z.testzip() is None; assert 'xl/workbook.xml' in z.namelist(); assert 'xl/worksheets/sheet1.xml' in z.namelist(); print('Excel ZIP íntegro y válido')"
 
+      - name: Probar ficha de jornada, calendario del personal y PDF propio
+        run: |
+          node --check operaciones/ops-jornada-sheet.mjs
+          node --check operaciones/ops-jornada-sheet-ui.mjs
+          TZ=America/Mexico_City node operaciones/tests/qa-jornada-sheet.mjs
+          python3 -c "from pathlib import Path; p=Path('/tmp/agora-ficha-jornada-qa.pdf'); data=p.read_bytes(); assert data.startswith(b'%PDF-1.4'); assert b'xref' in data; assert data.rstrip().endswith(b'%%EOF'); print('PDF de jornada válido')"
       - name: Validar cronograma staff y pagos sin montos inventados
         run: |
           node --check operaciones/staff-dashboard.mjs
@@ -112,6 +119,8 @@ jobs:
           sleep 2
       - name: Comprobar validación manual, nómina Excel y PDF imprimible en navegador
         run: TZ=America/Mexico_City node operaciones/tests/qa-attendance-payroll-browser.mjs
+      - name: Probar ficha y autocompletado de personal en navegador
+        run: TZ=America/Mexico_City node operaciones/tests/qa-jornada-sheet-browser.mjs
       - name: Probar volanteo por jornada, horarios, empalmes y visor
         run: node operaciones/tests/qa-visor-dia.mjs
       - name: Simular visor con dos navegadores separados (no Firebase real)
