@@ -106,8 +106,8 @@ try{
   }));
   await yes("coordinación puede bloquear cuenta",setDoc(access(admin),policy({enabled:false})));
   await no("staff bloqueado no puede hacer nuevo traslado",setDoc(trip(staff),createTrip()));
-  await yes("salida sigue permitida tras bloqueo",updateDoc(punch(staff),{
-    status:"finalizada",endGeo:geo,endNote:"Jornada cerrada correctamente",
+  await yes("salida sin GPS sigue permitida tras bloqueo",updateDoc(punch(staff),{
+    status:"finalizada",endNote:"Jornada cerrada, GPS no disponible",
     endedAt:serverTimestamp(),updatedAt:serverTimestamp()
   }));
   await no("no se inicia descanso después del cierre oficial",setDoc(doc(staff,"agora_ops_breaks",id+"_2"),breakRecord({slot:"2"})));
