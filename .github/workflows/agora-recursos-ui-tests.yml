@@ -1,0 +1,26 @@
+name: "ÁGORA Recursos · Documentos y respuestas externas"
+on:
+  pull_request:
+    paths:
+      - "recursos/**"
+      - ".github/workflows/agora-recursos-ui-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "recursos/**"
+      - ".github/workflows/agora-recursos-ui-tests.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validar JS de documentos
+        run: node --input-type=module --check < recursos/app.js
+      - name: Revisar exportación y respuesta externa, sin tocar Firebase
+        run: node recursos/tests/exports-and-external-review.test.mjs

@@ -65,11 +65,11 @@ async function loadRecords(){
    const snap=await dbSdk.getDocs(ref);
    state.records=sortRows(snap.docs.map(d=>({...d.data(),id:d.id})));
    state.mode='cloud';
-   banner('Conectado a Firebase · Los datos financieros son visibles solo para cuentas autorizadas. Los enlaces de aprobación requieren iniciar sesión con un perfil administrador.','success');
+   banner('Conectado a Firebase · Los datos bancarios son privados. El enlace externo permite enviar una respuesta sin acceso, pendiente de validación y registro.','success');
   }else{
    state.records=sortRows(await dbAll());
    state.mode='local';
-   banner('Modo local: los registros solo están en este navegador. Puedes generar PDF, PNG y respaldos, pero los enlaces no permiten aprobación remota. No elimines los datos del sitio.');
+   banner('Modo local: los registros quedan solo en este navegador. La respuesta externa se envía por correo o WhatsApp; no se registra automáticamente. Descarga respaldos frecuentes.');
   }
  }catch(error){
   if(state.cloud){state.cloud=false;state.mode='local';state.records=sortRows(await dbAll().catch(()=>[]));banner('No se pudo consultar Firebase: '+readable(error)+' Se muestra la copia local independiente.','error');}
@@ -226,6 +226,45 @@ function canEditRequest(r){return ['pendiente','ajustes'].includes(r.status)&&(!
 function available(r){return ['aprobada','aprobada_parcial','pago_parcial'].includes(r.status)&&round(r.approvedAmount-r.paidAmount)>0;}
 function canManage(){return !state.cloud||state.role==='admin';}
 function visibleLink(r){if(!state.cloud||r.createdBy==='local')return '';const u=new URL(location.href);u.search='';u.hash='';u.searchParams.set('id',r.id);return u.href;}
+// Enlace autocontenido de respuesta externa. Nunca exporta cuentas, CLABE ni notas bancarias.
+// NO modifica automáticamente la solicitud, para evitar permisos públicos de escritura.
+function approvalReplyLink(r){
+ const data={v:1,f:String(r.folio||'').slice(0,35),p:String(r.project||'').slice(0,130),
+  c:String(CATEGORIES[r.category]||r.category||'').slice(0,100),t:round(r.total),
+  d:String(r.dateNeeded||'').slice(0,10)};
+ const bytes=new TextEncoder().encode(JSON.stringify(data));
+ let raw='';for(const byte of bytes)raw+=String.fromCharCode(byte);
+ return new URL('./aprobar.html?d='+btoa(raw).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''),location.href).href;
+}
+function emailSubject(r){return 'Solicitud de recursos '+r.folio+' · '+r.project;}
+function emailBody(r){
+ return 'Hola,\n\nSolicito la revisión de esta solicitud de Dejavú Marketing:\n\n'
+  +'Folio: '+r.folio+'\nProyecto: '+r.project+'\nConcepto: '+(CATEGORIES[r.category]||r.category)
+  +'\nImporte solicitado: '+money(r.total)+'\nFecha requerida: '+(r.dateNeeded||'Por definir')
+  +'\n\nREVISAR Y RESPONDER SIN INICIAR SESIÓN:\n'+approvalReplyLink(r)
+  +'\n\nLa respuesta se enviará por correo o WhatsApp. Administración la verificará y la registrará en Finanzas.'
+  +'\nLos datos bancarios solo se muestran en el PDF/PNG que se adjunte de forma manual.\n\nGracias.';
+}
+function shareText(r){
+ return 'DEJAVÚ MARKETING · SOLICITUD DE DINERO\nFolio: '+r.folio
+ +'\nProyecto: '+r.project+'\nConcepto: '+(CATEGORIES[r.category]||r.category)
+ +'\nImporte solicitado: '+money(r.total)
+ +'\nFecha requerida: '+(r.dateNeeded||'Por definir')
+ +'\n\nResponder sin iniciar sesión:\n'+approvalReplyLink(r)
+ +'\nLa respuesta externa requiere validación y registro en Finanzas. Sin datos bancarios en este mensaje.';
+}
+async function copyText(value,label='Texto copiado'){
+ try{await navigator.clipboard.writeText(value);}
+ catch{
+  const ta=el('textarea');ta.value=value;ta.style.position='fixed';ta.style.left='-999px';
+  document.body.appendChild(ta);ta.select();
+  const ok=document.execCommand('copy');ta.remove();
+  if(!ok)throw Error('No se pudo copiar. Revisa permisos del navegador.');
+ }
+ showToast(label);
+}
+function openWhatsApp(r){window.open('https://wa.me/?text='+encodeURIComponent(shareText(r)),'_blank','noopener,noreferrer');}
+function openEmail(r){window.location.href='mailto:?subject='+encodeURIComponent(emailSubject(r))+'&body='+encodeURIComponent(emailBody(r));}
 function modalClose(){$('#modal').hidden=true;state.selected='';document.body.style.overflow='';}
 function openQueryDetail(){
  const id=new URLSearchParams(location.search).get('id');
@@ -246,7 +285,7 @@ function detailHtml(r){
  const safeLinks=(r.attachments||[]).filter(u=>typeof u==='string'&&/^https:\/\//i.test(u));
  const links=safeLinks.length?'<div class="detail-card detail-full"><b>Documentos de soporte</b>'+safeLinks.map(u=>'<div><a target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">'+esc(u)+'</a></div>').join('')+'</div>':'';
  let result='<div class="detail-head"><div><small>'+esc(r.folio)+'</small><h3>'+esc(r.project)+'</h3><span>'+esc(CATEGORIES[r.category]||r.category)+'</span></div>'+badge(r.status)+'</div>';
- result+='<div class="action-bar">'+(canEditRequest(r)?'<button class="btn btn-outline" data-action="edit">✎ Editar solicitud</button>':'')+'<button class="btn btn-gold" data-action="pdf">↓ PDF</button><button class="btn btn-outline" data-action="png">↓ Imagen PNG</button><button class="btn btn-outline" data-action="print">⎙ Imprimir</button><button class="btn btn-outline" data-action="preview">Vista previa</button><button class="btn btn-outline" data-action="share">Compartir referencia</button></div>';
+ result+='<div class="action-bar">'+(canEditRequest(r)?'<button class="btn btn-outline" data-action="edit">✎ Editar solicitud</button>':'')+'<button class="btn btn-gold" data-action="pdf">↓ PDF</button><button class="btn btn-outline" data-action="png">↓ Imagen PNG</button><button class="btn btn-outline" data-action="print">⎙ Imprimir</button><button class="btn btn-outline" data-action="preview">Vista previa</button><button class="btn btn-outline" data-action="share">Copiar WhatsApp</button><button class="btn btn-outline" data-action="whatsapp">Abrir WhatsApp</button><button class="btn btn-outline" data-action="copy-email">Copiar texto correo</button><button class="btn btn-outline" data-action="email">Abrir correo</button><button class="btn btn-outline" data-action="approval-link">Copiar enlace para autorizar</button></div>';
  result+='<div class="detail-grid">'+[
  ['Solicitado',money(r.total)],['Autorizado',money(r.approvedAmount)],['Pagado',money(r.paidAmount)],['Por pagar',money(outstanding)],
  ['Solicitante',r.requester||'—'],['Beneficiario',r.beneficiary||'—'],['Fecha requerida',r.dateNeeded||'—'],['Modalidad',r.paymentType==='directo'?'Pago directo':'Entrega de recursos'],
@@ -262,8 +301,7 @@ function detailHtml(r){
  if(canManage()&&available(r)){
   result+='<form id="payment-form" class="decision"><h4>Registrar entrega o pago</h4><input name="amount" type="number" step=".01" min=".01" max="'+esc(outstanding)+'" placeholder="Importe entregado (máximo '+money(outstanding)+')" required><input name="date" type="date" required value="'+localDate()+'"><select name="method"><option value="transferencia">Transferencia</option><option value="efectivo">Efectivo</option><option value="otro">Otro</option></select><input name="reference" maxlength="120" placeholder="Referencia bancaria o comprobante"><button class="btn btn-gold" type="submit">Guardar pago</button></form>';
  }
- const link=visibleLink(r);
- result+='<p class="small-note" style="margin-top:17px;font-size:11px;color:#837664">'+(link?'Enlace privado: solo usuarios de ÁGORA autorizados pueden consultar o aprobar.':'Modo local: PDF y PNG sí funcionan; un enlace por sí solo no puede registrar autorizaciones externas.')+'</p>';
+ result+='<p class="small-note" style="margin-top:17px;font-size:11px;color:#837664">La persona destinataria puede responder desde el enlace sin entrar a ÁGORA. Por ahora la respuesta se envía mediante correo o WhatsApp; no cambia el estado del expediente automáticamente. Administración valida y registra la decisión. No incluyas archivos bancarios en grupos abiertos.</p>';
  return result;
 }
 async function updateRecord(r,patch,log){
@@ -303,25 +341,24 @@ async function pay(e){
  }catch(error){showToast(readable(error));}
 }
 function htmlDoc(r){
- const link=visibleLink(r);
- let code='';
- if(link)code='<div class="doc-qr" id="document-qr"></div>';
+ const link=approvalReplyLink(r);
+ const code='<div class="doc-qr" id="document-qr"></div>';
  const list=r.items.map(i=>'<tr><td>'+esc(i.description)+'</td><td>'+esc(i.quantity)+'</td><td>'+money(i.unitPrice)+'</td><td>'+money(i.unitPrice*i.quantity)+'</td></tr>').join('');
  const payment=r.payments?.length?'<div class="doc-desc"><b>Pagos registrados:</b> '+r.payments.map(p=>esc(p.date)+' · '+money(p.amount)+' ('+esc(p.method)+')').join('; ')+'</div>':'';
  return '<article class="document-sheet" id="document-sheet"><div class="doc-brand"><div><img src="' + esc(LOGO_URL) + '" style="width:165px;height:65px;object-fit:contain;object-position:left center" alt="Dejavú Marketing"><br><em>MARKETING · ÁGORA</em></div><div style="text-align:right"><b>'+esc(r.folio)+'</b><br><span style="font-size:11px;color:#8b8174">'+esc(STATUS[r.status]||r.status)+'</span></div></div><h2>SOLICITUD DE RECURSOS Y PAGOS</h2><p class="doc-desc">'+esc(CATEGORIES[r.category]||r.category)+'</p><div class="doc-meta">'+[
  ['Proyecto / campaña',r.project],['Cliente',r.client||'—'],['Solicitante',r.requester],['Fecha requerida',r.dateNeeded],['Beneficiario',r.beneficiary],['Entrega / pago',r.paymentType==='directo'?'Pago directo':'Recursos al responsable'],['Forma de pago',r.paymentMethod],['Banco y cuenta',(r.bank||'—')+' · '+(r.account||'Sin registrar')]
- ].map(x=>'<div><span>'+esc(x[0])+'</span>'+esc(x[1]||'—')+'</div>').join('')+'</div><div class="doc-desc"><b>Justificación:</b> '+esc(r.reason)+'</div><table><thead><tr><th>Concepto</th><th>Cantidad</th><th>Precio unit.</th><th>Subtotal</th></tr></thead><tbody>'+list+'</tbody></table><div class="doc-total">TOTAL SOLICITADO: '+money(r.total)+'</div><p class="doc-desc"><b>Autorizado:</b> '+money(r.approvedAmount)+' &nbsp; <b>Pagado:</b> '+money(r.paidAmount)+'</p><p class="doc-desc"><b>Observaciones:</b> '+esc(r.notes||'Sin observaciones')+'</p>'+payment+'<div class="doc-foot"><div><b>DEJAVÚ MARKETING</b><br>Expediente '+esc(r.folio)+'<br>Generado el '+new Date().toLocaleString('es-MX')+'<br>'+(link?'<span class="doc-url">'+esc(link)+'</span>':'<span>Documento generado desde registro local. Sin enlace remoto.</span>')+'<br><span>La autorización requiere verificación de identidad en ÁGORA.</span></div>'+code+'</div></article>';
+ ].map(x=>'<div><span>'+esc(x[0])+'</span>'+esc(x[1]||'—')+'</div>').join('')+'</div><div class="doc-desc"><b>Justificación:</b> '+esc(r.reason)+'</div><table><thead><tr><th>Concepto</th><th>Cantidad</th><th>Precio unit.</th><th>Subtotal</th></tr></thead><tbody>'+list+'</tbody></table><div class="doc-total">TOTAL SOLICITADO: '+money(r.total)+'</div><p class="doc-desc"><b>Autorizado:</b> '+money(r.approvedAmount)+' &nbsp; <b>Pagado:</b> '+money(r.paidAmount)+'</p><p class="doc-desc"><b>Observaciones:</b> '+esc(r.notes||'Sin observaciones')+'</p>'+payment+'<div class="doc-foot"><div><b>DEJAVÚ MARKETING</b><br>Expediente '+esc(r.folio)+'<br>Generado el '+new Date().toLocaleString('es-MX')+'<br>'+(link?'<span class="doc-url">El enlace de respuesta se comparte por WhatsApp o correo; también puedes escanear el QR.</span>':'<span>Documento generado desde registro local. Sin enlace remoto.</span>')+'<br><span>Respuesta externa por correo o WhatsApp. Administración valida y registra la decisión.</span></div>'+code+'</div></article>';
 }
 function docHost(r){
  const host=el('div','doc-print-host');host.innerHTML=htmlDoc(r);document.body.appendChild(host);
- const link=visibleLink(r),target=$('#document-qr',host);
- if(link&&target&&window.QRCode){new window.QRCode(target,{text:link,width:96,height:96,colorDark:'#1b1a18',colorLight:'#ffffff',correctLevel:window.QRCode.CorrectLevel.M});}
+ const link=approvalReplyLink(r),target=$('#document-qr',host);
+ if(link&&target&&window.QRCode){new window.QRCode(target,{text:link,width:150,height:150,colorDark:'#1b1a18',colorLight:'#ffffff',correctLevel:window.QRCode.CorrectLevel.M});}
  return host;
 }
 function removeDoc(host){host?.remove();}
 async function makeCanvas(host){
  if(!window.html2canvas)throw Error('No se cargó la biblioteca para generar imagen. Revisa la conexión a internet y vuelve a intentar.');
- await Promise.all($('img',host).map(i=>i.complete?Promise.resolve():new Promise(resolve=>{i.onload=resolve;i.onerror=resolve;})));
+ await Promise.all(Array.from(host.querySelectorAll('img')).map(i=>i.complete?Promise.resolve():new Promise(resolve=>{i.onload=resolve;i.onerror=resolve;})));
  return await window.html2canvas($('.document-sheet',host),{scale:2,backgroundColor:'#fff',useCORS:false,logging:false,windowWidth:850});
 }
 function downloadBlob(blob,name){const url=URL.createObjectURL(blob),a=el('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);}
@@ -338,17 +375,38 @@ async function downloadPDF(r){
   const pageH=281;let top=8;
   doc.addImage(canvas.toDataURL('image/jpeg',.92),'JPEG',8,top,w,h);
   while(h+top>pageH){top-=pageH;doc.addPage();doc.addImage(canvas.toDataURL('image/jpeg',.92),'JPEG',8,top,w,h);}
-  const link=visibleLink(r);
-  if(link){doc.setFontSize(8);doc.textWithLink('Abrir solicitud privada en ÁGORA',12,289,{url:link});}
+  const link=approvalReplyLink(r);
+  doc.setFontSize(8);doc.textWithLink('Responder sin iniciar sesión',12,289,{url:link});
   doc.save(r.folio+'.pdf');
  }finally{removeDoc(host);}
 }
 function printDoc(r){
+ // El CSS general oculta documentos no marcados .print-view al imprimir.
+ // Abrimos la ventana directamente desde el clic para evitar el bloqueo de popups.
  const pop=window.open('','_blank');
- if(pop)pop.opener=null;
- if(!pop){showToast('El navegador bloqueó la ventana de impresión.');return;}
- pop.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>'+esc(r.folio)+'</title><link rel="stylesheet" href="'+new URL('./style.css',location.href).href+'"><style>body{background:#fff;margin:0}.document-sheet{margin:auto;border:0;min-height:0;width:190mm;padding:11mm;font-size:12px}@page{size:A4;margin:8mm}</style></head><body>'+htmlDoc(r)+'</body></html>');
- pop.document.close();let printed=false;const startPrint=()=>{if(printed)return;printed=true;pop.focus();pop.print();};pop.addEventListener('load',startPrint,{once:true});setTimeout(startPrint,800);
+ if(!pop){showToast('El navegador bloqueó la ventana. Permite ventanas emergentes para imprimir.');return;}
+ pop.opener=null;
+ const host=docHost(r);
+ const content=host.innerHTML.replace('class="document-sheet"','class="document-sheet print-view"');
+ removeDoc(host);
+ const css='<style>body{background:#fff!important;margin:0!important}.document-sheet{margin:0 auto!important;border:0!important;min-height:0!important;width:190mm!important;padding:9mm!important;font-size:12px!important;box-shadow:none!important}.document-sheet img{max-width:100%!important}@page{size:A4;margin:8mm}@media print{body>article.document-sheet.print-view{display:block!important}body{background:#fff!important}}</style>';
+ pop.document.open();
+ pop.document.write('<!doctype html><html lang="es-MX"><head><meta charset="utf-8"><title>'+esc(r.folio)+'</title><link rel="stylesheet" href="'+new URL('./style.css',location.href).href+'">'+css+'</head><body>'+content+'</body></html>');
+ pop.document.close();
+ let started=false;
+ const go=async()=>{
+  if(started)return;
+  started=true;
+  try{
+   await Promise.all(Array.from(pop.document.images).map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;})));
+   if(pop.document.fonts?.ready)await pop.document.fonts.ready;
+  }catch{}
+  if(pop.closed)return;
+  pop.focus();pop.print();
+ };
+ pop.addEventListener('load',go,{once:true});
+ // Si el evento load ya ocurrió, este respaldo también activa el diálogo.
+ setTimeout(go,1000);
 }
 function previewDoc(r){
  const host=docHost(r);$('#modal-body').innerHTML='<div class="action-bar"><button class="btn btn-outline" data-action="back">← Volver al expediente</button><button class="btn btn-gold" data-action="pdf">↓ PDF</button><button class="btn btn-outline" data-action="png">↓ PNG</button></div><div class="doc-preview">'+host.innerHTML+'</div>';removeDoc(host);
@@ -356,8 +414,8 @@ function previewDoc(r){
 function clearRequestForm(){
  state.editingId='';$('#submit-request').textContent='Guardar solicitud →';
  const form=$('#request-form');
- for(const e of $('input,textarea',form)){if(!e.closest('#line-items'))e.value='';}
- for(const e of $('select',form))e.selectedIndex=0;
+ for(const e of form.querySelectorAll('input,textarea')){if(!e.closest('#line-items'))e.value='';}
+ for(const e of form.querySelectorAll('select'))e.selectedIndex=0;
  form.elements.namedItem('dateNeeded').value=localDate();
  $('#line-items').innerHTML='';addLine();
 }
@@ -374,12 +432,10 @@ function editRequest(r){
  $('#page-title').textContent='Editar '+r.folio;
 }
 
-async function shareReference(r){
- const link=visibleLink(r);
- const message='DEJAVÚ MARKETING · '+r.folio+'\nProyecto: '+r.project+'\nConcepto: '+(CATEGORIES[r.category]||r.category)+'\nImporte solicitado: '+money(r.total)+'\nEstado: '+(STATUS[r.status]||r.status)+(link?'\nConsultar y responder (requiere acceso ÁGORA): '+link:'\nAdjunto PDF o PNG de esta solicitud.');
- try{await navigator.clipboard.writeText(message);showToast('Referencia copiada. Puedes pegarla en WhatsApp o Gmail.');}
- catch{const textArea=el('textarea');textArea.value=message;document.body.appendChild(textArea);textArea.select();document.execCommand('copy');textArea.remove();showToast('Referencia copiada.');}
-}
+async function shareReference(r){await copyText(shareText(r),'Mensaje de WhatsApp copiado.');}
+async function copyEmail(r){await copyText('Asunto: '+emailSubject(r)+'\n\n'+emailBody(r),'Texto del correo copiado.');}
+async function copyApprovalLink(r){await copyText(approvalReplyLink(r),'Enlace de revisión copiado.');}
+
 async function exportBackup(){
  try{
   const data={format:'agora-recursos-local-v1',exportedAt:iso(),records:state.cloud?[]:await dbAll()};
@@ -460,6 +516,10 @@ function setup(){
    if(action==='png')await downloadPNG(r);
    if(action==='print')printDoc(r);
    if(action==='share')await shareReference(r);
+    if(action==='whatsapp')openWhatsApp(r);
+    if(action==='copy-email')await copyEmail(r);
+    if(action==='email')openEmail(r);
+    if(action==='approval-link')await copyApprovalLink(r);
    if(action==='preview')previewDoc(r);
    if(action==='back')openDetail(r.id);
   }catch(error){showToast(readable(error));}

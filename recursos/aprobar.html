@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Revisar solicitud de recursos · Dejavú Marketing</title>
+<style>
+:root{font-family:Arial,Helvetica,sans-serif;color:#231e19;background:#f7f5f1}
+*{box-sizing:border-box}
+body{margin:0}
+main{width:min(760px,calc(100% - 30px));margin:34px auto 70px}
+header{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:22px}
+header img{width:160px;height:76px;object-fit:contain;object-position:left center}
+header span{font-size:11px;color:#796f5f;font-weight:700}
+.panel{border:1px solid #e5ddd0;border-radius:16px;background:#fff;padding:clamp(22px,4vw,40px);box-shadow:0 16px 48px #17140c0b}
+.eyebrow{font-size:11px;letter-spacing:2px;font-weight:700;color:#947243;text-transform:uppercase}
+h1{font-size:30px;letter-spacing:-.6px;line-height:1.2;margin:10px 0}
+.subtitle{font-size:13px;line-height:1.7;color:#6e6559}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:24px 0}
+.fact{background:#faf9f6;border:1px solid #ece7de;border-radius:9px;padding:17px}
+.fact span{display:block;font-size:10px;color:#8e8477;text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px}
+.fact strong{font-size:15px;overflow-wrap:anywhere}
+.fact.amount strong{font-size:25px}
+hr{height:1px;border:0;background:#ece7df;margin:24px 0}
+h2{font-size:17px}
+form{display:grid;gap:13px}
+label{display:grid;gap:7px;font-size:12px;font-weight:700}
+input,textarea{padding:12px;border:1px solid #d6cec0;border-radius:8px;font:14px Arial,sans-serif;color:#211d18;width:100%}
+textarea{resize:vertical;min-height:95px}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}
+button{font-size:13px;font-weight:700;border-radius:9px;padding:12px 17px;min-height:44px;border:1px solid #cab798;background:#fff;color:#6b5236;cursor:pointer}
+button.primary{background:#a9814a;color:#fff;border-color:#a9814a}
+button.reject{color:#b04436;border-color:#dab7af}
+button:disabled{opacity:.5;cursor:not-allowed}
+.note{border-left:3px solid #bba27b;background:#faf7f0;color:#675845;padding:13px 15px;font-size:12px;line-height:1.65;margin:24px 0}
+.result{background:#f7f8f6;border:1px solid #dfebdf;border-radius:9px;padding:18px;margin-top:20px}
+.result textarea{background:#fff;min-height:170px;font-size:12px}
+.status{font-size:12px;font-weight:700;color:#4f7754}
+.error{background:#fff3f0;border:1px solid #eac9c2;border-radius:9px;color:#a13c29;padding:16px;font-size:13px}
+small{color:#83796c;font-size:11px;line-height:1.6}
+footer{color:#877d6b;text-align:center;font-size:11px;margin-top:20px}
+[hidden]{display:none!important}
+@media(max-width:600px){main{margin:15px auto 35px}.facts{grid-template-columns:1fr}.fact.amount strong{font-size:23px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<img src="../archivos/dejavu-logo-oficial.png" alt="Dejavú Marketing">
+<span>RECURSOS Y FINANZAS</span>
+</header>
+<section class="panel">
+<div class="eyebrow">Respuesta externa · Sin iniciar sesión</div>
+<h1>Revisar solicitud de dinero</h1>
+<p class="subtitle">Consulta los datos básicos del requerimiento y prepara una respuesta de autorización o rechazo, sin entrar a ÁGORA.</p>
+<div id="error" class="error" hidden>Este enlace es inválido o está incompleto. Solicita al responsable que te envíe nuevamente la solicitud.</div>
+<div id="content" hidden>
+<div class="facts">
+<div class="fact"><span>Folio</span><strong id="folio"></strong></div>
+<div class="fact"><span>Proyecto</span><strong id="project"></strong></div>
+
+<div class="fact"><span>Concepto</span><strong id="category"></strong></div>
+<div class="fact amount"><span>Importe solicitado</span><strong id="amount"></strong></div>
+<div class="fact"><span>Fecha en que se necesita</span><strong id="dateNeeded"></strong></div>
+</div>
+<div class="note">Este enlace no muestra cuentas bancarias ni permite realizar pagos. <b>La respuesta no se registra automáticamente en ÁGORA.</b> Después de enviarla, administración deberá revisar la identidad del remitente y registrar la decisión en el expediente financiero.</div>
+<hr>
+<h2>¿Cuál es tu respuesta?</h2>
+<form id="review-form" novalidate>
+<label>Tu nombre completo
+<input id="reviewer" type="text" maxlength="120" minlength="3" autocomplete="name" required placeholder="Nombre de la persona que responde">
+</label>
+<label>Tu correo (opcional)
+<input id="reviewerEmail" type="email" maxlength="180" autocomplete="email" placeholder="correo@empresa.com">
+</label>
+<label>Comentario / motivo de la decisión
+<textarea id="comment" maxlength="500" placeholder="Justificación o condiciones, si aplica"></textarea>
+</label>
+<div class="actions">
+<button class="primary" type="button" id="approve">Autorizar solicitud</button>
+<button class="reject" type="button" id="reject">Rechazar solicitud</button>
+</div>
+<small>Quien reciba el enlace puede preparar una respuesta. El nombre y correo capturados no se verifican automáticamente.</small>
+</form>
+<div id="result" class="result" hidden>
+<p class="status" id="result-status"></p>
+<p class="subtitle">La respuesta está preparada, pero <b>todavía no se ha enviado</b>. Usa uno de estos botones para comunicarla a Dejavú.</p>
+<label>Texto de respuesta
+<textarea id="response" readonly></textarea>
+</label>
+<div class="actions">
+<button type="button" id="copy">Copiar respuesta</button>
+<button class="primary" type="button" id="mail">Responder por correo</button>
+<button type="button" id="whatsapp">Responder por WhatsApp</button>
+<button type="button" id="change">Cambiar decisión</button>
+</div>
+<small>El correo o WhatsApp se abre en tu dispositivo; verifica el destinatario antes de enviarlo.</small>
+</div>
+</div>
+</section>
+<footer>Dejavú Marketing · Respuestas externas · Sin transferencia ni validación bancaria</footer>
+</main>
+<script>
+"use strict";
+(function(){
+ const $=id=>document.getElementById(id);
+ const input=new URLSearchParams(location.search).get("d")||"";
+ let request=null,answer="";
+ function showError(){ $("error").hidden=false; $("content").hidden=true; }
+ try{
+  if(!/^[A-Za-z0-9_-]{20,3000}$/.test(input))throw Error("Formato");
+  const base=input.replace(/-/g,"+").replace(/_/g,"/");
+  const raw=atob(base.padEnd(Math.ceil(base.length/4)*4,"="));
+  const bytes=Uint8Array.from(raw,c=>c.charCodeAt(0));
+  const obj=JSON.parse(new TextDecoder().decode(bytes));
+  if(obj.v!==1||typeof obj.f!=="string"||obj.f.length>35||
+   !/^RF-[A-Za-z0-9-]{5,35}$/.test(obj.f)||
+   typeof obj.p!=="string"||!obj.p.trim()||obj.p.length>130||
+   typeof obj.c!=="string"||obj.c.length>100||
+   typeof obj.d!=="string"||obj.d.length>10||
+   !Number.isFinite(obj.t)||obj.t<=0||obj.t>=1000000000)throw Error("Datos inválidos");
+  request=obj;
+  $("folio").textContent=obj.f;
+  $("project").textContent=obj.p;
+  $("category").textContent=obj.c;
+  $("dateNeeded").textContent=obj.d||"—";
+  $("amount").textContent=new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(obj.t);
+  $("content").hidden=false;
+ }catch(e){showError();}
+ function respond(decision){
+  if(!request)return;
+  const name=$("reviewer").value.trim(),email=$("reviewerEmail").value.trim(),note=$("comment").value.trim();
+  if(name.length<3){alert("Escribe tu nombre completo.");$("reviewer").focus();return;}
+  if(email&&!$("reviewerEmail").checkValidity()){alert("Revisa la dirección de correo.");$("reviewerEmail").focus();return;}
+  if(decision==="RECHAZADA"&&note.length<5){alert("Escribe un motivo de rechazo de al menos 5 caracteres.");$("comment").focus();return;}
+  answer="DEJAVÚ MARKETING · RESPUESTA EXTERNA\n"+
+   "Folio: "+request.f+"\nProyecto: "+request.p+
+   "\nImporte solicitado: "+$("amount").textContent+
+   "\nDecisión comunicada: "+decision+
+   "\nRespondió: "+name+
+   (email?"\nCorreo declarado: "+email:"")+
+   "\nFecha de respuesta: "+new Date().toLocaleString("es-MX")+
+   "\nComentarios: "+(note||"Sin comentarios")+
+   "\n\nIMPORTANTE: Esta respuesta se prepara fuera de ÁGORA. Administración debe verificar quién la emitió y registrarla en el expediente. No es constancia de transferencia.";
+  $("response").value=answer;
+  $("result-status").textContent="Respuesta: "+decision+" · pendiente de envío y validación";
+  $("result").hidden=false;
+  $("result").scrollIntoView({behavior:"smooth",block:"start"});
+ }
+ $("approve").addEventListener("click",()=>respond("AUTORIZADA"));
+ $("reject").addEventListener("click",()=>respond("RECHAZADA"));
+ $("copy").addEventListener("click",async()=>{
+  try{await navigator.clipboard.writeText(answer);}
+  catch{
+   $("response").focus();$("response").select();
+   if(!document.execCommand("copy")){alert("Selecciona y copia el texto de respuesta.");return;}
+  }
+  $("result-status").textContent="Texto copiado. Envíalo a la persona solicitante.";
+ });
+ $("mail").addEventListener("click",()=>{
+  if(!answer)return;
+  location.href="mailto:?subject="+encodeURIComponent("Respuesta a solicitud "+request.f)+"&body="+encodeURIComponent(answer);
+ });
+ $("whatsapp").addEventListener("click",()=>{
+  if(!answer)return;
+  window.open("https://wa.me/?text="+encodeURIComponent(answer),"_blank","noopener,noreferrer");
+ });
+ $("change").addEventListener("click",()=>{ $("result").hidden=true;$("review-form").scrollIntoView({behavior:"smooth",block:"start"}); });
+})();
+</script>
+</body>
+</html>
