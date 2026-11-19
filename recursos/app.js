@@ -386,7 +386,9 @@ function printDoc(r){
  const pop=window.open('','_blank');
  if(!pop){showToast('El navegador bloqueó la ventana. Permite ventanas emergentes para imprimir.');return;}
  pop.opener=null;
- const content=htmlDoc(r).replace('class="document-sheet"','class="document-sheet print-view"');
+ const host=docHost(r);
+ const content=host.innerHTML.replace('class="document-sheet"','class="document-sheet print-view"');
+ removeDoc(host);
  const css='<style>body{background:#fff!important;margin:0!important}.document-sheet{margin:0 auto!important;border:0!important;min-height:0!important;width:190mm!important;padding:9mm!important;font-size:12px!important;box-shadow:none!important}.document-sheet img{max-width:100%!important}@page{size:A4;margin:8mm}@media print{body>article.document-sheet.print-view{display:block!important}body{background:#fff!important}}</style>';
  pop.document.open();
  pop.document.write('<!doctype html><html lang="es-MX"><head><meta charset="utf-8"><title>'+esc(r.folio)+'</title><link rel="stylesheet" href="'+new URL('./style.css',location.href).href+'">'+css+'</head><body>'+content+'</body></html>');
