@@ -1,4 +1,5 @@
 import {buildJornadaSheet,existingAssignments,suggestedEventStaff,jornadaPdf,jornadaShareText,jornadaEmail,safeHtml} from "./ops-jornada-sheet.mjs";
+import {payrollXlsx} from "./ops-payroll-preview.mjs";
 let root=null,eventId="",scope="evento",includePayroll=false,report=null;
 const db=()=>window.AGORA_OPS_APP?.snapshot?.()||window.AGORA_TEST?.getState?.();
 const allowed=()=>window.AGORA_OPS_BRIDGE?
@@ -8,13 +9,24 @@ const money=x=>new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).
 function pdfFile(){
  const bytes=jornadaPdf(report,{includePayroll});
  const id=report.folio.replace(/[^A-Za-z0-9_-]/g,"").slice(0,48);
- return new File([bytes],id+(includePayroll?"-NOMINA":"-OPERATIVO")+".pdf",{type:"application/pdf"});
+ return new File([bytes],id+"-"+report.dateFrom+(includePayroll?"-NOMINA":"-OPERATIVO")+".pdf",{type:"application/pdf"});
 }
 function downloadPdf(){
  const file=pdfFile(),url=URL.createObjectURL(file),a=document.createElement("a");
  a.href=url;a.download=file.name;document.body.append(a);a.click();a.remove();
  setTimeout(()=>URL.revokeObjectURL(url),30000);
  return file;
+}
+function downloadExcel(){
+ const month=report.dateFrom.slice(0,7),dueDate=report.payroll.find(x=>x.dueDate)?.dueDate||"";
+ const bytes=payrollXlsx({folio:report.folio,month,dueDate,
+   rows:report.payroll,total:report.totals.estimated,authorized:report.totals.authorized,
+   pending:report.totals.pending,count:report.payroll.length});
+ const url=URL.createObjectURL(new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
+ const a=document.createElement("a");
+ a.href=url;a.download=report.folio+"-"+report.dateFrom+"-NOMINA.xlsx";
+ document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+ return a.download;
 }
 function info(s){const n=root?.querySelector("#jornada-message");if(n)n.textContent=s}
 function render(){
@@ -50,7 +62,7 @@ function render(){
  ' · Por revisar: '+money(r.totals.pending)+'</p><p class="jornada-note">'+safeHtml(r.moneyWarning)+'</p></section>'+
  '<section><h3>Descargar y compartir</h3><label class="jornada-private"><input type="checkbox" id="jornada-finanzas" '+
  (includePayroll?'checked':'')+'> Incluir nómina e importes en el PDF y el mensaje (confidencial)</label>'+
- '<div class="jornada-actions"><button id="jornada-download">Descargar PDF</button><button class="primary" id="jornada-share">Compartir archivo PDF</button>'+
+ '<div class="jornada-actions"><button id="jornada-download">Descargar PDF</button><button id="jornada-xlsx">Descargar nómina Excel</button><button class="primary" id="jornada-share">Compartir archivo PDF</button>'+
  '<button id="jornada-whatsapp">WhatsApp</button><button id="jornada-email">Correo</button><button id="jornada-copy">Copiar texto</button></div>'+
  '<p id="jornada-message" class="jornada-note" aria-live="polite">WhatsApp y correo abren el mensaje listo. En equipos sin compartir archivos, adjunta manualmente el PDF descargado.</p></section></div></div>';
 }
@@ -61,6 +73,7 @@ async function action(e){
  if(b.id==="jornada-evento"){scope="evento";render();return}
  if(b.id==="jornada-dia"){scope="dia";render();return}
  if(b.id==="jornada-download"){const f=downloadPdf();info("PDF descargado: "+f.name);return}
+ if(b.id==="jornada-xlsx"){const name=downloadExcel();info("Excel de nómina descargado: "+name);return}
  if(b.id==="jornada-share"){
   const file=pdfFile(),text=jornadaShareText(report,{includePayroll});
   if(navigator.canShare?.({files:[file]})&&navigator.share){
