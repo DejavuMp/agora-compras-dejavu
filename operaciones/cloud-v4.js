@@ -142,6 +142,31 @@ function changedShiftDocs(before,after){
   for(const id of old.keys())if(!fresh.has(id))changed.set(id,null);
   return changed;
 }
+function clockTimeLabel(value){
+  const millis=value?.toMillis?.()??(typeof value?.seconds==="number"?value.seconds*1000:new Date(value).getTime());
+  return Number.isFinite(millis)?
+    new Intl.DateTimeFormat("es-MX",{timeZone:"America/Mexico_City",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(millis)):
+    "hora pendiente de servidor";
+}
+function clockStamp(value){
+  return value?.toMillis?.()??(typeof value?.seconds==="number"?value.seconds*1000:new Date(value).getTime());
+}
+function notifyCoordinatorClock(clock,kind){
+  if(role!=="coordinador"||!ready)return;
+  const p=baseBoard?.payload?.people?.find(x=>x.id===clock.personId)?.name||"Personal";
+  const ev=baseBoard?.payload?.events?.find(x=>x.id===clock.eventId)?.title||"Jornada asignada";
+  const time=clockTimeLabel(kind==="entrada"?clock.startedAt:clock.endedAt);
+  const note=document.createElement("div");
+  note.className="ops-live-clock-notice";
+  note.setAttribute("role","status");
+  note.textContent=(kind==="entrada"?"Entrada registrada: ":"Salida registrada: ")+p+" · "+ev+" · "+time;
+  Object.assign(note.style,{position:"fixed",right:"14px",bottom:"18px",zIndex:"8500",
+    maxWidth:"420px",background:"#252625",color:"white",padding:"14px 18px",
+    border:"1px solid #b99757",borderRadius:"12px",boxShadow:"0 12px 35px #0003",
+    font:"600 13px/1.5 Arial,sans-serif"});
+  document.body.appendChild(note);
+  setTimeout(()=>note.remove(),15000);
+}
 function loadCoordinator(){
   role="coordinador";
   notice("Firebase · preparando datos","pending");
@@ -164,7 +189,22 @@ function loadCoordinator(){
     incidents=new Map(snap.docs.map(d=>[d.id,{...d.data(),id:d.id}]));
     if(initialized)emit();
   });
-  listen(CLOCKLIST,snap=>{clocks=new Map(snap.docs.map(d=>[d.id,{...d.data(),id:d.id}]));if(initialized)emit();});
+  let haveFirstClockSnapshot=false;
+  listen(CLOCKLIST,snap=>{
+    const next=new Map(snap.docs.map(d=>[d.id,{...d.data(),id:d.id}]));
+    if(haveFirstClockSnapshot&&!snap.metadata.fromCache){
+      for(const [id,now] of next){
+        const before=clocks.get(id);
+        if(!before&&now.startedAt)notifyCoordinatorClock(now,"entrada");
+        else if(before&&!before.endedAt&&now.endedAt)notifyCoordinatorClock(now,"salida");
+        else if(before&&before.startedAt&&now.startedAt&&clockStamp(before.startedAt)!==clockStamp(now.startedAt))
+          notifyCoordinatorClock(now,"entrada");
+      }
+    }
+    clocks=next;
+    if(!snap.metadata.fromCache)haveFirstClockSnapshot=true;
+    if(initialized)emit();
+  });
   listen(REQUESTS,snap=>{requests=new Map(snap.docs.map(d=>[d.id,{...d.data(),id:d.id}]));renderRequests()});
 }
 function loadStaff(uid,id){
