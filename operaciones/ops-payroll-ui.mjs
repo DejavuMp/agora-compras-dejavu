@@ -7,7 +7,7 @@ const pad=x=>String(x).padStart(2,"0");
 const currentMonth=()=>{const d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)};
 function build(){
  const db=state();if(!db)return;
- dueDate=db.settings?.payrollPlan?.[month]||dueDate||"";
+ dueDate=dueDate||db.settings?.payrollPlan?.[month]||"";
  report=buildPayroll({...db,month,dueDate});
 }
 const currency=v=>new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(v||0);
