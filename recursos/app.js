@@ -65,11 +65,11 @@ async function loadRecords(){
    const snap=await dbSdk.getDocs(ref);
    state.records=sortRows(snap.docs.map(d=>({...d.data(),id:d.id})));
    state.mode='cloud';
-   banner('Conectado a Firebase · Los datos financieros son visibles solo para cuentas autorizadas. Los enlaces de aprobación requieren iniciar sesión con un perfil administrador.','success');
+   banner('Conectado a Firebase · Los datos bancarios son privados. El enlace externo permite enviar una respuesta sin acceso, pendiente de validación y registro.','success');
   }else{
    state.records=sortRows(await dbAll());
    state.mode='local';
-   banner('Modo local: los registros solo están en este navegador. Puedes generar PDF, PNG y respaldos, pero los enlaces no permiten aprobación remota. No elimines los datos del sitio.');
+   banner('Modo local: los registros quedan solo en este navegador. La respuesta externa se envía por correo o WhatsApp; no se registra automáticamente. Descarga respaldos frecuentes.');
   }
  }catch(error){
   if(state.cloud){state.cloud=false;state.mode='local';state.records=sortRows(await dbAll().catch(()=>[]));banner('No se pudo consultar Firebase: '+readable(error)+' Se muestra la copia local independiente.','error');}
@@ -229,9 +229,9 @@ function visibleLink(r){if(!state.cloud||r.createdBy==='local')return '';const u
 // Enlace autocontenido de respuesta externa. Nunca exporta cuentas, CLABE ni notas bancarias.
 // NO modifica automáticamente la solicitud, para evitar permisos públicos de escritura.
 function approvalReplyLink(r){
- const data={v:1,folio:String(r.folio||'').slice(0,35),project:String(r.project||'').slice(0,130),
-  client:String(r.client||'').slice(0,100),category:String(CATEGORIES[r.category]||r.category||'').slice(0,100),
-  total:round(r.total),dateNeeded:String(r.dateNeeded||'').slice(0,10)};
+ const data={v:1,f:String(r.folio||'').slice(0,35),p:String(r.project||'').slice(0,130),
+  c:String(CATEGORIES[r.category]||r.category||'').slice(0,100),t:round(r.total),
+  d:String(r.dateNeeded||'').slice(0,10)};
  const bytes=new TextEncoder().encode(JSON.stringify(data));
  let raw='';for(const byte of bytes)raw+=String.fromCharCode(byte);
  return new URL('./aprobar.html?d='+btoa(raw).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''),location.href).href;
@@ -347,12 +347,12 @@ function htmlDoc(r){
  const payment=r.payments?.length?'<div class="doc-desc"><b>Pagos registrados:</b> '+r.payments.map(p=>esc(p.date)+' · '+money(p.amount)+' ('+esc(p.method)+')').join('; ')+'</div>':'';
  return '<article class="document-sheet" id="document-sheet"><div class="doc-brand"><div><img src="' + esc(LOGO_URL) + '" style="width:165px;height:65px;object-fit:contain;object-position:left center" alt="Dejavú Marketing"><br><em>MARKETING · ÁGORA</em></div><div style="text-align:right"><b>'+esc(r.folio)+'</b><br><span style="font-size:11px;color:#8b8174">'+esc(STATUS[r.status]||r.status)+'</span></div></div><h2>SOLICITUD DE RECURSOS Y PAGOS</h2><p class="doc-desc">'+esc(CATEGORIES[r.category]||r.category)+'</p><div class="doc-meta">'+[
  ['Proyecto / campaña',r.project],['Cliente',r.client||'—'],['Solicitante',r.requester],['Fecha requerida',r.dateNeeded],['Beneficiario',r.beneficiary],['Entrega / pago',r.paymentType==='directo'?'Pago directo':'Recursos al responsable'],['Forma de pago',r.paymentMethod],['Banco y cuenta',(r.bank||'—')+' · '+(r.account||'Sin registrar')]
- ].map(x=>'<div><span>'+esc(x[0])+'</span>'+esc(x[1]||'—')+'</div>').join('')+'</div><div class="doc-desc"><b>Justificación:</b> '+esc(r.reason)+'</div><table><thead><tr><th>Concepto</th><th>Cantidad</th><th>Precio unit.</th><th>Subtotal</th></tr></thead><tbody>'+list+'</tbody></table><div class="doc-total">TOTAL SOLICITADO: '+money(r.total)+'</div><p class="doc-desc"><b>Autorizado:</b> '+money(r.approvedAmount)+' &nbsp; <b>Pagado:</b> '+money(r.paidAmount)+'</p><p class="doc-desc"><b>Observaciones:</b> '+esc(r.notes||'Sin observaciones')+'</p>'+payment+'<div class="doc-foot"><div><b>DEJAVÚ MARKETING</b><br>Expediente '+esc(r.folio)+'<br>Generado el '+new Date().toLocaleString('es-MX')+'<br>'+(link?'<span class="doc-url">'+esc(link)+'</span>':'<span>Documento generado desde registro local. Sin enlace remoto.</span>')+'<br><span>Respuesta externa por correo o WhatsApp. Administración valida y registra la decisión.</span></div>'+code+'</div></article>';
+ ].map(x=>'<div><span>'+esc(x[0])+'</span>'+esc(x[1]||'—')+'</div>').join('')+'</div><div class="doc-desc"><b>Justificación:</b> '+esc(r.reason)+'</div><table><thead><tr><th>Concepto</th><th>Cantidad</th><th>Precio unit.</th><th>Subtotal</th></tr></thead><tbody>'+list+'</tbody></table><div class="doc-total">TOTAL SOLICITADO: '+money(r.total)+'</div><p class="doc-desc"><b>Autorizado:</b> '+money(r.approvedAmount)+' &nbsp; <b>Pagado:</b> '+money(r.paidAmount)+'</p><p class="doc-desc"><b>Observaciones:</b> '+esc(r.notes||'Sin observaciones')+'</p>'+payment+'<div class="doc-foot"><div><b>DEJAVÚ MARKETING</b><br>Expediente '+esc(r.folio)+'<br>Generado el '+new Date().toLocaleString('es-MX')+'<br>'+(link?'<span class="doc-url">El enlace de respuesta se comparte por WhatsApp o correo; también puedes escanear el QR.</span>':'<span>Documento generado desde registro local. Sin enlace remoto.</span>')+'<br><span>Respuesta externa por correo o WhatsApp. Administración valida y registra la decisión.</span></div>'+code+'</div></article>';
 }
 function docHost(r){
  const host=el('div','doc-print-host');host.innerHTML=htmlDoc(r);document.body.appendChild(host);
  const link=approvalReplyLink(r),target=$('#document-qr',host);
- if(link&&target&&window.QRCode){new window.QRCode(target,{text:link,width:96,height:96,colorDark:'#1b1a18',colorLight:'#ffffff',correctLevel:window.QRCode.CorrectLevel.M});}
+ if(link&&target&&window.QRCode){new window.QRCode(target,{text:link,width:150,height:150,colorDark:'#1b1a18',colorLight:'#ffffff',correctLevel:window.QRCode.CorrectLevel.M});}
  return host;
 }
 function removeDoc(host){host?.remove();}
