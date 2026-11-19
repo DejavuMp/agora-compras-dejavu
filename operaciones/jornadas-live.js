@@ -76,10 +76,14 @@ const hourLabel=value=>{
 const statusOf=e=>{
   const clock=records.get(key(user?.uid||"",e.id));
   const policy=access.get(key(user?.uid||"",e.id));
-  if(clock?.status==="finalizada")return ["Terminada","done"];
-  if(clock?.status==="en_curso")return ["En curso","active"];
-  if(policy?.enabled&&allowedByPolicy(policy).ok)return ["Lista para iniciar","active"];
-  return ["Por habilitar","blocked"];
+  if(e.status==="cancelado")return ["Cancelada","blocked"];
+  if(clock?.status==="finalizada")return ["Salida registrada · pendiente de validación","done"];
+  if(clock?.status==="en_curso")return ["Entrada registrada · jornada abierta","active"];
+  const from=instant(eventStart(e,personId)),until=instant(eventEnd(e,personId)),now=Date.now();
+  if(Number.isFinite(from)&&now<from)return ["Programada","blocked"];
+  if(Number.isFinite(until)&&now>until)return ["Horario terminado · asistencia por revisar","done"];
+  if(policy?.enabled&&allowedByPolicy(policy).ok)return ["En horario · puedes registrar entrada","active"];
+  return ["En horario · permiso pendiente","blocked"];
 };
 const eventSite=e=>(staff?.sites||[]).find(s=>s.id===e.siteId);
 const destination=e=>e?.venueAddress||eventSite(e)?.address||e?.venueName||eventSite(e)?.name||e?.location||"";
@@ -217,8 +221,8 @@ function renderAttendance(){
       '<small>Límite de ocho pausas alcanzado.</small>')+'</div>';
   $("policy-state").textContent=p?
     (p.enabled?"Acceso "+(check.ok?"habilitado":"fuera de horario")+" · "+(p.mode==="horas"?"Cupo de "+(p.maxMinutes/60).toFixed(1)+" horas":"Horario fijo")+
-      " · "+when(p.startsAt)+" a "+when(p.endsAt):"Jornada bloqueada por coordinación"):
-    "Coordinación todavía no ha habilitado el marcaje de esta jornada. Puedes consultar tu cronograma, pero no registrar entrada.";
+      " · "+when(p.startsAt)+" a "+when(p.endsAt):"Permiso suspendido por coordinación"):
+    "El permiso de esta jornada está sincronizándose. Si el horario ya comenzó, coordinación debe revisar tu asignación.";
   const remaining=r?.status==="en_curso"?timeLeft(p,r.startedAt):null;
   const canStart=check.ok&&!r&&!busy;
   const ended=r?.status==="finalizada";
@@ -236,7 +240,7 @@ function renderAttendance(){
       '<button class="primary" id="start-shift" '+(!canStart?"disabled":"")+'>Confirmar GPS e iniciar jornada</button>':"")+
     (r?.status==="en_curso"?pauseMarkup+'<details class="staff-incidents"><summary>¿Hubo alguna incidencia? Agrega un comentario (opcional)</summary>'+
       '<label>Comentario de cierre<textarea id="end-note" maxlength="240" placeholder="Incidencia, resultado u observación"></textarea></label></details>'+
-      '<button class="primary" id="end-shift" '+(busy||!!currentRest?"disabled":"")+'>Confirmar GPS y finalizar jornada</button>':"")+
+      '<button class="primary" id="end-shift" '+(busy||!!currentRest?"disabled":"")+'>Registrar salida real</button>':"")+
     (!check.ok&&!r?'<p class="notice">'+esc(check.reason)+'</p>':"")+
     (ended?'<p><button type="button" class="staff-subtle" data-staff-tab="pagos">Ver mis comprobantes</button></p>':"")+
     (ended&&breaksReady&&shiftBreaks.length?'<p><b>Descanso con marcajes:</b> '+restSummary.minutes+' min en '+shiftBreaks.length+' pausa(s)</p>':"")+
@@ -505,14 +509,17 @@ async function markEnd(){
       }
       try{geo=await locSnapshot()}
       catch(error){
-        if($("live-location").checked&&currentClock()?.status==="en_curso")startTracking();
-        throw error;
+        // La ausencia de GPS no debe bloquear el horario real de salida.
+        // El servidor distinguirá una salida sin ubicación verificada.
+        const yes=confirm("No se obtuvo ubicación GPS en este momento. ¿Registrar la hora real de salida sin ubicación verificada? Coordinación podrá revisarla.");
+        if(!yes)throw error;
+        geo=null;
       }
     }
-    await updateDoc(clockRef(selected),{
-      status:"finalizada",endGeo:geo,endNote:note.slice(0,240),
-      endedAt:serverTimestamp(),updatedAt:serverTimestamp()
-    });
+    const payload={status:"finalizada",endNote:note.slice(0,240),
+      endedAt:serverTimestamp(),updatedAt:serverTimestamp()};
+    if(geo)payload.endGeo=geo;
+    await updateDoc(clockRef(selected),payload);
     stopTracking();
   },"Registrando término y ubicación de salida…");
 }
