@@ -237,13 +237,17 @@ function approvalReplyLink(r){
  return new URL('./aprobar.html?d='+btoa(raw).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''),location.href).href;
 }
 function emailSubject(r){return 'Solicitud de recursos '+r.folio+' · '+r.project;}
-function emailBody(r){
+function emailBody(r,includeBank=false){
  return 'Hola,\n\nSolicito la revisión de esta solicitud de Dejavú Marketing:\n\n'
   +'Folio: '+r.folio+'\nProyecto: '+r.project+'\nConcepto: '+(CATEGORIES[r.category]||r.category)
   +'\nImporte solicitado: '+money(r.total)+'\nFecha requerida: '+(r.dateNeeded||'Por definir')
   +'\n\nREVISAR Y RESPONDER SIN INICIAR SESIÓN:\n'+approvalReplyLink(r)
   +'\n\nLa respuesta se enviará por correo o WhatsApp. Administración la verificará y la registrará en Finanzas.'
-  +'\nLos datos bancarios solo se muestran en el PDF/PNG que se adjunte de forma manual.\n\nGracias.';
+  +(includeBank?'\n\nDATOS BANCARIOS PARA TRANSFERENCIA (COMPARTIR SOLO CON DESTINATARIO AUTORIZADO):'
+   +'\nBeneficiario: '+(r.beneficiary||'No registrado')
+   +'\nBanco: '+(r.bank||'No registrado')
+   +'\nCuenta / CLABE: '+(r.account||'No registrada'):'\nLos datos bancarios se incluyen únicamente en el documento privado o al copiar la versión especial con cuenta.')
+  +'\n\nGracias.';
 }
 function shareText(r){
  return 'DEJAVÚ MARKETING · SOLICITUD DE DINERO\nFolio: '+r.folio
@@ -285,7 +289,7 @@ function detailHtml(r){
  const safeLinks=(r.attachments||[]).filter(u=>typeof u==='string'&&/^https:\/\//i.test(u));
  const links=safeLinks.length?'<div class="detail-card detail-full"><b>Documentos de soporte</b>'+safeLinks.map(u=>'<div><a target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">'+esc(u)+'</a></div>').join('')+'</div>':'';
  let result='<div class="detail-head"><div><small>'+esc(r.folio)+'</small><h3>'+esc(r.project)+'</h3><span>'+esc(CATEGORIES[r.category]||r.category)+'</span></div>'+badge(r.status)+'</div>';
- result+='<div class="action-bar">'+(canEditRequest(r)?'<button class="btn btn-outline" data-action="edit">✎ Editar solicitud</button>':'')+'<button class="btn btn-gold" data-action="pdf">↓ PDF</button><button class="btn btn-outline" data-action="png">↓ Imagen PNG</button><button class="btn btn-outline" data-action="print">⎙ Imprimir</button><button class="btn btn-outline" data-action="preview">Vista previa</button><button class="btn btn-outline" data-action="share">Copiar WhatsApp</button><button class="btn btn-outline" data-action="whatsapp">Abrir WhatsApp</button><button class="btn btn-outline" data-action="copy-email">Copiar texto correo</button><button class="btn btn-outline" data-action="email">Abrir correo</button><button class="btn btn-outline" data-action="approval-link">Copiar enlace para autorizar</button></div>';
+ result+='<div class="action-bar">'+(canEditRequest(r)?'<button class="btn btn-outline" data-action="edit">✎ Editar solicitud</button>':'')+'<button class="btn btn-gold" data-action="pdf">↓ PDF</button><button class="btn btn-outline" data-action="png">↓ Imagen PNG</button><button class="btn btn-outline" data-action="print">⎙ Imprimir</button><button class="btn btn-outline" data-action="preview">Vista previa</button><button class="btn btn-outline" data-action="share">Copiar WhatsApp</button><button class="btn btn-outline" data-action="whatsapp">Abrir WhatsApp</button><button class="btn btn-outline" data-action="copy-email">Copiar texto correo</button><button class="btn btn-outline" data-action="copy-email-bank">Copiar correo + cuenta</button><button class="btn btn-outline" data-action="email">Abrir correo</button><button class="btn btn-outline" data-action="approval-link">Copiar enlace para autorizar</button></div>';
  result+='<div class="detail-grid">'+[
  ['Solicitado',money(r.total)],['Autorizado',money(r.approvedAmount)],['Pagado',money(r.paidAmount)],['Por pagar',money(outstanding)],
  ['Solicitante',r.requester||'—'],['Beneficiario',r.beneficiary||'—'],['Fecha requerida',r.dateNeeded||'—'],['Modalidad',r.paymentType==='directo'?'Pago directo':'Entrega de recursos'],
@@ -434,6 +438,7 @@ function editRequest(r){
 
 async function shareReference(r){await copyText(shareText(r),'Mensaje de WhatsApp copiado.');}
 async function copyEmail(r){await copyText('Asunto: '+emailSubject(r)+'\n\n'+emailBody(r),'Texto del correo copiado.');}
+async function copyEmailBank(r){await copyText('Asunto: '+emailSubject(r)+'\n\n'+emailBody(r,true),'Correo con beneficiario, banco y cuenta copiado. Compártelo solo por canales autorizados.');}
 async function copyApprovalLink(r){await copyText(approvalReplyLink(r),'Enlace de revisión copiado.');}
 
 async function exportBackup(){
@@ -518,6 +523,7 @@ function setup(){
    if(action==='share')await shareReference(r);
     if(action==='whatsapp')openWhatsApp(r);
     if(action==='copy-email')await copyEmail(r);
+    if(action==='copy-email-bank')await copyEmailBank(r);
     if(action==='email')openEmail(r);
     if(action==='approval-link')await copyApprovalLink(r);
    if(action==='preview')previewDoc(r);
