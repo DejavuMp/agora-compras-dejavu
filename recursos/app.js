@@ -303,9 +303,8 @@ async function pay(e){
  }catch(error){showToast(readable(error));}
 }
 function htmlDoc(r){
- const link=visibleLink(r);
- let code='';
- if(link)code='<div class="doc-qr" id="document-qr"></div>';
+ const link=approvalReplyLink(r);
+ const code='<div class="doc-qr" id="document-qr"></div>';
  const list=r.items.map(i=>'<tr><td>'+esc(i.description)+'</td><td>'+esc(i.quantity)+'</td><td>'+money(i.unitPrice)+'</td><td>'+money(i.unitPrice*i.quantity)+'</td></tr>').join('');
  const payment=r.payments?.length?'<div class="doc-desc"><b>Pagos registrados:</b> '+r.payments.map(p=>esc(p.date)+' · '+money(p.amount)+' ('+esc(p.method)+')').join('; ')+'</div>':'';
  return '<article class="document-sheet" id="document-sheet"><div class="doc-brand"><div><img src="' + esc(LOGO_URL) + '" style="width:165px;height:65px;object-fit:contain;object-position:left center" alt="Dejavú Marketing"><br><em>MARKETING · ÁGORA</em></div><div style="text-align:right"><b>'+esc(r.folio)+'</b><br><span style="font-size:11px;color:#8b8174">'+esc(STATUS[r.status]||r.status)+'</span></div></div><h2>SOLICITUD DE RECURSOS Y PAGOS</h2><p class="doc-desc">'+esc(CATEGORIES[r.category]||r.category)+'</p><div class="doc-meta">'+[
@@ -314,14 +313,14 @@ function htmlDoc(r){
 }
 function docHost(r){
  const host=el('div','doc-print-host');host.innerHTML=htmlDoc(r);document.body.appendChild(host);
- const link=visibleLink(r),target=$('#document-qr',host);
+ const link=approvalReplyLink(r),target=$('#document-qr',host);
  if(link&&target&&window.QRCode){new window.QRCode(target,{text:link,width:96,height:96,colorDark:'#1b1a18',colorLight:'#ffffff',correctLevel:window.QRCode.CorrectLevel.M});}
  return host;
 }
 function removeDoc(host){host?.remove();}
 async function makeCanvas(host){
  if(!window.html2canvas)throw Error('No se cargó la biblioteca para generar imagen. Revisa la conexión a internet y vuelve a intentar.');
- await Promise.all($('img',host).map(i=>i.complete?Promise.resolve():new Promise(resolve=>{i.onload=resolve;i.onerror=resolve;})));
+ await Promise.all(Array.from(host.querySelectorAll('img')).map(i=>i.complete?Promise.resolve():new Promise(resolve=>{i.onload=resolve;i.onerror=resolve;})));
  return await window.html2canvas($('.document-sheet',host),{scale:2,backgroundColor:'#fff',useCORS:false,logging:false,windowWidth:850});
 }
 function downloadBlob(blob,name){const url=URL.createObjectURL(blob),a=el('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);}
@@ -344,11 +343,30 @@ async function downloadPDF(r){
  }finally{removeDoc(host);}
 }
 function printDoc(r){
+ // El CSS general oculta documentos no marcados .print-view al imprimir.
+ // Abrimos la ventana directamente desde el clic para evitar el bloqueo de popups.
  const pop=window.open('','_blank');
- if(pop)pop.opener=null;
- if(!pop){showToast('El navegador bloqueó la ventana de impresión.');return;}
- pop.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>'+esc(r.folio)+'</title><link rel="stylesheet" href="'+new URL('./style.css',location.href).href+'"><style>body{background:#fff;margin:0}.document-sheet{margin:auto;border:0;min-height:0;width:190mm;padding:11mm;font-size:12px}@page{size:A4;margin:8mm}</style></head><body>'+htmlDoc(r)+'</body></html>');
- pop.document.close();let printed=false;const startPrint=()=>{if(printed)return;printed=true;pop.focus();pop.print();};pop.addEventListener('load',startPrint,{once:true});setTimeout(startPrint,800);
+ if(!pop){showToast('El navegador bloqueó la ventana. Permite ventanas emergentes para imprimir.');return;}
+ pop.opener=null;
+ const content=htmlDoc(r).replace('class="document-sheet"','class="document-sheet print-view"');
+ const css='<style>body{background:#fff!important;margin:0!important}.document-sheet{margin:0 auto!important;border:0!important;min-height:0!important;width:190mm!important;padding:9mm!important;font-size:12px!important;box-shadow:none!important}.document-sheet img{max-width:100%!important}@page{size:A4;margin:8mm}@media print{body>article.document-sheet.print-view{display:block!important}body{background:#fff!important}}</style>';
+ pop.document.open();
+ pop.document.write('<!doctype html><html lang="es-MX"><head><meta charset="utf-8"><title>'+esc(r.folio)+'</title><link rel="stylesheet" href="'+new URL('./style.css',location.href).href+'">'+css+'</head><body>'+content+'</body></html>');
+ pop.document.close();
+ let started=false;
+ const go=async()=>{
+  if(started)return;
+  started=true;
+  try{
+   await Promise.all(Array.from(pop.document.images).map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;})));
+   if(pop.document.fonts?.ready)await pop.document.fonts.ready;
+  }catch{}
+  if(pop.closed)return;
+  pop.focus();pop.print();
+ };
+ pop.addEventListener('load',go,{once:true});
+ // Si el evento load ya ocurrió, este respaldo también activa el diálogo.
+ setTimeout(go,1000);
 }
 function previewDoc(r){
  const host=docHost(r);$('#modal-body').innerHTML='<div class="action-bar"><button class="btn btn-outline" data-action="back">← Volver al expediente</button><button class="btn btn-gold" data-action="pdf">↓ PDF</button><button class="btn btn-outline" data-action="png">↓ PNG</button></div><div class="doc-preview">'+host.innerHTML+'</div>';removeDoc(host);
@@ -356,8 +374,8 @@ function previewDoc(r){
 function clearRequestForm(){
  state.editingId='';$('#submit-request').textContent='Guardar solicitud →';
  const form=$('#request-form');
- for(const e of $('input,textarea',form)){if(!e.closest('#line-items'))e.value='';}
- for(const e of $('select',form))e.selectedIndex=0;
+ for(const e of form.querySelectorAll('input,textarea')){if(!e.closest('#line-items'))e.value='';}
+ for(const e of form.querySelectorAll('select'))e.selectedIndex=0;
  form.elements.namedItem('dateNeeded').value=localDate();
  $('#line-items').innerHTML='';addLine();
 }
