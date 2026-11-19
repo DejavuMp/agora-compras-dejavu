@@ -650,7 +650,7 @@ match /agora_finance_requests/{requestId} {
         'id','personId','ownerUid','eventId','start','end','breakMins',
         'activity','place','notes','paymentBasis','paymentStatus','requestedRate',
         'requestedAmount','requestedHours','approvedHours','approvedAmount',
-        'returnNote','revision','updatedAt','type','status'
+        'returnNote','paymentDueDate','revision','updatedAt','type','status'
       ]) &&
       request.resource.data.keys().hasAll([
         'id','personId','ownerUid','eventId','revision','updatedAt'
@@ -840,8 +840,9 @@ match /agora_finance_requests/{requestId} {
            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
              'status','endGeo','endNote','endedAt','updatedAt'
            ]) &&
-           request.resource.data.keys().hasAll(['endGeo','endNote','endedAt']) &&
-           shiftGeoValid(request.resource.data.endGeo) &&
+           request.resource.data.keys().hasAll(['endNote','endedAt']) &&
+           (!request.resource.data.keys().hasAny(['endGeo']) ||
+             shiftGeoValid(request.resource.data.endGeo)) &&
            request.resource.data.endNote is string &&
            request.resource.data.endNote.size() >= 4 &&
            request.resource.data.endNote.size() <= 240 &&
