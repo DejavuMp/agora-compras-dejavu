@@ -710,7 +710,8 @@ match /agora_finance_requests/{requestId} {
       allow create: if opsValidReport() && request.resource.data.id == id &&
         request.resource.data.revision == 1 && (
           canEdit() ||
-          (opsOwnReport() && request.resource.data.status == 'pendiente')
+          (opsOwnReport() && request.resource.data.status == 'pendiente' &&
+           request.resource.data.type != 'validacion_asistencia')
         );
       allow update: if opsValidReport() && request.resource.data.id == resource.data.id &&
         request.resource.data.ownerUid == resource.data.ownerUid &&
@@ -718,6 +719,7 @@ match /agora_finance_requests/{requestId} {
         request.resource.data.revision == resource.data.revision + 1 && (
           canEdit() ||
           (opsOwnReport() && resource.data.status == 'pendiente' &&
+            resource.data.type != 'validacion_asistencia' &&
             request.resource.data.status == 'pendiente' &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'notes','type','updatedAt','revision'
