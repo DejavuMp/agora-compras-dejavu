@@ -61,7 +61,7 @@ footer{color:#877d6b;text-align:center;font-size:11px;margin-top:20px}
 <div class="facts">
 <div class="fact"><span>Folio</span><strong id="folio"></strong></div>
 <div class="fact"><span>Proyecto</span><strong id="project"></strong></div>
-<div class="fact"><span>Cliente</span><strong id="client"></strong></div>
+
 <div class="fact"><span>Concepto</span><strong id="category"></strong></div>
 <div class="fact amount"><span>Importe solicitado</span><strong id="amount"></strong></div>
 <div class="fact"><span>Fecha en que se necesita</span><strong id="dateNeeded"></strong></div>
@@ -116,20 +116,18 @@ footer{color:#877d6b;text-align:center;font-size:11px;margin-top:20px}
   const raw=atob(base.padEnd(Math.ceil(base.length/4)*4,"="));
   const bytes=Uint8Array.from(raw,c=>c.charCodeAt(0));
   const obj=JSON.parse(new TextDecoder().decode(bytes));
-  if(obj.v!==1||typeof obj.folio!=="string"||obj.folio.length>35||
-   !/^RF-[A-Za-z0-9-]{5,35}$/.test(obj.folio)||
-   typeof obj.project!=="string"||!obj.project.trim()||obj.project.length>130||
-   typeof obj.category!=="string"||obj.category.length>100||
-   typeof obj.client!=="string"||obj.client.length>100||
-   typeof obj.dateNeeded!=="string"||obj.dateNeeded.length>10||
-   !Number.isFinite(obj.total)||obj.total<=0||obj.total>=1000000000)throw Error("Datos inválidos");
+  if(obj.v!==1||typeof obj.f!=="string"||obj.f.length>35||
+   !/^RF-[A-Za-z0-9-]{5,35}$/.test(obj.f)||
+   typeof obj.p!=="string"||!obj.p.trim()||obj.p.length>130||
+   typeof obj.c!=="string"||obj.c.length>100||
+   typeof obj.d!=="string"||obj.d.length>10||
+   !Number.isFinite(obj.t)||obj.t<=0||obj.t>=1000000000)throw Error("Datos inválidos");
   request=obj;
-  $("folio").textContent=obj.folio;
-  $("project").textContent=obj.project;
-  $("client").textContent=obj.client||"—";
-  $("category").textContent=obj.category;
-  $("dateNeeded").textContent=obj.dateNeeded||"—";
-  $("amount").textContent=new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(obj.total);
+  $("folio").textContent=obj.f;
+  $("project").textContent=obj.p;
+  $("category").textContent=obj.c;
+  $("dateNeeded").textContent=obj.d||"—";
+  $("amount").textContent=new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(obj.t);
   $("content").hidden=false;
  }catch(e){showError();}
  function respond(decision){
@@ -139,7 +137,7 @@ footer{color:#877d6b;text-align:center;font-size:11px;margin-top:20px}
   if(email&&!$("reviewerEmail").checkValidity()){alert("Revisa la dirección de correo.");$("reviewerEmail").focus();return;}
   if(decision==="RECHAZADA"&&note.length<5){alert("Escribe un motivo de rechazo de al menos 5 caracteres.");$("comment").focus();return;}
   answer="DEJAVÚ MARKETING · RESPUESTA EXTERNA\n"+
-   "Folio: "+request.folio+"\nProyecto: "+request.project+
+   "Folio: "+request.f+"\nProyecto: "+request.p+
    "\nImporte solicitado: "+$("amount").textContent+
    "\nDecisión comunicada: "+decision+
    "\nRespondió: "+name+
@@ -164,7 +162,7 @@ footer{color:#877d6b;text-align:center;font-size:11px;margin-top:20px}
  });
  $("mail").addEventListener("click",()=>{
   if(!answer)return;
-  location.href="mailto:?subject="+encodeURIComponent("Respuesta a solicitud "+request.folio)+"&body="+encodeURIComponent(answer);
+  location.href="mailto:?subject="+encodeURIComponent("Respuesta a solicitud "+request.f)+"&body="+encodeURIComponent(answer);
  });
  $("whatsapp").addEventListener("click",()=>{
   if(!answer)return;
