@@ -73,6 +73,13 @@ jobs:
           node --check operaciones/ops-timekeeping.mjs
           node --check operaciones/ops-receipt.mjs
           node operaciones/tests/qa-timekeeping-receipt.mjs
+      - name: Verificar prenómina interna, documento Excel y fase automática
+        run: |
+          node --check operaciones/ops-payroll-preview.mjs
+          node --check operaciones/ops-payroll-ui.mjs
+          TZ=America/Mexico_City node operaciones/tests/qa-payroll-preview.mjs
+          python3 -c "import zipfile; p='/tmp/agora-prenomina-qa.xlsx'; z=zipfile.ZipFile(p); assert z.testzip() is None; assert 'xl/workbook.xml' in z.namelist(); assert 'xl/worksheets/sheet1.xml' in z.namelist(); print('Excel ZIP íntegro y válido')"
+
       - name: Validar cronograma staff y pagos sin montos inventados
         run: |
           node --check operaciones/staff-dashboard.mjs
