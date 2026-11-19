@@ -226,6 +226,45 @@ function canEditRequest(r){return ['pendiente','ajustes'].includes(r.status)&&(!
 function available(r){return ['aprobada','aprobada_parcial','pago_parcial'].includes(r.status)&&round(r.approvedAmount-r.paidAmount)>0;}
 function canManage(){return !state.cloud||state.role==='admin';}
 function visibleLink(r){if(!state.cloud||r.createdBy==='local')return '';const u=new URL(location.href);u.search='';u.hash='';u.searchParams.set('id',r.id);return u.href;}
+// Enlace autocontenido de respuesta externa. Nunca exporta cuentas, CLABE ni notas bancarias.
+// NO modifica automáticamente la solicitud, para evitar permisos públicos de escritura.
+function approvalReplyLink(r){
+ const data={v:1,folio:String(r.folio||'').slice(0,35),project:String(r.project||'').slice(0,130),
+  client:String(r.client||'').slice(0,100),category:String(CATEGORIES[r.category]||r.category||'').slice(0,100),
+  total:round(r.total),dateNeeded:String(r.dateNeeded||'').slice(0,10)};
+ const bytes=new TextEncoder().encode(JSON.stringify(data));
+ let raw='';for(const byte of bytes)raw+=String.fromCharCode(byte);
+ return new URL('./aprobar.html?d='+btoa(raw).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''),location.href).href;
+}
+function emailSubject(r){return 'Solicitud de recursos '+r.folio+' · '+r.project;}
+function emailBody(r){
+ return 'Hola,\n\nSolicito la revisión de esta solicitud de Dejavú Marketing:\n\n'
+  +'Folio: '+r.folio+'\nProyecto: '+r.project+'\nConcepto: '+(CATEGORIES[r.category]||r.category)
+  +'\nImporte solicitado: '+money(r.total)+'\nFecha requerida: '+(r.dateNeeded||'Por definir')
+  +'\n\nREVISAR Y RESPONDER SIN INICIAR SESIÓN:\n'+approvalReplyLink(r)
+  +'\n\nLa respuesta se enviará por correo o WhatsApp. Administración la verificará y la registrará en Finanzas.'
+  +'\nLos datos bancarios solo se muestran en el PDF/PNG que se adjunte de forma manual.\n\nGracias.';
+}
+function shareText(r){
+ return 'DEJAVÚ MARKETING · SOLICITUD DE DINERO\nFolio: '+r.folio
+ +'\nProyecto: '+r.project+'\nConcepto: '+(CATEGORIES[r.category]||r.category)
+ +'\nImporte solicitado: '+money(r.total)
+ +'\nFecha requerida: '+(r.dateNeeded||'Por definir')
+ +'\n\nResponder sin iniciar sesión:\n'+approvalReplyLink(r)
+ +'\nLa respuesta externa requiere validación y registro en Finanzas. Sin datos bancarios en este mensaje.';
+}
+async function copyText(value,label='Texto copiado'){
+ try{await navigator.clipboard.writeText(value);}
+ catch{
+  const ta=el('textarea');ta.value=value;ta.style.position='fixed';ta.style.left='-999px';
+  document.body.appendChild(ta);ta.select();
+  const ok=document.execCommand('copy');ta.remove();
+  if(!ok)throw Error('No se pudo copiar. Revisa permisos del navegador.');
+ }
+ showToast(label);
+}
+function openWhatsApp(r){window.open('https://wa.me/?text='+encodeURIComponent(shareText(r)),'_blank','noopener,noreferrer');}
+function openEmail(r){window.location.href='mailto:?subject='+encodeURIComponent(emailSubject(r))+'&body='+encodeURIComponent(emailBody(r));}
 function modalClose(){$('#modal').hidden=true;state.selected='';document.body.style.overflow='';}
 function openQueryDetail(){
  const id=new URLSearchParams(location.search).get('id');
