@@ -1,4 +1,20 @@
 
+## Ficha de Jornada y reutilización de personal
+
+En `operaciones/index.html` y en la demostración local `operaciones/demo.html`, el panel **Por día** incluye el botón **Vista de jornada**. El cronograma también abre esta ficha para consulta. La pantalla privada de coordinación ofrece:
+
+- **Evento completo o esta jornada**: si varias fechas comparten el mismo `seriesId`, la vista agrupa únicamente esas jornadas; no mezcla actividades que casualmente tengan el mismo nombre.
+- **Calendario y personal asignado**: carga turnos y nombres desde `events[].staff[]`; cada persona aparece una vez en el total de integrantes y tantas veces como jornadas distintas le correspondan, sin duplicar registros.
+- **Asistencia**: muestra horarios programados, marcajes reales y el estado de validación manual. No convierte tardanzas en faltas automáticas.
+- **Nómina prevista por evento**: obtiene las tarifas e importes de los módulos actuales de pagos; distingue previsto, autorizado, programado y pagado. El Excel `.xlsx` contiene solamente las jornadas de la ficha.
+- **PDF real descargable** (creado sin API ni servicio de pago), opción nativa **Compartir archivo PDF**, botones **WhatsApp**, **Correo** y **Copiar texto**. En móvil compatible, compartir permite elegir una aplicación y enviar el archivo. En un navegador que no permite compartir adjuntos, WhatsApp/correo abren un mensaje prellenado y descargan el PDF, que el usuario **debe adjuntar manualmente**. No se envía correo ni dinero automáticamente.
+- El PDF compartido incluye **solo datos operativos por defecto**. Para añadir la nómina y los importes, coordinación debe activar expresamente «Incluir nómina e importes». Nunca se genera un enlace público a los sueldos.
+
+**Selección automática de staff:** en el formulario de actividad, al escoger un nombre existente se despliegan automáticamente todas sus otras asignaciones registradas, con fecha, actividad y horario. Cuando se registra una nueva actividad para una campaña ya conocida y aún no se ha capturado personal en la nueva ficha, se recupera el equipo de las jornadas coincidentes (sin crear duplicados ni cambiar horarios anteriores). La operación sigue impidiendo empalmes al guardar. Si se requiere otro equipo, se puede reemplazar o editar la sugerencia.
+
+Archivos: `ops-jornada-sheet.mjs` (modelo y PDF), `ops-jornada-sheet-ui.mjs` (interfaz/compartir), `tests/qa-jornada-sheet.mjs` y `tests/qa-jornada-sheet-browser.mjs` (verificaciones).
+
+
 ## Actualización · activación horaria, validación manual y prenómina
 
 - **Permisos automáticos por agenda:** al guardar un cronograma con integrantes vinculados a sus cuentas, se provisionan en Firestore los accesos de marcaje correspondientes. Si ya existen permisos, las horas se sincronizan; cualquier suspensión manual permanece suspendida. El reloj permite entrada 60 minutos antes del turno y un cierre tardío protegido, pero el inicio y fin reales **solo** se capturan cuando el staff confirma sus marcajes.
