@@ -403,11 +403,35 @@ function editRequest(r){
  $('#page-title').textContent='Editar '+r.folio;
 }
 
-async function shareReference(r){
+function shareText(r){
  const link=visibleLink(r);
- const message='DEJAVÚ MARKETING · '+r.folio+'\nProyecto: '+r.project+'\nConcepto: '+(CATEGORIES[r.category]||r.category)+'\nImporte solicitado: '+money(r.total)+'\nEstado: '+(STATUS[r.status]||r.status)+(link?'\nConsultar y responder (requiere acceso ÁGORA): '+link:'\nAdjunto PDF o PNG de esta solicitud.');
- try{await navigator.clipboard.writeText(message);showToast('Referencia copiada. Puedes pegarla en WhatsApp o Gmail.');}
- catch{const textArea=el('textarea');textArea.value=message;document.body.appendChild(textArea);textArea.select();document.execCommand('copy');textArea.remove();showToast('Referencia copiada.');}
+ return 'DEJAVÚ MARKETING · SOLICITUD DE DINERO'
+  +'\nFolio: '+r.folio
+  +'\nID Dejavú: '+(r.agoraId||'No vinculado')
+  +'\nProyecto: '+r.project+(r.projectId?' ('+r.projectId+')':'')
+  +'\nConcepto: '+(CATEGORIES[r.category]||r.category)
+  +'\nImporte solicitado: '+money(r.total)
+  +'\nEstado: '+(STATUS[r.status]||r.status)
+  +(link?'\nConsultar / revisar solicitud (acceso privado ÁGORA): '+link:
+    '\nAdjunto solicitud en PDF o PNG para revisión.')
+  +'\nLos datos bancarios se encuentran en el expediente privado, no en este mensaje.';
+}
+async function shareReference(r){
+ const message=shareText(r);
+ try{await navigator.clipboard.writeText(message);showToast('Mensaje copiado. Pégalo en WhatsApp o correo.');}
+ catch{
+  const box=el('textarea');box.value=message;document.body.appendChild(box);
+  box.select();document.execCommand('copy');box.remove();showToast('Mensaje copiado.');
+ }
+}
+function shareWhatsApp(r){
+ const url='https://wa.me/?text='+encodeURIComponent(shareText(r));
+ window.open(url,'_blank','noopener,noreferrer');
+}
+function shareEmail(r){
+ const url='mailto:?subject='+encodeURIComponent('Solicitud Dejavú '+r.folio+' · '+r.project)
+  +'&body='+encodeURIComponent(shareText(r));
+ window.location.href=url;
 }
 async function exportBackup(){
  try{
@@ -489,12 +513,14 @@ function setup(){
    if(action==='png')await downloadPNG(r);
    if(action==='print')printDoc(r);
    if(action==='share')await shareReference(r);
+    if(action==='whatsapp')shareWhatsApp(r);
+    if(action==='email')shareEmail(r);
    if(action==='preview')previewDoc(r);
    if(action==='back')openDetail(r.id);
   }catch(error){showToast(readable(error));}
  });
  $('#request-form').addEventListener('submit',saveRequest);
- $('#request-form').addEventListener('reset',()=>setTimeout(()=>{state.editingId='';$('#submit-request').textContent='Guardar solicitud →';$('#line-items').innerHTML='';addLine();$('#request-form').querySelector('[name="dateNeeded"]').value=localDate();},0));
+ $('#request-form').addEventListener('reset',()=>setTimeout(()=>{state.editingId='';$('#submit-request').textContent='Guardar solicitud →';$('#line-items').innerHTML='';addLine();$('#request-form').querySelector('[name="dateNeeded"]').value=localDate();updateIdentityForm();},0));
  $('#line-items').addEventListener('input',calc);
  $('#search').addEventListener('input',render);
  $('#status-filter').addEventListener('change',render);
