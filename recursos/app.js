@@ -492,7 +492,7 @@ function setup(){
  $('#footer-date').textContent=new Date().getFullYear();
  $('#request-form').querySelector('[name="dateNeeded"]').value=localDate();
  addLine();
- $$('#line-items').length;
+ if(!new URLSearchParams(location.search).has('id'))view('new');
  document.addEventListener('click',async e=>{
   const v=e.target.closest('[data-view]');if(v){if(v.dataset.view==='new')clearRequestForm();view(v.dataset.view);return;}
   const target=e.target.closest('[data-open]');if(target){openDetail(target.dataset.open);return;}
