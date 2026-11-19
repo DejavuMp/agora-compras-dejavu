@@ -7,7 +7,7 @@
 import "../firebase-init.js";
 import {projectStaffView} from "./ops-safe-view.mjs";
 import {availablePeople,personForLink} from "./access-link-model.mjs";
-import {createEventControl} from "./editor-jornadas-control.mjs";
+import {createEventControl,eventPolicyEntries} from "./editor-jornadas-control.mjs";
 import {
   GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
@@ -30,7 +30,7 @@ const blank = () => ({people:[],vehicles:[],events:[],blocks:[],sites:[],campaig
 },audit:[],logs:[],incidents:[]});
 let account=null,role=null,personId="",baseBoard=null,saving=false,ready=false;
 let logs = new Map(),incidents = new Map(),requests = new Map();
-let linkingUid=null;
+let linkingUid=null,autoPoliciesChecked=false;
 let unwatches=[],dirtyWaiting=false,authVersion=0,view=null;
 const root=document.getElementById("ops-gate");
 const app=window.AGORA_OPS_APP;
@@ -63,7 +63,7 @@ function stop(){
   opsJornadas.stop();
   for(const off of unwatches.splice(0))try{off()}catch(_){}
   role=null;personId="";baseBoard=null;logs.clear();incidents.clear();requests.clear();
-  saving=false;ready=false;dirtyWaiting=false;
+  saving=false;ready=false;dirtyWaiting=false;autoPoliciesChecked=false;
   app?.reset?.();
 }
 function boardOnly(state){
@@ -90,6 +90,49 @@ function listen(s,ok){
   const off=onSnapshot(s,{includeMetadataChanges:true},ok,error=>fail(err(error)));
   unwatches.push(off);
 }
+function shiftPolicies(board){
+  const entries=new Map();
+  for(const event of board?.events||[]){
+    if(["cancelado","borrador"].includes(event.status)||!(event.staff||[]).length)continue;
+    const from=new Date(event.start).getTime();
+    if(!Number.isFinite(from)||from>Date.now()+93*86400000||new Date(event.end).getTime()<Date.now()-2*86400000)continue;
+    try{
+      const proposed=eventPolicyEntries(event,board.people||[],true,"horario",account.uid,serverTimestamp);
+      for(const x of proposed.items)entries.set(x.id,x.data);
+    }catch(_){/* Staff sin cuenta se vinculará antes de habilitar el marcaje. */}
+  }
+  return entries;
+}
+async function ensureShiftPolicies(){
+  if(autoPoliciesChecked||!ready||role!=="coordinador"||!baseBoard?.payload)return;
+  autoPoliciesChecked=true;
+  const items=shiftPolicies(baseBoard.payload);
+  if(items.size>180){notice("Agenda grande: accesos sin sincronizar; revisa por períodos.","error");return}
+  if(!items.size)return;
+  try{
+    const refs=[...items.keys()].map(id=>doc(fs,"agora_ops_shift_access",id));
+    await runTransaction(fs,async tx=>{
+      const snaps=await Promise.all(refs.map(ref=>tx.get(ref)));
+      snaps.forEach((snap,i)=>{
+        if(snap.exists())return; // Respetar suspensiones y ajustes manuales previos.
+        const data=items.get([...items.keys()][i]);
+        tx.set(refs[i],{...data,enabled:true,mode:"horario"});
+      });
+    });
+  }catch(e){notice("La activación automática requiere permisos: "+err(e),"error")}
+}
+function changedShiftDocs(before,after){
+  const old=shiftPolicies(before),fresh=shiftPolicies(after);
+  const changed=new Map();
+  for(const [id,v] of fresh){
+    const was=old.get(id);
+    const same=was&&was.personId===v.personId&&was.eventId===v.eventId&&
+      +was.startsAt===+v.startsAt&&+was.endsAt===+v.endsAt&&was.maxMinutes===v.maxMinutes;
+    if(!same)changed.set(id,v);
+  }
+  for(const id of old.keys())if(!fresh.has(id))changed.set(id,null);
+  return changed;
+}
 function loadCoordinator(){
   role="coordinador";
   notice("Firebase · preparando datos","pending");
@@ -102,6 +145,7 @@ function loadCoordinator(){
     if(snap.metadata.fromCache){notice("Firebase · esperando confirmación del servidor","pending");return;}
     if(!ready){show();notice("Firebase · sincronizado","ok");}
     emit();
+    if(!snap.metadata.fromCache)void ensureShiftPolicies();
   });
   listen(LOGLIST,snap=>{
     logs=new Map(snap.docs.map(d=>[d.id,{...d.data(),id:d.id}]));
@@ -397,6 +441,16 @@ async function store(next){
           const current=oldSnap.exists()?oldSnap.data():null;
           const actual=current?Number(current.revision||0):0;
           if(actual!==(previous?.revision||0))throw Error("La agenda fue cambiada por otro coordinador. No se sobrescribió.");
+          const accessChanges=changedShiftDocs(previous?.payload||blank(),nextBoard);
+          if(accessChanges.size>180)throw Error("Demasiados cambios de turno. Guarda los eventos por grupos.");
+          const accessRefs=[...accessChanges.keys()].map(id=>doc(fs,"agora_ops_shift_access",id));
+          const accessSnaps=await Promise.all(accessRefs.map(ref=>tx.get(ref)));
+          accessSnaps.forEach((snap,i)=>{
+            const desired=accessChanges.get([...accessChanges.keys()][i]),ref=accessRefs[i];
+            if(!desired){if(snap.exists())tx.delete(ref);return}
+            const existing=snap.exists()?snap.data():null;
+            tx.set(ref,{...desired,enabled:existing?.enabled??true,mode:existing?.mode||"horario"});
+          });
           tx.set(SCHEDULE,{revision:actual+1,payload:nextBoard,updatedAt:serverTimestamp(),updatedBy:account.uid});
           const oldByUid=new Map((previous?.payload?.people||[]).filter(p=>p.authUid).map(p=>[p.authUid,p]));
           const newByUid=new Map(nextBoard.people.filter(p=>p.authUid).map(p=>[p.authUid,p]));
