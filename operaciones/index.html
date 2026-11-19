@@ -689,7 +689,7 @@ window.AGORA_OPS_APP={
     if(first)ui.view=role==='personal'?'mi_espacio':'inicio';
     render();
   },
-  savePayrollDueDate(month,date){
+  getRole(){return ui.role},savePayrollDueDate(month,date){
     if(ui.role!=='coordinador'||!/^\d{4}-\d{2}$/.test(month)||date&&!/^\d{4}-\d{2}-\d{2}$/.test(date))return false;
     db.settings.payrollPlan={...(db.settings.payrollPlan||{}),[month]:date};save();render();return true;
   },
