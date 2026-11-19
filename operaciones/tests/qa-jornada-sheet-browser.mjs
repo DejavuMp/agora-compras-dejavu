@@ -38,6 +38,9 @@ try{
  assert.equal(await page.locator("#jornada-finanzas").isChecked(),false,"Sin datos financieros en PDF por defecto");
  assert.ok(await page.locator("#jornada-whatsapp").isVisible());
  assert.ok(await page.locator("#jornada-email").isVisible());
+ const [xlsx]=await Promise.all([page.waitForEvent("download"),page.locator("#jornada-xlsx").click()]);
+ assert.ok(xlsx.suggestedFilename().endsWith(".xlsx"),"Excel de nómina por evento");
+ assert.deepEqual([...readFileSync(await xlsx.path()).subarray(0,4)],[80,75,3,4],"Excel XLSX real");
  const [file]=await Promise.all([page.waitForEvent("download"),page.locator("#jornada-download").click()]);
  const filename=await file.path();
  assert.ok(file.suggestedFilename().endsWith(".pdf"),"Descarga PDF real");
