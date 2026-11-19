@@ -115,9 +115,17 @@ async function ensureShiftPolicies(){
     await runTransaction(fs,async tx=>{
       const snaps=await Promise.all(refs.map(ref=>tx.get(ref)));
       snaps.forEach((snap,i)=>{
-        if(snap.exists())return; // Respetar suspensiones y ajustes manuales previos.
         const data=items.get([...items.keys()][i]);
-        tx.set(refs[i],{...data,enabled:true,mode:"horario"});
+        if(!snap.exists()){tx.set(refs[i],{...data,enabled:true,mode:"horario"});return;}
+        const prior=snap.data();
+        if(prior.ownerUid!==data.ownerUid||prior.personId!==data.personId||prior.eventId!==data.eventId)
+          throw Error("Identidad de acceso no coincide con la jornada asignada.");
+        if(prior.enabled===false)return; // Una suspensión manual no se reactiva sola.
+        const t=x=>x?.toMillis?.()??new Date(x).getTime();
+        if(t(prior.startsAt)!==t(data.startsAt)||t(prior.endsAt)!==t(data.endsAt)||
+           prior.maxMinutes!==data.maxMinutes){
+          tx.set(refs[i],{...data,enabled:true,mode:prior.mode||"horario"});
+        }
       });
     });
   }catch(e){notice("La activación automática requiere permisos: "+err(e),"error")}
