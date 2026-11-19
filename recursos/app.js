@@ -285,7 +285,7 @@ function detailHtml(r){
  const safeLinks=(r.attachments||[]).filter(u=>typeof u==='string'&&/^https:\/\//i.test(u));
  const links=safeLinks.length?'<div class="detail-card detail-full"><b>Documentos de soporte</b>'+safeLinks.map(u=>'<div><a target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">'+esc(u)+'</a></div>').join('')+'</div>':'';
  let result='<div class="detail-head"><div><small>'+esc(r.folio)+'</small><h3>'+esc(r.project)+'</h3><span>'+esc(CATEGORIES[r.category]||r.category)+'</span></div>'+badge(r.status)+'</div>';
- result+='<div class="action-bar">'+(canEditRequest(r)?'<button class="btn btn-outline" data-action="edit">✎ Editar solicitud</button>':'')+'<button class="btn btn-gold" data-action="pdf">↓ PDF</button><button class="btn btn-outline" data-action="png">↓ Imagen PNG</button><button class="btn btn-outline" data-action="print">⎙ Imprimir</button><button class="btn btn-outline" data-action="preview">Vista previa</button><button class="btn btn-outline" data-action="share">Compartir referencia</button></div>';
+ result+='<div class="action-bar">'+(canEditRequest(r)?'<button class="btn btn-outline" data-action="edit">✎ Editar solicitud</button>':'')+'<button class="btn btn-gold" data-action="pdf">↓ PDF</button><button class="btn btn-outline" data-action="png">↓ Imagen PNG</button><button class="btn btn-outline" data-action="print">⎙ Imprimir</button><button class="btn btn-outline" data-action="preview">Vista previa</button><button class="btn btn-outline" data-action="share">Copiar WhatsApp</button><button class="btn btn-outline" data-action="whatsapp">Abrir WhatsApp</button><button class="btn btn-outline" data-action="copy-email">Copiar texto correo</button><button class="btn btn-outline" data-action="email">Abrir correo</button><button class="btn btn-outline" data-action="approval-link">Copiar enlace para autorizar</button></div>';
  result+='<div class="detail-grid">'+[
  ['Solicitado',money(r.total)],['Autorizado',money(r.approvedAmount)],['Pagado',money(r.paidAmount)],['Por pagar',money(outstanding)],
  ['Solicitante',r.requester||'—'],['Beneficiario',r.beneficiary||'—'],['Fecha requerida',r.dateNeeded||'—'],['Modalidad',r.paymentType==='directo'?'Pago directo':'Entrega de recursos'],
@@ -301,8 +301,7 @@ function detailHtml(r){
  if(canManage()&&available(r)){
   result+='<form id="payment-form" class="decision"><h4>Registrar entrega o pago</h4><input name="amount" type="number" step=".01" min=".01" max="'+esc(outstanding)+'" placeholder="Importe entregado (máximo '+money(outstanding)+')" required><input name="date" type="date" required value="'+localDate()+'"><select name="method"><option value="transferencia">Transferencia</option><option value="efectivo">Efectivo</option><option value="otro">Otro</option></select><input name="reference" maxlength="120" placeholder="Referencia bancaria o comprobante"><button class="btn btn-gold" type="submit">Guardar pago</button></form>';
  }
- const link=visibleLink(r);
- result+='<p class="small-note" style="margin-top:17px;font-size:11px;color:#837664">'+(link?'Enlace privado: solo usuarios de ÁGORA autorizados pueden consultar o aprobar.':'Modo local: PDF y PNG sí funcionan; un enlace por sí solo no puede registrar autorizaciones externas.')+'</p>';
+ result+='<p class="small-note" style="margin-top:17px;font-size:11px;color:#837664">La persona destinataria puede responder desde el enlace sin entrar a ÁGORA. Por ahora la respuesta se envía mediante correo o WhatsApp; no cambia el estado del expediente automáticamente. Administración valida y registra la decisión. No incluyas archivos bancarios en grupos abiertos.</p>';
  return result;
 }
 async function updateRecord(r,patch,log){
@@ -348,7 +347,7 @@ function htmlDoc(r){
  const payment=r.payments?.length?'<div class="doc-desc"><b>Pagos registrados:</b> '+r.payments.map(p=>esc(p.date)+' · '+money(p.amount)+' ('+esc(p.method)+')').join('; ')+'</div>':'';
  return '<article class="document-sheet" id="document-sheet"><div class="doc-brand"><div><img src="' + esc(LOGO_URL) + '" style="width:165px;height:65px;object-fit:contain;object-position:left center" alt="Dejavú Marketing"><br><em>MARKETING · ÁGORA</em></div><div style="text-align:right"><b>'+esc(r.folio)+'</b><br><span style="font-size:11px;color:#8b8174">'+esc(STATUS[r.status]||r.status)+'</span></div></div><h2>SOLICITUD DE RECURSOS Y PAGOS</h2><p class="doc-desc">'+esc(CATEGORIES[r.category]||r.category)+'</p><div class="doc-meta">'+[
  ['Proyecto / campaña',r.project],['Cliente',r.client||'—'],['Solicitante',r.requester],['Fecha requerida',r.dateNeeded],['Beneficiario',r.beneficiary],['Entrega / pago',r.paymentType==='directo'?'Pago directo':'Recursos al responsable'],['Forma de pago',r.paymentMethod],['Banco y cuenta',(r.bank||'—')+' · '+(r.account||'Sin registrar')]
- ].map(x=>'<div><span>'+esc(x[0])+'</span>'+esc(x[1]||'—')+'</div>').join('')+'</div><div class="doc-desc"><b>Justificación:</b> '+esc(r.reason)+'</div><table><thead><tr><th>Concepto</th><th>Cantidad</th><th>Precio unit.</th><th>Subtotal</th></tr></thead><tbody>'+list+'</tbody></table><div class="doc-total">TOTAL SOLICITADO: '+money(r.total)+'</div><p class="doc-desc"><b>Autorizado:</b> '+money(r.approvedAmount)+' &nbsp; <b>Pagado:</b> '+money(r.paidAmount)+'</p><p class="doc-desc"><b>Observaciones:</b> '+esc(r.notes||'Sin observaciones')+'</p>'+payment+'<div class="doc-foot"><div><b>DEJAVÚ MARKETING</b><br>Expediente '+esc(r.folio)+'<br>Generado el '+new Date().toLocaleString('es-MX')+'<br>'+(link?'<span class="doc-url">'+esc(link)+'</span>':'<span>Documento generado desde registro local. Sin enlace remoto.</span>')+'<br><span>La autorización requiere verificación de identidad en ÁGORA.</span></div>'+code+'</div></article>';
+ ].map(x=>'<div><span>'+esc(x[0])+'</span>'+esc(x[1]||'—')+'</div>').join('')+'</div><div class="doc-desc"><b>Justificación:</b> '+esc(r.reason)+'</div><table><thead><tr><th>Concepto</th><th>Cantidad</th><th>Precio unit.</th><th>Subtotal</th></tr></thead><tbody>'+list+'</tbody></table><div class="doc-total">TOTAL SOLICITADO: '+money(r.total)+'</div><p class="doc-desc"><b>Autorizado:</b> '+money(r.approvedAmount)+' &nbsp; <b>Pagado:</b> '+money(r.paidAmount)+'</p><p class="doc-desc"><b>Observaciones:</b> '+esc(r.notes||'Sin observaciones')+'</p>'+payment+'<div class="doc-foot"><div><b>DEJAVÚ MARKETING</b><br>Expediente '+esc(r.folio)+'<br>Generado el '+new Date().toLocaleString('es-MX')+'<br>'+(link?'<span class="doc-url">'+esc(link)+'</span>':'<span>Documento generado desde registro local. Sin enlace remoto.</span>')+'<br><span>Respuesta externa por correo o WhatsApp. Administración valida y registra la decisión.</span></div>'+code+'</div></article>';
 }
 function docHost(r){
  const host=el('div','doc-print-host');host.innerHTML=htmlDoc(r);document.body.appendChild(host);
@@ -376,8 +375,8 @@ async function downloadPDF(r){
   const pageH=281;let top=8;
   doc.addImage(canvas.toDataURL('image/jpeg',.92),'JPEG',8,top,w,h);
   while(h+top>pageH){top-=pageH;doc.addPage();doc.addImage(canvas.toDataURL('image/jpeg',.92),'JPEG',8,top,w,h);}
-  const link=visibleLink(r);
-  if(link){doc.setFontSize(8);doc.textWithLink('Abrir solicitud privada en ÁGORA',12,289,{url:link});}
+  const link=approvalReplyLink(r);
+  doc.setFontSize(8);doc.textWithLink('Responder sin iniciar sesión',12,289,{url:link});
   doc.save(r.folio+'.pdf');
  }finally{removeDoc(host);}
 }
@@ -431,12 +430,10 @@ function editRequest(r){
  $('#page-title').textContent='Editar '+r.folio;
 }
 
-async function shareReference(r){
- const link=visibleLink(r);
- const message='DEJAVÚ MARKETING · '+r.folio+'\nProyecto: '+r.project+'\nConcepto: '+(CATEGORIES[r.category]||r.category)+'\nImporte solicitado: '+money(r.total)+'\nEstado: '+(STATUS[r.status]||r.status)+(link?'\nConsultar y responder (requiere acceso ÁGORA): '+link:'\nAdjunto PDF o PNG de esta solicitud.');
- try{await navigator.clipboard.writeText(message);showToast('Referencia copiada. Puedes pegarla en WhatsApp o Gmail.');}
- catch{const textArea=el('textarea');textArea.value=message;document.body.appendChild(textArea);textArea.select();document.execCommand('copy');textArea.remove();showToast('Referencia copiada.');}
-}
+async function shareReference(r){await copyText(shareText(r),'Mensaje de WhatsApp copiado.');}
+async function copyEmail(r){await copyText('Asunto: '+emailSubject(r)+'\n\n'+emailBody(r),'Texto del correo copiado.');}
+async function copyApprovalLink(r){await copyText(approvalReplyLink(r),'Enlace de revisión copiado.');}
+
 async function exportBackup(){
  try{
   const data={format:'agora-recursos-local-v1',exportedAt:iso(),records:state.cloud?[]:await dbAll()};
@@ -517,6 +514,10 @@ function setup(){
    if(action==='png')await downloadPNG(r);
    if(action==='print')printDoc(r);
    if(action==='share')await shareReference(r);
+    if(action==='whatsapp')openWhatsApp(r);
+    if(action==='copy-email')await copyEmail(r);
+    if(action==='email')openEmail(r);
+    if(action==='approval-link')await copyApprovalLink(r);
    if(action==='preview')previewDoc(r);
    if(action==='back')openDetail(r.id);
   }catch(error){showToast(readable(error));}
