@@ -126,5 +126,27 @@ try{
   await yes('coordinador revisa incidencia',updateDoc(inc(coord),{
     status:'justificado',revision:2,updatedAt:serverTimestamp()
   }));
+  await no('staff no puede declararse asistencia correcta',setDoc(inc(staff,'asistencia-qa'),{
+    id:'asistencia-qa',personId,ownerUid:staffId,eventId:'event001',
+    type:'validacion_asistencia',status:'pendiente',notes:'',
+    revision:1,updatedAt:serverTimestamp()
+  }));
+  await yes('coordinación crea validación de asistencia manual',setDoc(inc(coord,'asistencia-qa'),{
+    id:'asistencia-qa',personId,ownerUid:staffId,eventId:'event001',
+    type:'validacion_asistencia',status:'correcta',notes:'Revisado por coordinación',
+    revision:1,updatedAt:serverTimestamp()
+  }));
+  await no('staff no puede cambiar validación de coordinación',updateDoc(inc(staff,'asistencia-qa'),{
+    status:'retardo',notes:'Manipulado',revision:2,updatedAt:serverTimestamp()
+  }));
+  await yes('coordinación puede corregir validación manual',updateDoc(inc(coord,'asistencia-qa'),{
+    status:'justificada',notes:'Documentación comprobada',revision:2,updatedAt:serverTimestamp()
+  }));
+  await no('staff no puede fijar fecha de nómina',updateDoc(log(staff),{
+    paymentDueDate:'2026-12-12',revision:4,updatedAt:serverTimestamp()
+  }));
+  await yes('coordinación fija la fecha prevista del pago',updateDoc(log(coord),{
+    paymentDueDate:'2026-12-12',revision:4,updatedAt:serverTimestamp()
+  }));
   console.log('ÁGORA OPS V4: '+passed+' pruebas terminadas.');
 }finally{await env.cleanup();}
