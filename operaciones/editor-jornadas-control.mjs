@@ -1,4 +1,4 @@
-/* ÁGORA: control de acceso por evento, dentro del editor, con permisos existentes. */
+/* ÁGORA: permisos precargados por agenda y habilitados automáticamente por reloj. */
 const e=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 export function linkedStaff(event,people){
   const byId=new Map((people||[]).map(p=>[p.id,p]));
@@ -22,7 +22,7 @@ export function eventPolicyEntries(event,people,enabled,mode,uid,serverTimestamp
   return {missing,items:linked.map(p=>({
     id:p.uid+"_"+event.id,
     data:{ownerUid:p.uid,personId:p.personId,eventId:event.id,enabled,mode,
-      startsAt:p.start,endsAt:p.end,maxMinutes:Math.max(30,Math.min(1440,Math.round((p.end-p.start)/60000))),
+      startsAt:new Date(p.start.getTime()-60*60000),endsAt:new Date(p.end.getTime()+18*3600000),maxMinutes:Math.max(30,Math.min(1440,Math.round((p.end-p.start)/60000))),
       updatedAt:serverTimestamp(),updatedBy:uid}
   }))};
 }
@@ -108,7 +108,7 @@ export function createEventControl({getBoard,getUser,isCoordinator,fs,doc,collec
     }).join("");
     panel.innerHTML='<div class="event-control-window" role="dialog" aria-modal="true" aria-label="Control de jornadas dentro del editor">'+
       '<div class="event-control-header"><div><h2>Control de jornadas · por evento</h2>'+
-      '<p>Una sola acción habilita o deshabilita los marcajes de todo el staff vinculado.</p></div>'+
+      '<p>El horario habilita el marcaje automáticamente; estos botones son solo para suspensiones excepcionales.</p></div>'+
       '<button type="button" data-control-close>Cerrar</button></div>'+
       '<div class="event-control-body"><p id="event-control-status" class="event-control-status">'+
       (loaded?"Permisos sincronizados desde Firebase.":"Consultando permisos…")+'</p>'+
