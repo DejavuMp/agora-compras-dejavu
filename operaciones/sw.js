@@ -1,9 +1,10 @@
 /* ÁGORA Operaciones PWA. Solo shell estático, jamás Firestore, GPS, selfies, datos o credenciales. */
-const CACHE="agora-ops-shell-v6-20261118";
+const CACHE="agora-ops-shell-v7-20261119";
 const FILES=[
   "./visor.html","./index.html","./visor-live.js","./jornadas-live.js",
   "./jornadas-logic.mjs","./staff-dashboard.mjs","./ops-timekeeping.mjs","./ops-receipt.mjs","./ops-breaks.mjs","./ops-reminders.mjs","./ops-monthly-receipt.mjs","./ops-route-estimate.mjs","./ops-safe-view.mjs",
   "./cloud-v4.js","./editor-jornadas-control.mjs","./access-link-model.mjs",
+  "./ops-payroll-preview.mjs","./ops-payroll-ui.mjs",
   "./assets/dejavu-horizontal.png","./assets/dejavu-monograma.png",
   "./manifest.webmanifest","../icons/icon-192.png","../icons/icon-512.png"
 ];
