@@ -66,7 +66,7 @@ try{
   page.on("pageerror",e=>errors.push(e.message));
   await page.goto("http://127.0.0.1:8765/operaciones/visor.html",{waitUntil:"domcontentloaded"});
   await page.waitForFunction(()=>document.querySelector("#j-events")?.textContent.includes("Volanteo de prueba"));
-  assert.ok(await page.locator('[data-staff-tab="inicio"]').isVisible());
+  assert.ok(await page.locator('.staff-shortcuts summary').isVisible(),"Acceso sencillo con herramientas plegadas");
   assert.equal(await page.locator("#staff-tabs button").count(),3,"Menú del staff con solo tres opciones");
   assert.ok(await page.locator("#j-home-attendance #j-active").isVisible(),"El marcaje está en Mi día, no en otra pantalla");
   assert.ok((await page.locator("#j-home-pay").innerText()).includes("$720.00"),"Staff ve solo su propio pago previsto");
