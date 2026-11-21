@@ -578,6 +578,7 @@ async function refreshFromServer(){
 }
 window.AGORA_OPS_BRIDGE={
   get ready(){return ready},get role(){return role},
+  get coordinatorLabel(){return role==="coordinador"?(account?.displayName||account?.email||""):""},
   get personId(){return personId},
   save:store,
   openJornadasControl:()=>{if(role==="coordinador"&&ready)opsJornadas.open()},
