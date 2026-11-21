@@ -41,6 +41,7 @@ const dbJS=[
   "export async function getDocFromServer(ref){",
   " if(ref==='agora_users/staff-qa')return {exists:()=>false,data:()=>({})};",
   " if(ref==='agora_ops_members/staff-qa')return {exists:()=>true,data:()=>({active:true,role:'staff',personId:'p1'})};",
+  " if(ref.startsWith('agora_ops_logs/')){const row=rec.logs.get(ref.split('/')[1]);return {exists:()=>!!row,data:()=>row}}",
   " throw Error('unexpected '+ref);}",
   "function emit(coll){for(const fn of listeners[coll]||[])queueMicrotask(()=>fn(snapshot(coll)))}",
   "function snapshot(coll){",
@@ -121,10 +122,15 @@ try{
   await page.locator("#trip-arrive").click();
   await page.waitForFunction(()=>document.querySelector("#j-trips")?.textContent.includes("Llegada registrada"));
 
+  await page.locator("#j-return-home").click();
+  assert.ok(await page.locator("#j-send-hours").isVisible(),"El envío de horas está en Mi día después de marcar salida");
+  assert.ok((await page.locator("#j-active").innerText()).includes("enviar tus horas"));
+  await page.locator("#j-send-hours").click();
+  await page.waitForFunction(()=>document.querySelector("#j-active")?.textContent.includes("Horas enviadas a coordinación"));
+  await page.locator('.staff-shortcuts summary').click();
   await page.locator('#staff-tabs [data-staff-tab="pagos"]').click();
-  assert.equal(await page.locator('[data-break-for="evento1"]').count(),0,"Descansos verificados no permiten duplicación manual");
-  await page.locator('[data-create-report="evento1"]').click();
-  await page.waitForFunction(()=>document.querySelector("#j-payment-list")?.textContent.includes("Horas capturadas"));
+  assert.equal(await page.locator('[data-create-report="evento1"]').count(),0,"Un solo paso, sin segundo comprobante manual");
+  assert.ok((await page.locator("#j-payment-list").innerText()).includes("En revisión"));
   const monthWindow=page.waitForEvent("popup");
   await page.locator("#j-print-month").click();
   const monthPage=await monthWindow;
@@ -143,8 +149,7 @@ try{
   assert.ok((await receiptPage.locator("body").innerText()).includes("Descanso declarado"));
   assert.ok(!(await receiptPage.locator("body").innerText()).includes("NOMINA_PRIVADA"));
   await receiptPage.close();
-  await page.locator('[data-request-payment]').click();
-  await page.waitForFunction(()=>document.querySelector("#j-payment-list")?.textContent.includes("En revisión"));
+  assert.equal(await page.locator('[data-request-payment]').count(),0,"No se exige un segundo envío");
   const reports=await page.evaluate(()=>[...window.__mockRecords.logs.values()]);
   assert.equal(reports.length,1,"El reporte no debe duplicarse");
   assert.equal(reports[0].paymentStatus,"solicitado");
