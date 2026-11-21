@@ -128,7 +128,8 @@ try{
   assert.ok((await page.locator("#j-active").innerText()).includes("enviar tus horas"));
   await page.locator("#j-send-hours").click();
   await page.waitForFunction(()=>document.querySelector("#j-active")?.textContent.includes("Horas enviadas a coordinación"));
-  await page.locator('.staff-shortcuts summary').click();
+  const more=page.locator('.staff-shortcuts');
+  if(!(await more.evaluate(el=>el.open)))await more.locator('summary').click();
   await page.locator('#staff-tabs [data-staff-tab="pagos"]').click();
   assert.equal(await page.locator('[data-create-report="evento1"]').count(),0,"Un solo paso, sin segundo comprobante manual");
   assert.ok((await page.locator("#j-payment-list").innerText()).includes("En revisión"));
