@@ -781,6 +781,10 @@ $("verify").onclick=async()=>{
 };
 $("logout").onclick=()=>signOut(auth);
 $("j-reminders-enable").onclick=enableShiftNotices;
+$("j-reminders-show").onclick=()=>{
+  const el=document.querySelector("#staff-board>.staff-reminders");
+  if(el)el.classList.toggle("show-reminders");
+};
 window.addEventListener("focus",checkShiftNotices);
 setInterval(checkShiftNotices,60000);
 $("staff-board").addEventListener("click",event=>{
