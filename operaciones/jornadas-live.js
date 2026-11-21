@@ -140,12 +140,14 @@ function renderOwnPay(events){
  const month=(focused?localDay(eventStart(focused,personId)):localDay(Date.now())).slice(0,7);
  const items=events.filter(e=>localDay(eventStart(e,personId)).startsWith(month)&&e.status!=="cancelado")
   .map(event=>({event,pay:ownPayFor(event)}));
- const values=items.filter(x=>x.pay.amount!==null),planned=values.reduce((n,x)=>n+x.pay.amount,0);
- const approved=values.filter(x=>x.pay.confirmed).reduce((n,x)=>n+x.pay.amount,0);
+ const values=items.filter(x=>x.pay.amount!==null);
+ const paid=values.filter(x=>x.pay.kind==="Pagado").reduce((n,x)=>n+x.pay.amount,0);
+ const remaining=values.filter(x=>x.pay.kind!=="Pagado").reduce((n,x)=>n+x.pay.amount,0);
+ const approved=values.filter(x=>x.pay.confirmed&&x.pay.kind!=="Pagado").reduce((n,x)=>n+x.pay.amount,0);
  const undefinedCount=items.length-values.length;
- area.innerHTML='<div class="own-pay-total">'+(items.length?mxnOwn(planned):"Sin jornadas")+'</div>'+
-   '<p class="own-pay-sub">'+esc(month)+' · '+items.length+' jornada(s) · Total provisional de tus pagos. '+
-   'Autorizado: <b>'+mxnOwn(approved)+'</b>.'+
+ area.innerHTML='<div class="own-pay-total">'+(items.length?mxnOwn(remaining):"Sin jornadas")+'</div>'+
+   '<p class="own-pay-sub">'+esc(month)+' · '+items.length+' jornada(s) · Pendiente de recibir (estimación). '+
+   'Autorizado pendiente: <b>'+mxnOwn(approved)+'</b> · Ya pagado: <b>'+mxnOwn(paid)+'</b>.'+
    (undefinedCount?' <b>'+undefinedCount+' importe(s) por definir.</b>':'')+
    '<br>Las estimaciones no equivalen a pagos aprobados. Tu fecha prevista se mostrará cuando coordinación la programe.</p>'+
    items.slice(0,8).map(({event,pay})=>
