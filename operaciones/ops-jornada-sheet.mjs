@@ -80,7 +80,7 @@ export function buildJornadaSheet(db,eventId,{scope="evento"}={}){
    const log=logs.find(x=>x.eventId===e.id&&x.personId===shift.personId);
    const adjudication=review(db,shift.personId,e.id);
    const staffLine={
-    eventId:e.id,personId:shift.personId,person:p.name||"Personal",role:p.role||"",
+    eventId:e.id,personId:shift.personId,person:p.name||"Personal",role:p.role||"",assignedByName:shift.assignedByName||e.assignedByName||"",
     phone:p.phone||"",date:day(shift.start)||d,day:d,activity:e.title||"Jornada",start:shift.start,end:shift.end,
     scheduledStart:time(shift.start),scheduledEnd:time(shift.end),
     actualStart:clock?.startedAt?time(clock.startedAt):log?.start?time(log.start):"Sin entrada",
@@ -215,7 +215,7 @@ export function jornadaPdf(report,{includePayroll=false}={}){
  add("PERSONAL ASIGNADO Y ASISTENCIA","section");
  if(!report.roster.length)add("No hay personal asignado.");
  for(const r of report.roster){
-  add(r.date+" | "+r.person+" ("+(r.role||"Personal")+") | Previsto "+r.scheduledStart+"-"+r.scheduledEnd);
+  add(r.date+" | "+r.person+" ("+(r.role||"Personal")+") | Previsto "+r.scheduledStart+"-"+r.scheduledEnd+" | Asigno: "+(r.assignedByName||"No registrado"));
   add("Entrada: "+r.actualStart+" | Salida: "+r.actualEnd+" | Revisión: "+r.attendance);
  }
  if(includePayroll){
