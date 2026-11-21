@@ -461,11 +461,12 @@ async function sendHoursFromMyDay(eventId,declaredBreakMins=0){
  try{summary=timeStatement({clock,event,personId,breakMins})}
  catch(error){status(errorMessage(error),"error");return}
  if(summary.netMinutes<=0){status("No se pueden enviar cero horas netas. Contacta a coordinación.","error");return}
- const id="j_"+user.uid+"_"+eventId,ref=doc(fs,"agora_ops_logs",id);
  await action(async()=>{
-   // El listener de pagos ya contiene únicamente registros del UID autenticado.
-   // Leer con getDocFromServer una ruta inexistente puede ser denegado por las reglas.
-   const existing=[...logs.values()].find(l=>l.id===id&&l.ownerUid===user.uid);
+   // Reutilizar un comprobante existente evita duplicarlo si fue creado con un folio anterior.
+   // El listener de pagos solo contiene registros del UID autenticado.
+   const existing=[...logs.values()].find(l=>l.eventId===eventId&&l.ownerUid===user.uid&&l.personId===personId);
+   const id=existing?.id||("j_"+user.uid+"_"+eventId);
+   const ref=doc(fs,"agora_ops_logs",id);
    let value;
    if(existing){
      value=existing;
