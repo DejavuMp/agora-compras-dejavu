@@ -75,6 +75,7 @@ try{
 
   await page.locator('.staff-shortcuts summary').click();
   await page.locator('#staff-tabs [data-staff-tab="cronograma"]').click();
+  assert.ok(await page.locator("#j-return-home").isVisible(),"Botón claro de regreso al inicio");
   await page.locator("#j-period").selectOption("14");
   await page.locator("#j-period").selectOption("30");
   await page.locator("#j-period").selectOption("7");
@@ -151,6 +152,8 @@ try{
   assert.equal(reports[0].requestedAmount,null,"El staff no define monto");
   assert.ok(reports[0].requestedHours>0);
   assert.ok(!(await page.locator("#j-payment-list").innerText()).includes("Tarifa por hora"));
+  await page.locator("#j-return-home").click();
+  assert.ok(await page.locator("#j-home-attendance #j-active").isVisible(),"Regreso de un toque a Mi día");
   assert.deepEqual(errors,[],"Interfaz no debe lanzar errores de JavaScript");
   console.log("OK: UI de personal: turno, salida, GPS, traslado y arribo en un navegador simulado. NO producción.");
 }finally{await c.close();await browser.close()}
