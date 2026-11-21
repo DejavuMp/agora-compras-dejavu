@@ -276,11 +276,29 @@ function renderAttendance(){
   const remaining=r?.status==="en_curso"?timeLeft(p,r.startedAt):null;
   const canStart=check.ok&&!r&&!busy;
   const ended=r?.status==="finalizada";
+  const paymentRecord=logsLoaded?[...logs.values()].find(l=>l.eventId===e.id&&l.ownerUid===user.uid&&l.personId===personId):null;
+  const existingBreak=$("j-submit-break")?.value??"0";
+  const assignedBy=shiftOf(e,personId)?.assignedByName||e.assignedByName||"";
+  const paymentStatus=paymentRecord?.paymentStatus||"capturado";
+  const submitBreakAvailable=!(breaksReady&&shiftBreaks.length);
+  const sendHoursControls=ended?(!logsLoaded?
+    '<p class="staff-pay-flow">Consultando tu solicitud de horas…</p>':
+    paymentRecord&&["solicitado","validado","programado","pagado"].includes(paymentStatus)?
+    '<div class="staff-pay-flow"><b>Horas enviadas a coordinación</b><p>Estado: '+esc(payLabel[paymentStatus]||paymentStatus)+
+      '. No necesitas mandar PDF ni correo. Coordinación recibe el registro en ÁGORA.</p></div>':
+    paymentRecord&&paymentStatus==="revision"?
+    '<div class="staff-pay-flow"><b>Coordinación pidió una corrección</b><p>Entra a Mis pagos para corregir y reenviar tu reporte.</p><button type="button" data-staff-tab="pagos">Corregir mi reporte</button></div>':
+    '<div class="staff-pay-flow"><b>Último paso: enviar tus horas para pago</b><p>Tu entrada y salida ya se guardaron. Confirma las horas y pulsa enviar. No tienes que generar ni adjuntar un PDF.</p>'+
+      (submitBreakAvailable&&!paymentRecord?'<label>Minutos de descanso (si no tomaste, escribe 0)<input id="j-submit-break" type="number" min="0" step="1" value="'+esc(existingBreak)+'"></label>':
+        '<p>Descanso registrado: '+(paymentRecord?.breakMins??restSummary.minutes)+' min.</p>')+
+      '<button type="button" class="primary" id="j-send-hours" '+(busy?"disabled":"")+'>Confirmar y enviar horas a coordinación</button></div>'
+  ):"";
   const existingNote=$("end-note")?.value||"";
   const existingActivity=$("start-activity")?.value||"";
   $("j-active").innerHTML='<div class="card"><b>'+esc(e.title||"Jornada")+'</b>'+
     '<p>Horario asignado: '+esc(when(eventStart(e,personId)))+' a '+esc(when(eventEnd(e,personId)))+'</p>'+
     '<p>Sede: '+esc(placeLabel(e))+'</p>'+
+    '<p><b>Asignado por:</b> '+esc(assignedBy||"No registrado en esta asignación anterior")+'</p>'+
     (r?'<p><b>Entrada oficial:</b> '+esc(when(r.startedAt))+'<br>'+linkGeo(r.startGeo,"Ver punto de entrada")+'</p>':"")+
     (ended?'<p><b>Salida oficial:</b> '+esc(when(r.endedAt))+'<br>'+linkGeo(r.endGeo,"Ver punto de salida")+
       '</p><p>Actividad realizada: '+esc(r.endNote||"Sin descripción")+'</p>':"")+
@@ -292,7 +310,7 @@ function renderAttendance(){
       '<label>Comentario de cierre<textarea id="end-note" maxlength="240" placeholder="Incidencia, resultado u observación"></textarea></label></details>'+
       '<button class="primary" id="end-shift" '+(busy||!!currentRest?"disabled":"")+'>Registrar salida real</button>':"")+
     (!check.ok&&!r?'<p class="notice">'+esc(check.reason)+'</p>':"")+
-    (ended?'<p><button type="button" class="staff-subtle" data-staff-tab="pagos">Ver mis comprobantes</button></p>':"")+
+    (ended?sendHoursControls:"")+
     (ended&&breaksReady&&shiftBreaks.length?'<p><b>Descanso con marcajes:</b> '+restSummary.minutes+' min en '+shiftBreaks.length+' pausa(s)</p>':"")+
     '</div>';
   if($("end-note")&&existingNote)$("end-note").value=existingNote;
@@ -425,6 +443,44 @@ function render(){
   renderPayments(events);
   setTab(staffTab);
   checkShiftNotices();
+}
+async function sendHoursFromMyDay(eventId,declaredBreakMins=0){
+ if(!user||!personId||!staff||!logsLoaded){status("Aún no se sincronizan tus registros. Reintenta desde Mi día.","error");return}
+ const event=(staff.events||[]).find(e=>e.id===eventId),clock=records.get(key(user.uid,eventId));
+ if(!event||!clock||clock.status!=="finalizada"){
+   status("Registra primero la salida oficial para poder enviar tus horas.","error");return;
+ }
+ if(!Number.isInteger(Number(declaredBreakMins))||Number(declaredBreakMins)<0){
+   status("El descanso debe expresarse en minutos completos.","error");return;
+ }
+ const pauses=ownBreaks([...breaks.values()],user.uid,eventId);
+ const certified=verifiedBreakSummary(clock,pauses);
+ if(breaksReady&&certified.active){status("Primero termina tu descanso activo.","error");return}
+ const breakMins=breaksReady&&pauses.length?certified.minutes:Number(declaredBreakMins);
+ let summary;
+ try{summary=timeStatement({clock,event,personId,breakMins})}
+ catch(error){status(errorMessage(error),"error");return}
+ if(summary.netMinutes<=0){status("No se pueden enviar cero horas netas. Contacta a coordinación.","error");return}
+ const id="j_"+user.uid+"_"+eventId,ref=doc(fs,"agora_ops_logs",id);
+ await action(async()=>{
+   const snap=await getDocFromServer(ref);
+   let value;
+   if(snap.exists()){
+     value=snap.data();
+     if(value.ownerUid!==user.uid||value.personId!==personId||value.eventId!==eventId)throw Error("El reporte existe con otra identidad. Consulta a coordinación.");
+     if(value.paymentStatus!=="capturado")throw Error("Esta jornada ya fue enviada o requiere una corrección. Revisa Mis pagos.");
+     if("approvedAmount" in value||"approvedHours" in value)throw Error("Este reporte ya contiene un importe autorizado y debe revisarlo coordinación.");
+   }else{
+     value=reportFromFinishedClock({clock,event,uid:user.uid,personId,id,breakMins});
+     await setDoc(ref,{...value,updatedAt:serverTimestamp()});
+   }
+   const requested=Number(netHours(value).toFixed(2));
+   if(!(requested>0))throw Error("El comprobante no contiene horas válidas.");
+   await updateDoc(ref,{
+     paymentStatus:"solicitado",requestedHours:requested,requestedRate:null,requestedAmount:null,
+     revision:Number(value.revision||1)+1,updatedAt:serverTimestamp()
+   });
+ },"Enviando tus horas oficiales a coordinación…");
 }
 async function createReport(eventId,declaredBreakMins=0){
   if(!user||!personId||!staff||!logsLoaded)return;
@@ -867,6 +923,11 @@ $("j-active").addEventListener("click",e=>{
   if(e.target.id==="j-break-resume")resumeBreak();
   if(e.target.id==="start-shift")markStart();
   if(e.target.id==="end-shift")markEnd();
+  if(e.target.id==="j-send-hours"){
+    const input=$("j-submit-break"),value=Number(input?.value||0);
+    if(!Number.isInteger(value)||value<0){status("El descanso debe indicarse en minutos completos.","error");return}
+    sendHoursFromMyDay(selected,value);
+  }
 });
 $("trip-start").onclick=startTrip;$("trip-arrive").onclick=arriveTrip;
 $("live-location").onchange=function(){
