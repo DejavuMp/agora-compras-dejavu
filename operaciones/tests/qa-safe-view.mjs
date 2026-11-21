@@ -30,6 +30,9 @@ assert.equal(staff.events[0].staff.length,1);
 assert.equal(staff.events[0].staff[0].personId,"p1");
 assert.equal(staff.events[0].staff[0].start,"2026-12-01T09:30");
 assert.equal(staff.events[0].staff[0].end,"2026-12-01T16:30");
+assert.equal(staff.events[0].ownPay.amount,6993,"La persona puede ver solo su propio estimado (7 h x 999)");
+assert.equal(staff.events[0].ownPay.basis,"hora");
+assert.ok(!("ownPay" in (staff.events[1]||{})),"Sin jornadas ajenas");
 assert.equal(staff.vehicles[0].name,"Unidad A");
 assert.equal(staff.settings.dailyLimit,8);
 for(const secret of ["SENSITIVE_BANK","SENSITIVE_PLATE","SENSITIVE_PAYROLL","hourRate","dayRate","approvedAmount","authUid","rate"]){
