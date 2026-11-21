@@ -10,7 +10,7 @@ const staff={
   personId:"p1",person:{id:"p1",name:"Persona ficticia QA"},
   events:[{id:"evento1",title:"Volanteo de prueba",type:"Volanteo",status:"confirmado",
     venueName:"Sucursal ficticia",venueAddress:"Insurgentes 100, Ciudad de México",
-    start:eStart,end:eEnd,staff:[{personId:"p1",start:eStart,end:eEnd}],dayIndex:1,dayCount:1,
+    start:eStart,end:eEnd,staff:[{personId:"p1",start:eStart,end:eEnd,assignedByName:"Coordinación QA"}],dayIndex:1,dayCount:1,
     ownPay:{amount:720,basis:"hora",label:"Estimado por horas programadas"}}]
 };
 const policy={
@@ -70,6 +70,7 @@ try{
   assert.ok(await page.locator('.staff-shortcuts summary').isVisible(),"Acceso sencillo con herramientas plegadas");
   assert.equal(await page.locator("#staff-tabs button").count(),3,"Menú del staff con solo tres opciones");
   assert.ok(await page.locator("#j-home-attendance #j-active").isVisible(),"El marcaje está en Mi día, no en otra pantalla");
+  assert.ok((await page.locator("#j-active").innerText()).includes("Coordinación QA"),"El staff ve quién lo asignó");
   assert.ok((await page.locator("#j-home-pay").innerText()).includes("$720.00"),"Staff ve solo su propio pago previsto");
   assert.ok((await page.locator("#j-home-pay").innerText()).includes("Estimado"),"Estimado no se confunde con autorizado");
   assert.ok(await page.locator("#j-home-pay").isVisible());
