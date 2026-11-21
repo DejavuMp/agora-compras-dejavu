@@ -31,7 +31,7 @@ const blank = () => ({people:[],vehicles:[],events:[],blocks:[],sites:[],campaig
 },audit:[],logs:[],incidents:[]});
 let account=null,role=null,personId="",baseBoard=null,saving=false,ready=false;
 let logs = new Map(),incidents = new Map(),requests = new Map(),clocks = new Map();
-let linkingUid=null,autoPoliciesChecked=false;
+let linkingUid=null,autoPoliciesChecked=false,ownPaySyncStarted=false;
 let unwatches=[],dirtyWaiting=false,authVersion=0,view=null;
 const root=document.getElementById("ops-gate");
 const app=window.AGORA_OPS_APP;
@@ -64,7 +64,7 @@ function stop(){
   opsJornadas.stop();
   for(const off of unwatches.splice(0))try{off()}catch(_){}
   role=null;personId="";baseBoard=null;logs.clear();incidents.clear();requests.clear();clocks.clear();
-  saving=false;ready=false;dirtyWaiting=false;autoPoliciesChecked=false;
+  saving=false;ready=false;dirtyWaiting=false;autoPoliciesChecked=false;ownPaySyncStarted=false;
   app?.reset?.();
 }
 function boardOnly(state){
@@ -167,6 +167,28 @@ function notifyCoordinatorClock(clock,kind){
   document.body.appendChild(note);
   setTimeout(()=>note.remove(),15000);
 }
+async function ensureOwnPayProjection(){
+ // Solo el coordinador puede regenerar la ficha privada de cada integrante.
+ // Se ejecuta una vez al abrir una agenda confirmada por el servidor.
+ if(ownPaySyncStarted||role!=="coordinador"||!ready||!baseBoard?.payload)return;
+ ownPaySyncStarted=true;
+ const snapshot=baseBoard,people=(snapshot.payload.people||[]).filter(p=>p.authUid);
+ if(people.length>120){notice("Más de 120 fichas: no se sincronizarán automáticamente todas las previsiones.","pending");return}
+ for(const person of people){
+  const expected=viewFor(person,snapshot.payload),ref=doc(fs,"agora_ops_staff",person.authUid);
+  try{
+   await runTransaction(fs,async tx=>{
+    const liveBoard=await tx.get(SCHEDULE);
+    if(Number(liveBoard.data()?.revision||0)!==Number(snapshot.revision||0))return;
+    const current=await tx.get(ref),existing=current.exists()?current.data():null;
+    const wanted=JSON.stringify(expected.events.map(e=>({id:e.id,ownPay:e.ownPay||null})));
+    const held=JSON.stringify((existing?.events||[]).map(e=>({id:e.id,ownPay:e.ownPay||null})));
+    if(existing&&wanted===held)return; // No reescribir un registro idéntico.
+    tx.set(ref,{...expected,uid:person.authUid,updatedAt:serverTimestamp()});
+   });
+  }catch(error){notice("Algunas previsiones de pago propias siguen pendientes: "+err(error),"pending");break}
+ }
+}
 function loadCoordinator(){
   role="coordinador";
   notice("Firebase · preparando datos","pending");
@@ -180,6 +202,7 @@ function loadCoordinator(){
     if(!ready){show();notice("Firebase · sincronizado","ok");}
     emit();
     if(!snap.metadata.fromCache)void ensureShiftPolicies();
+    if(!snap.metadata.fromCache)void ensureOwnPayProjection();
   });
   listen(LOGLIST,snap=>{
     logs=new Map(snap.docs.map(d=>[d.id,{...d.data(),id:d.id}]));
