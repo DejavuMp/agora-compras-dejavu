@@ -9,7 +9,7 @@ const board={
   events:[
     {id:"e1",title:"Volanteo ficticio",type:"Volanteo",status:"confirmado",
       start:"2026-12-01T10:00",end:"2026-12-01T16:00",before:30,after:30,
-      staff:[{personId:"p1",start:"2026-12-01T09:30",end:"2026-12-01T16:30",rate:800},
+      staff:[{personId:"p1",start:"2026-12-01T09:30",end:"2026-12-01T16:30",assignedByName:"Coordinación QA",rate:800},
              {personId:"p2",start:"2026-12-01T09:30",end:"2026-12-01T16:30",rate:900}],
       vehicles:["v1"],siteId:"s1",travelMin:40,routeBufferMin:15,
       venueName:"Sucursal ficticia",venueAddress:"México",
@@ -30,6 +30,7 @@ assert.equal(staff.events[0].staff.length,1);
 assert.equal(staff.events[0].staff[0].personId,"p1");
 assert.equal(staff.events[0].staff[0].start,"2026-12-01T09:30");
 assert.equal(staff.events[0].staff[0].end,"2026-12-01T16:30");
+assert.equal(staff.events[0].staff[0].assignedByName,"Coordinación QA","Nombre del asignador visible únicamente en la jornada propia");
 assert.equal(staff.events[0].ownPay.amount,6993,"La persona puede ver solo su propio estimado (7 h x 999)");
 assert.equal(staff.events[0].ownPay.basis,"hora");
 assert.ok(!("ownPay" in (staff.events[1]||{})),"Sin jornadas ajenas");
