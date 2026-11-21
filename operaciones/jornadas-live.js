@@ -98,6 +98,11 @@ const eventDescription=e=>{
 };
 function setTab(tab){
   if(!["inicio","cronograma","asistencia","traslados","pagos"].includes(tab))return;
+  const attendance=document.querySelector("#j-active")?.closest(".panel");
+  const homeHolder=$("j-home-attendance");
+  const otherHolder=document.querySelector('#viewer-staff [data-staff-panel="asistencia"]');
+  const destination=tab==="inicio"?homeHolder:otherHolder;
+  if(attendance&&destination&&attendance.parentElement!==destination)destination.appendChild(attendance);
   staffTab=tab;
   $("staff-tabs").querySelectorAll("[data-staff-tab]").forEach(button=>{
     const active=button.dataset.staffTab===tab;
@@ -114,6 +119,41 @@ function chooseEvent(id,tab){
   selected=id;
   if(tab)setTab(tab);
   render();
+}
+function ownPayFor(event){
+ const mine=[...logs.values()].find(l=>l.ownerUid===user?.uid&&l.personId===personId&&l.eventId===event.id);
+ const approved=mine&&["validado","programado","pagado"].includes(mine.paymentStatus)&&
+   typeof mine.approvedAmount==="number"&&Number.isFinite(mine.approvedAmount);
+ if(approved)return {amount:mine.approvedAmount,kind:mine.paymentStatus==="pagado"?"Pagado":mine.paymentStatus==="programado"?"Programado":"Autorizado",
+   confirmed:true,date:mine.paymentDueDate||"",source:"Monto confirmado por coordinación"};
+ const forecast=event.ownPay?.amount;
+ if(typeof forecast==="number"&&Number.isFinite(forecast)&&forecast>=0)
+   return {amount:forecast,kind:"Estimado",confirmed:false,date:mine?.paymentDueDate||"",source:event.ownPay?.label||"Horas programadas"};
+ return {amount:null,kind:"Por definir",confirmed:false,date:"",source:"Coordinación debe registrar tu tarifa"};
+}
+const mxnOwn=amount=>new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(amount||0);
+function renderOwnPay(events){
+ const area=$("j-home-pay");if(!area)return;
+ if(!logsLoaded){area.innerHTML='<p class="staff-empty">Cargando tus importes desde Firebase…</p>';return}
+ const ongoing=events.filter(e=>instant(eventEnd(e,personId))>=Date.now()-86400000);
+ const focused=ongoing.find(e=>records.get(key(user.uid,e.id))?.status==="en_curso")||ongoing[0]||events.at(-1);
+ const month=(focused?localDay(eventStart(focused,personId)):localDay(Date.now())).slice(0,7);
+ const items=events.filter(e=>localDay(eventStart(e,personId)).startsWith(month)&&e.status!=="cancelado")
+  .map(event=>({event,pay:ownPayFor(event)}));
+ const values=items.filter(x=>x.pay.amount!==null),planned=values.reduce((n,x)=>n+x.pay.amount,0);
+ const approved=values.filter(x=>x.pay.confirmed).reduce((n,x)=>n+x.pay.amount,0);
+ const undefinedCount=items.length-values.length;
+ area.innerHTML='<div class="own-pay-total">'+(items.length?mxnOwn(planned):"Sin jornadas")+'</div>'+
+   '<p class="own-pay-sub">'+esc(month)+' · '+items.length+' jornada(s) · Total provisional de tus pagos. '+
+   'Autorizado: <b>'+mxnOwn(approved)+'</b>.'+
+   (undefinedCount?' <b>'+undefinedCount+' importe(s) por definir.</b>':'')+
+   '<br>Las estimaciones no equivalen a pagos aprobados. Tu fecha prevista se mostrará cuando coordinación la programe.</p>'+
+   items.slice(0,8).map(({event,pay})=>
+    '<div class="own-pay-line"><span><b>'+esc(event.title||"Jornada")+'</b><small>'+esc(dateLabel(eventStart(event,personId)))+
+      ' · '+esc(pay.kind)+(pay.date?' · Pago previsto: '+esc(pay.date):'')+'</small></span>'+
+      '<strong class="'+(pay.confirmed?"":"own-pay-pending")+'">'+(pay.amount===null?"Por definir":mxnOwn(pay.amount))+
+      '<small>'+esc(pay.source)+'</small></strong></div>').join("")+
+   (items.length>8?'<p class="own-pay-sub">Hay '+(items.length-8)+' jornada(s) adicionales en este período. Abre Mis pagos para ver sus registros.</p>':'');
 }
 function renderSummary(events){
   const ongoing=events.filter(e=>statusOf(e)[1]==="active"&&records.get(key(user.uid,e.id))?.status==="en_curso").length;
@@ -139,7 +179,7 @@ function renderHome(events){
     '<p>'+eventDescription(featured)+'</p>'+
     '<p>Campaña: '+esc(featured.campaign||featured.project||"No especificada")+'</p>'+
     '<p>Transporte: '+esc(tripLabel(featured))+'</p>'+
-    '<div class="staff-featured-actions"><button type="button" class="primary" data-open-event="'+esc(featured.id)+'" data-open-tab="asistencia">Marcar jornada</button>'+
+    '<div class="staff-featured-actions"><button type="button" class="primary" data-open-event="'+esc(featured.id)+'" data-open-tab="inicio">Entrada / salida</button>'+
     '<button type="button" data-open-event="'+esc(featured.id)+'" data-open-tab="traslados">Ver traslado</button></div></div>';
   const others=upcoming.filter(e=>e.id!==featured.id).slice(0,4);
   $("j-upcoming").innerHTML=others.length?others.map(e=>
@@ -317,8 +357,9 @@ function renderPayments(events){
     const clock=e?records.get(key(user.uid,e.id)):null;
     const summary=(e&&clock?.status==="finalizada")?
       timeStatement({clock,event:e,personId,breakMins:l.breakMins||0}):null;
-    const money=approved?" · Importe validado: "+new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(l.approvedAmount):
-      " · Importe pendiente de validación";
+    const projection=e?ownPayFor(e):{amount:null};
+    const money=approved?" · Importe "+(state==="pagado"?"pagado":state==="programado"?"programado":"autorizado")+": "+mxnOwn(l.approvedAmount):
+      projection.amount!==null?" · Previsto: "+mxnOwn(projection.amount)+" (sin autorizar)":" · Importe por definir";
     const tagClass=state==="pagado"?"done":["solicitado","validado","programado"].includes(state)?"review":"";
     return '<article class="staff-payment"><div class="pay-row"><div><h4>'+esc(events.find(e=>e.id===l.eventId)?.title||"Registro de jornada")+'</h4>'+
       '<span class="staff-status-tag '+tagClass+'">'+esc(payLabel[state]||"Pendiente")+'</span></div></div>'+
@@ -366,6 +407,7 @@ function render(){
   }
   renderSummary(events);
   renderHome(events);
+  renderOwnPay(events);
   renderChronogram(events);
   renderSelectors(events);
   renderAttendance();
@@ -736,7 +778,7 @@ $("staff-board").addEventListener("click",event=>{
   const tab=event.target.closest("[data-staff-tab]");
   if(tab){setTab(tab.dataset.staffTab);return}
   const opened=event.target.closest("[data-open-event]");
-  if(opened){chooseEvent(opened.dataset.openEvent,opened.dataset.openTab||"asistencia");return}
+  if(opened){const tab=opened.dataset.openTab||"inicio";chooseEvent(opened.dataset.openEvent,tab);if(tab==="inicio")requestAnimationFrame(()=>$('j-home-attendance')?.scrollIntoView({behavior:'smooth',block:'nearest'}));return}
   const mode=event.target.closest("[data-calendar-mode]");
   if(mode){calendarMode=mode.dataset.calendarMode;render();return}
   const report=event.target.closest("[data-create-report]");
