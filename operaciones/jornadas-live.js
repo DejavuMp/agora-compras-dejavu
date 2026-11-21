@@ -109,6 +109,7 @@ function setTab(tab){
     if(destination&&attendance.parentElement!==destination)destination.appendChild(attendance);
   }
   staffTab=tab;
+  const back=$("j-return-home");if(back)back.hidden=tab==="inicio";
   $("staff-tabs").querySelectorAll("[data-staff-tab]").forEach(button=>{
     const active=button.dataset.staffTab===tab;
     button.classList.toggle("active",active);
