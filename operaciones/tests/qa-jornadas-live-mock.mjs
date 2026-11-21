@@ -10,7 +10,8 @@ const staff={
   personId:"p1",person:{id:"p1",name:"Persona ficticia QA"},
   events:[{id:"evento1",title:"Volanteo de prueba",type:"Volanteo",status:"confirmado",
     venueName:"Sucursal ficticia",venueAddress:"Insurgentes 100, Ciudad de México",
-    start:eStart,end:eEnd,staff:[{personId:"p1",start:eStart,end:eEnd}],dayIndex:1,dayCount:1}]
+    start:eStart,end:eEnd,staff:[{personId:"p1",start:eStart,end:eEnd}],dayIndex:1,dayCount:1,
+    ownPay:{amount:720,basis:"hora",label:"Estimado por horas programadas"}}]
 };
 const policy={
   ownerUid:"staff-qa",personId:"p1",eventId:"evento1",enabled:true,mode:"horario",maxMinutes:480,
@@ -66,6 +67,12 @@ try{
   await page.goto("http://127.0.0.1:8765/operaciones/visor.html",{waitUntil:"domcontentloaded"});
   await page.waitForFunction(()=>document.querySelector("#j-events")?.textContent.includes("Volanteo de prueba"));
   assert.ok(await page.locator('[data-staff-tab="inicio"]').isVisible());
+  assert.equal(await page.locator("#staff-tabs button").count(),3,"Menú del staff con solo tres opciones");
+  assert.ok(await page.locator("#j-home-attendance #j-active").isVisible(),"El marcaje está en Mi día, no en otra pantalla");
+  assert.ok((await page.locator("#j-home-pay").innerText()).includes("$720.00"),"Staff ve solo su propio pago previsto");
+  assert.ok((await page.locator("#j-home-pay").innerText()).includes("Estimado"),"Estimado no se confunde con autorizado");
+  assert.ok(await page.locator("#j-home-pay").isVisible());
+
   await page.locator('#staff-tabs [data-staff-tab="cronograma"]').click();
   await page.locator("#j-period").selectOption("14");
   await page.locator("#j-period").selectOption("30");
