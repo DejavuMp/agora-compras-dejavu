@@ -102,7 +102,12 @@ function setTab(tab){
   const homeHolder=$("j-home-attendance");
   const otherHolder=document.querySelector('#viewer-staff [data-staff-panel="asistencia"]');
   const destination=tab==="inicio"?homeHolder:otherHolder;
-  if(attendance&&destination&&attendance.parentElement!==destination)destination.appendChild(attendance);
+  if(attendance){
+    const consent=attendance.querySelector(".staff-location-consent");
+    const active=attendance.querySelector("#j-active");
+    if(consent&&active&&consent.nextElementSibling!==active)active.before(consent);
+    if(destination&&attendance.parentElement!==destination)destination.appendChild(attendance);
+  }
   staffTab=tab;
   $("staff-tabs").querySelectorAll("[data-staff-tab]").forEach(button=>{
     const active=button.dataset.staffTab===tab;
@@ -134,28 +139,30 @@ function ownPayFor(event){
 const mxnOwn=amount=>new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(amount||0);
 function renderOwnPay(events){
  const area=$("j-home-pay");if(!area)return;
- if(!logsLoaded){area.innerHTML='<p class="staff-empty">Cargando tus importes desde Firebase…</p>';return}
- const ongoing=events.filter(e=>instant(eventEnd(e,personId))>=Date.now()-86400000);
- const focused=ongoing.find(e=>records.get(key(user.uid,e.id))?.status==="en_curso")||ongoing[0]||events.at(-1);
- const month=(focused?localDay(eventStart(focused,personId)):localDay(Date.now())).slice(0,7);
- const items=events.filter(e=>localDay(eventStart(e,personId)).startsWith(month)&&e.status!=="cancelado")
-  .map(event=>({event,pay:ownPayFor(event)}));
- const values=items.filter(x=>x.pay.amount!==null);
- const paid=values.filter(x=>x.pay.kind==="Pagado").reduce((n,x)=>n+x.pay.amount,0);
- const remaining=values.filter(x=>x.pay.kind!=="Pagado").reduce((n,x)=>n+x.pay.amount,0);
- const approved=values.filter(x=>x.pay.confirmed&&x.pay.kind!=="Pagado").reduce((n,x)=>n+x.pay.amount,0);
- const undefinedCount=items.length-values.length;
- area.innerHTML='<div class="own-pay-total">'+(items.length?mxnOwn(remaining):"Sin jornadas")+'</div>'+
-   '<p class="own-pay-sub">'+esc(month)+' · '+items.length+' jornada(s) · Pendiente de recibir (estimación). '+
-   'Autorizado pendiente: <b>'+mxnOwn(approved)+'</b> · Ya pagado: <b>'+mxnOwn(paid)+'</b>.'+
-   (undefinedCount?' <b>'+undefinedCount+' importe(s) por definir.</b>':'')+
-   '<br>Las estimaciones no equivalen a pagos aprobados. Tu fecha prevista se mostrará cuando coordinación la programe.</p>'+
-   items.slice(0,8).map(({event,pay})=>
-    '<div class="own-pay-line"><span><b>'+esc(event.title||"Jornada")+'</b><small>'+esc(dateLabel(eventStart(event,personId)))+
-      ' · '+esc(pay.kind)+(pay.date?' · Pago previsto: '+esc(pay.date):'')+'</small></span>'+
-      '<strong class="'+(pay.confirmed?"":"own-pay-pending")+'">'+(pay.amount===null?"Por definir":mxnOwn(pay.amount))+
-      '<small>'+esc(pay.source)+'</small></strong></div>').join("")+
-   (items.length>8?'<p class="own-pay-sub">Hay '+(items.length-8)+' jornada(s) adicionales en este período. Abre Mis pagos para ver sus registros.</p>':'');
+ if(!logsLoaded){area.innerHTML='<p class="staff-empty">Consultando tu pago…</p>';return}
+ const focused=events.find(e=>e.id===selected)||events.find(e=>instant(eventEnd(e,personId))>=Date.now())||events.at(-1);
+ if(!focused){area.innerHTML='<p class="staff-empty">Aún no tienes jornadas con pago previsto.</p>';return}
+ const own=ownPayFor(focused);
+ const month=localDay(eventStart(focused,personId)).slice(0,7);
+ const values=events.filter(e=>e.status!=="cancelado"&&localDay(eventStart(e,personId)).startsWith(month))
+  .map(e=>({event:e,pay:ownPayFor(e)}));
+ const unpaid=values.filter(x=>x.pay.amount!==null&&x.pay.kind!=="Pagado")
+  .reduce((sum,x)=>sum+x.pay.amount,0);
+ const unknown=values.filter(x=>x.pay.amount===null).length;
+ area.innerHTML=
+   '<p class="own-pay-sub">Jornada seleccionada · '+esc(focused.title||"Jornada")+'</p>'+
+   '<div class="own-pay-total">'+(own.amount===null?"Por definir":mxnOwn(own.amount))+'</div>'+
+   '<p class="own-pay-sub"><b>'+esc(own.kind)+'</b> · '+esc(own.source)+
+   (own.date?' · Pago previsto: '+esc(own.date):'')+
+   (own.confirmed?'.':' · Aún no está autorizado.')+'</p>'+
+   '<details class="own-pay-more"><summary>Ver todos mis pagos de '+esc(month)+'</summary>'+
+   '<p class="own-pay-sub">Pendiente de recibir este mes: <b>'+mxnOwn(unpaid)+'</b>. '+
+     (unknown?unknown+' jornada(s) sin importe definido. ':'')+
+     'Este total combina previsiones y autorizaciones; no acredita un pago.</p>'+
+   values.map(({event,pay})=>'<div class="own-pay-line"><span>'+esc(event.title||"Jornada")+
+       '<small>'+esc(dateLabel(eventStart(event,personId)))+' · '+esc(pay.kind)+'</small></span><strong>'+
+       (pay.amount===null?"Por definir":mxnOwn(pay.amount))+'</strong></div>').join("")+
+   '</details>';
 }
 function renderSummary(events){
   const ongoing=events.filter(e=>statusOf(e)[1]==="active"&&records.get(key(user.uid,e.id))?.status==="en_curso").length;
