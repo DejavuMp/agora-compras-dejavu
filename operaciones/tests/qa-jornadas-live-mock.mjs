@@ -84,7 +84,8 @@ try{
   await page.locator("#j-download-calendar").click();
   const calendarFile=await calendar;
   assert.ok(calendarFile.suggestedFilename().endsWith(".ics"),"El staff puede exportar sus jornadas");
-  await page.locator('#staff-tabs [data-staff-tab="asistencia"]').click();
+  await page.locator('.staff-more-tools summary').click();
+  await page.locator('.staff-more-tools [data-staff-tab="asistencia"]').click();
   assert.equal(new URL(page.url()).pathname,"/operaciones/visor.html","El staff permanece dentro del visor");
   assert.ok(await page.locator("#viewer-agenda").isHidden(),"Sin acceso a agenda administrativa");
   assert.ok(await page.locator("#viewer-request").isHidden(),"Una cuenta asignada no requiere repetir solicitud");
@@ -110,7 +111,7 @@ try{
 
   await page.locator("#end-shift").click();
   await page.waitForFunction(()=>document.querySelector("#j-active")?.textContent.includes("Salida oficial:"),{timeout:8000}).catch(async error=>{console.log("JORNADA END DEBUG",JSON.stringify({status:await page.locator("#auth-status").textContent(),body:await page.locator("#j-active").innerText(),checked:await page.locator("#live-location").isChecked(),clock:await page.evaluate(()=>[...window.__mockRecords.clock.values()])}));throw error;});
-  await page.locator('#staff-tabs [data-staff-tab="traslados"]').click();
+  await page.locator('.staff-more-tools [data-staff-tab="traslados"]').click();
   await page.locator("#trip-origin").fill("Metro ficticio");
   await page.locator("#trip-minutes").fill("30");
   await page.locator("#trip-buffer").fill("15");
