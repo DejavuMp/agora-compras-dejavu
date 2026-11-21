@@ -244,6 +244,41 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
 #viewer-staff [data-staff-panel="inicio"] .staff-dashboard{grid-template-columns:1fr}
 #viewer-staff [data-staff-panel="inicio"] .staff-dashboard>.panel:nth-child(2){display:none}
 @media(max-width:680px){#viewer-staff .staff-my-pay{margin-top:10px}#viewer-staff .own-pay-total{font-size:22px}}
+
+/* Vista esencial: una jornada + una cantidad. Lo demás es opcional. */
+#viewer-staff .staff-title{display:none}
+#viewer-staff #j-operational-status{margin:10px 0;padding:9px 13px;font-size:12px}
+#viewer-staff .staff-reminders{display:none}
+#viewer-staff #staff-board>.staff-reminders.show-reminders{display:flex}
+#viewer-staff .staff-shortcuts{margin:12px 0;padding:6px 12px;border:1px solid #e3e0d9;background:#fbfaf8;border-radius:10px}
+#viewer-staff .staff-shortcuts>summary{padding:8px 3px;cursor:pointer;font-size:12px;font-weight:700;color:#70603f}
+#viewer-staff .staff-shortcuts .staff-tabs{border:0;gap:5px;margin:8px 0;padding:0;overflow-x:auto}
+#viewer-staff .staff-shortcuts .staff-tabs button{font-size:12px;min-height:36px;padding:9px 11px}
+#viewer-staff .staff-shortcuts .staff-more-tools{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 9px}
+#viewer-staff .staff-shortcuts .staff-more-tools button{padding:8px 11px;font-size:11px;border:1px solid #e2dfd9;border-radius:8px;background:white}
+#viewer-staff [data-staff-panel="inicio"] .staff-dashboard{display:grid;grid-template-columns:1fr;gap:12px}
+#viewer-staff [data-staff-panel="inicio"] .staff-dashboard>.panel:first-child{display:none}
+#viewer-staff [data-staff-panel="inicio"] .staff-dashboard>.panel:last-child{display:none}
+#viewer-staff [data-staff-panel="inicio"]>.staff-hint{display:none}
+#viewer-staff #j-home-attendance>.panel{padding:19px;border:1px solid #e3e4e1;border-radius:14px}
+#viewer-staff #j-home-attendance .staff-section-heading{margin-bottom:8px}
+#viewer-staff #j-home-attendance .staff-section-heading h3{font-size:23px}
+#viewer-staff #j-home-attendance .staff-policy{font-size:11px;line-height:1.4;margin:8px 0;color:#745837}
+#viewer-staff #j-home-attendance .staff-location-consent{margin:10px 0;padding:11px 13px}
+#viewer-staff #j-home-attendance .staff-location-consent label{font-size:12px;line-height:1.5}
+#viewer-staff #j-home-attendance .staff-location-consent input{width:18px;height:18px;flex-shrink:0}
+#viewer-staff #j-home-attendance .disclaimer{display:none}
+#viewer-staff #j-home-attendance #j-active .card{border:0;box-shadow:none;padding:10px 0}
+#viewer-staff #j-home-attendance #start-shift,
+#viewer-staff #j-home-attendance #end-shift{display:block;width:100%;min-height:54px;font-size:17px;font-weight:800;margin:15px 0 8px;border-radius:12px}
+#viewer-staff .staff-my-pay{margin:0}
+#viewer-staff .staff-my-pay>.staff-section-heading{margin-bottom:9px}
+#viewer-staff .staff-my-pay .own-pay-total{font-size:36px;margin:0 0 4px}
+#viewer-staff .staff-my-pay .own-pay-more{margin-top:12px;border-top:1px solid #eeece7;padding:9px 0;font-size:12px}
+#viewer-staff .staff-my-pay .own-pay-more summary{cursor:pointer;font-weight:700;color:#6f5933}
+#viewer-staff .staff-my-pay .own-pay-more .own-pay-line{padding:8px 0}
+@media(min-width:940px){#viewer-staff [data-staff-panel="inicio"] .staff-dashboard{max-width:750px;margin-inline:auto}}
+
 </style>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="../icons/icon-192.png">
@@ -289,17 +324,16 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
       <div><b>Recordatorios de mi jornada</b><p id="j-reminders-status" role="status" aria-live="polite">Los avisos se muestran únicamente mientras tengas ÁGORA abierta.</p></div>
       <button type="button" id="j-reminders-enable">Activar avisos</button>
     </div><div id="j-summary" class="staff-metrics" aria-label="Resumen personal de actividades"></div>
-    <nav id="staff-tabs" class="staff-tabs" aria-label="Secciones de Mis jornadas">
+    <details class="staff-shortcuts"><summary>Consultar calendario, pagos y otras funciones</summary><nav id="staff-tabs" class="staff-tabs" aria-label="Secciones de Mis jornadas">
       <button type="button" data-staff-tab="inicio" aria-selected="true" class="active">Mi día</button>
       <button type="button" data-staff-tab="cronograma" aria-selected="false">Mi calendario</button>
       
       
       <button type="button" data-staff-tab="pagos" aria-selected="false">Mis pagos</button>
-    </nav>
-    <details class="staff-more-tools"><summary>Más opciones: traslados y asistencia detallada</summary><div><button type="button" data-staff-tab="traslados">Traslados</button><button type="button" data-staff-tab="asistencia">Ver marcajes completos</button></div></details>
+    </nav><div class="staff-more-tools"><button type="button" data-staff-tab="traslados">Traslados</button><button type="button" data-staff-tab="asistencia">Asistencia detallada</button><button type="button" id="j-reminders-show" class="staff-extra-button">Recordatorios</button></div></details>
     <section class="staff-tab-panel" data-staff-panel="inicio" aria-label="Resumen de mi jornada">
       <div class="staff-dashboard">
-        <section class="panel"><div class="staff-section-heading"><div><h3>Mi jornada</h3><p>Tu lugar, horario y entrada/salida aquí mismo.</p></div></div><div id="j-today"></div></section><div id="j-home-attendance"></div><section class="panel staff-my-pay"><div class="staff-section-heading"><div><h3>¿Cuánto voy a cobrar?</h3><p>Solo tus jornadas y tus importes, sin información de otros integrantes.</p></div><button type="button" class="staff-subtle" data-staff-tab="pagos">Ver detalle</button></div><div id="j-home-pay"></div></section>
+        <section class="panel"><div class="staff-section-heading"><div><h3>Mi jornada</h3><p>Tu lugar, horario y entrada/salida aquí mismo.</p></div></div><div id="j-today"></div></section><div id="j-home-attendance"></div><section class="panel staff-my-pay"><div class="staff-section-heading"><div><h3>Mi pago de esta jornada</h3><p>Importe previsto o aprobado exclusivamente para ti.</p></div><button type="button" class="staff-subtle" data-staff-tab="pagos">Ver detalle</button></div><div id="j-home-pay"></div></section>
         <section class="panel"><div class="staff-section-heading"><div><h3>Enseguida</h3><p>Actividades asignadas para los próximos días.</p></div><button type="button" class="staff-subtle" data-staff-tab="cronograma">Ver todo el cronograma</button></div><div id="j-upcoming"></div></section>
       </div>
       <div class="staff-hint">Tus datos se actualizan desde Firebase. Solo tú y coordinación pueden consultar tus registros de asistencia y pagos.</div>
@@ -321,11 +355,11 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
       </section>
     </section>
     <section class="staff-tab-panel" data-staff-panel="asistencia" hidden aria-label="Mi asistencia">
-      <section class="panel"><div class="staff-section-heading"><div><h3>Marcar mi jornada</h3><p>Confirma tu lugar, entrada y salida con la hora oficial del servidor.</p></div></div>
-        <label class="staff-select-label">Jornada a registrar<select id="j-select-attendance" data-choose-event></select></label>
+      <section class="panel"><div class="staff-section-heading"><div><h3>Mi jornada</h3><p>Horario, lugar y asistencia en un solo lugar.</p></div></div>
+        <label class="staff-select-label">Elegir jornada<select id="j-select-attendance" data-choose-event></select></label>
         <div id="policy-state" class="staff-policy" role="status"></div>
         <div id="j-active"></div><div id="j-punches"></div>
-        <div class="staff-location-consent"><label><input type="checkbox" id="live-location"> Acepto compartir mi ubicación durante la jornada mientras esta página esté abierta (requerido para iniciar)</label><p id="location-state" class="geo">Ubicación continua desactivada.</p></div>
+        <div class="staff-location-consent"><label><input type="checkbox" id="live-location"> Permito compartir mi ubicación al registrar entrada y mientras esta página esté abierta. Puedo desactivarla cuando quiera.</label><p id="location-state" class="geo">Ubicación continua desactivada.</p></div>
         <p class="disclaimer">La hora de marcaje se guarda desde Firebase. Para iniciar debes permitir ubicación puntual y seguimiento visible mientras tengas esta página abierta. Puedes revocar el permiso en cualquier momento; si cierras la app el seguimiento se detendrá y no se simulará ubicación en segundo plano.</p>
       </section>
     </section>
