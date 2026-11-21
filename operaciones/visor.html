@@ -279,6 +279,9 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
 #viewer-staff .staff-my-pay .own-pay-more .own-pay-line{padding:8px 0}
 @media(min-width:940px){#viewer-staff [data-staff-panel="inicio"] .staff-dashboard{max-width:750px;margin-inline:auto}}
 
+
+#viewer-staff #j-return-home{background:#fff;color:#403527;border:1px solid #ded7c9;border-radius:9px;padding:10px 13px;font-size:12px;font-weight:800;margin:6px 0 16px}
+#viewer-staff #j-return-home[hidden]{display:none!important}
 </style>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="../icons/icon-192.png">
@@ -330,7 +333,7 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
       
       
       <button type="button" data-staff-tab="pagos" aria-selected="false">Mis pagos</button>
-    </nav><div class="staff-more-tools"><button type="button" data-staff-tab="traslados">Traslados</button><button type="button" data-staff-tab="asistencia">Asistencia detallada</button><button type="button" id="j-reminders-show" class="staff-extra-button">Recordatorios</button></div></details>
+    </nav><div class="staff-more-tools"><button type="button" data-staff-tab="traslados">Traslados</button><button type="button" data-staff-tab="asistencia">Asistencia detallada</button><button type="button" id="j-reminders-show" class="staff-extra-button">Recordatorios</button></div></details><button type="button" id="j-return-home" data-staff-tab="inicio" hidden>← Volver a Mi día</button>
     <section class="staff-tab-panel" data-staff-panel="inicio" aria-label="Resumen de mi jornada">
       <div class="staff-dashboard">
         <section class="panel"><div class="staff-section-heading"><div><h3>Mi jornada</h3><p>Tu lugar, horario y entrada/salida aquí mismo.</p></div></div><div id="j-today"></div></section><div id="j-home-attendance"></div><section class="panel staff-my-pay"><div class="staff-section-heading"><div><h3>Mi pago de esta jornada</h3><p>Importe previsto o aprobado exclusivamente para ti.</p></div><button type="button" class="staff-subtle" data-staff-tab="pagos">Ver detalle</button></div><div id="j-home-pay"></div></section>
