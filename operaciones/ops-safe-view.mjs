@@ -11,10 +11,32 @@ const staffEventFields = [
 ];
 const staffSettings = ["dailyLimit","weeklyLimit","prepDefault","afterDefault","notificationMinutes","lateGraceMinutes","earlyGraceMinutes"];
 
+/**
+ * Previsión visible únicamente en el documento personal privado de cada UID.
+ * Nunca añade tarifas de otras personas, cuentas bancarias ni montos de equipo.
+ * Sin tarifa propia configurada, el importe permanece sin definir (null).
+ */
+export function ownPlannedPayment(person,event){
+ if(["cancelado","borrador"].includes(event.status))return null;
+ const shift=(event.staff||[]).find(a=>a.personId===person.id);
+ if(!shift)return null;
+ const start=new Date(shift.start).getTime(),end=new Date(shift.end).getTime();
+ if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start)return null;
+ const hours=(end-start)/3600000;
+ const byHour=Number(person.hourRate),byDay=Number(person.dayRate);
+ const hasHour=Number.isFinite(byHour)&&byHour>0;
+ const hasDay=Number.isFinite(byDay)&&byDay>0;
+ const dayMode=String(event.workMode||"").startsWith("jornada");
+ if(dayMode&&hasDay)return {amount:Math.round(byDay*100)/100,basis:"jornada",label:"Estimado por jornada"};
+ if(hasHour)return {amount:Math.round(hours*byHour*100)/100,basis:"hora",label:"Estimado por horas programadas"};
+ if(hasDay)return {amount:Math.round(byDay*100)/100,basis:"jornada",label:"Estimado por jornada"};
+ return null;
+}
 export function projectStaffView(person, board) {
   const mine = (board.events || []).filter(e => (e.staff || []).some(a => a.personId === person.id))
     .map(e => ({
       ...field(e, staffEventFields),
+      ownPay: ownPlannedPayment(person,e),
       vehicles: (e.vehicles || []).slice(0, 50),
       staff: (e.staff || []).filter(a => a.personId === person.id).map(a => field(a, ["personId","start","end"]))
     }));
