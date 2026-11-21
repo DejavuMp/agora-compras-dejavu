@@ -463,10 +463,12 @@ async function sendHoursFromMyDay(eventId,declaredBreakMins=0){
  if(summary.netMinutes<=0){status("No se pueden enviar cero horas netas. Contacta a coordinación.","error");return}
  const id="j_"+user.uid+"_"+eventId,ref=doc(fs,"agora_ops_logs",id);
  await action(async()=>{
-   const snap=await getDocFromServer(ref);
+   // El listener de pagos ya contiene únicamente registros del UID autenticado.
+   // Leer con getDocFromServer una ruta inexistente puede ser denegado por las reglas.
+   const existing=[...logs.values()].find(l=>l.id===id&&l.ownerUid===user.uid);
    let value;
-   if(snap.exists()){
-     value=snap.data();
+   if(existing){
+     value=existing;
      if(value.ownerUid!==user.uid||value.personId!==personId||value.eventId!==eventId)throw Error("El reporte existe con otra identidad. Consulta a coordinación.");
      if(value.paymentStatus!=="capturado")throw Error("Esta jornada ya fue enviada o requiere una corrección. Revisa Mis pagos.");
      if("approvedAmount" in value||"approvedHours" in value)throw Error("Este reporte ya contiene un importe autorizado y debe revisarlo coordinación.");
