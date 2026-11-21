@@ -388,6 +388,7 @@ function handleSubmit(form){if(form.id==='event-form'){
   };
   const venueName=read('ev-site-name'),venueAddress=read('ev-site-address');
   const site=venueName?lookup('sites',venueName,{address:venueAddress,client:read('ev-project'),city:'',notes:''}):null;
+  const actorName=window.AGORA_OPS_BRIDGE?.coordinatorLabel||'';
   const staff=[],ids=new Set();
   for(const row of form.querySelectorAll('.direct-person-row')){
     const name=row.querySelector('[data-person-name]').value.trim();
@@ -404,7 +405,10 @@ function handleSubmit(form){if(form.id==='event-form'){
     if(!validPeriod(st,ed)||dateMs(st)<dateMs(start)-86400000||dateMs(ed)>dateMs(end)+86400000){
       toast('Corrige las horas de entrada y salida del personal.','error');return;
     }
-    staff.push({personId:person.id,start:st,end:ed});ids.add(person.id);
+    const oldShift=(prior?.staff||[]).find(a=>a.personId===person.id);
+    staff.push({personId:person.id,start:st,end:ed,
+      ...(oldShift?.assignedByName?{assignedByName:oldShift.assignedByName}:!oldShift&&actorName?{assignedByName:actorName}:{})});
+    ids.add(person.id);
   }
   const vehicles=[],vids=new Set();
   for(const row of form.querySelectorAll('.direct-vehicle-row')){
@@ -423,7 +427,9 @@ function handleSubmit(form){if(form.id==='event-form'){
   if(!Number.isFinite(travelMin)||travelMin<0||travelMin>720||!Number.isFinite(routeBufferMin)||routeBufferMin<0||routeBufferMin>180){
     toast('Revisa minutos de traslado y margen.','error');return;
   }
-  const original={...prior,id:form.dataset.id||uid(),title,project:read('ev-project'),campaign:read('ev-campaign'),
+  const original={...prior,id:form.dataset.id||uid(),title,
+    ...(!prior?.id&&actorName?{assignedByName:actorName}:{}),
+    project:read('ev-project'),campaign:read('ev-campaign'),
     siteId:site?.id||'',venueName,venueAddress,location:read('ev-location'),origin:read('ev-origin'),stops:read('ev-stops'),
     travelMin,routeBufferMin,staffBufferMin:document.getElementById('ev-auto')?.checked?30:0,
     driverId:driver?.id||'',type:read('ev-type'),workMode:read('ev-work-mode'),status,start,end,
