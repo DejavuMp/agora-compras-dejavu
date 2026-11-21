@@ -1,5 +1,5 @@
 /* ÁGORA Operaciones PWA. Solo shell estático, jamás Firestore, GPS, selfies, datos o credenciales. */
-const CACHE="agora-ops-shell-v9-20261121";
+const CACHE="agora-ops-shell-v10-20261121";
 const FILES=[
   "./visor.html","./index.html","./visor-live.js","./jornadas-live.js",
   "./jornadas-logic.mjs","./staff-dashboard.mjs","./ops-timekeeping.mjs","./ops-receipt.mjs","./ops-breaks.mjs","./ops-reminders.mjs","./ops-monthly-receipt.mjs","./ops-route-estimate.mjs","./ops-safe-view.mjs",
