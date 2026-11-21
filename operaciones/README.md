@@ -1,4 +1,13 @@
 
+## Inicio simplificado (noviembre 2026)
+
+El portal **Mi jornada** del staff se abre en la misma URL protegida del visor. Su pantalla principal agrupa actividad, sede, horario, botón de entrada/salida (incluyendo consentimiento GPS), y **Mi pago pendiente de recibir**, sin obligar a cambiar de apartado. Solo aparecen tres secciones principales: Mi día, Mi calendario y Mis pagos. Traslados y asistencia detallada siguen accesibles en Más opciones. Coordinación muestra cuatro apartados principales: Hoy, Calendario, Personal y Pagos; los módulos anteriores están conservados bajo Más opciones.
+
+**Pago propio:** al publicar/proyectar una jornada, el documento privado `agora_ops_staff/{uid}` incluye exclusivamente la previsión de ese integrante. Se calcula con su tarifa horaria o de jornada y horas programadas, según modalidad. No se transmite su tarifa al staff, las tarifas ajenas ni la nómina general. En pantalla se distinguen estimado, autorizado, programado y pagado. El saldo pendiente excluye los registros marcados como pagados. Si no hay tarifa cargada se muestra «Por definir», nunca se inventa un importe. Los importes autorizados proceden de registros privados `agora_ops_logs` y tienen prioridad sobre estimaciones.
+
+Al iniciar sesión en coordinación, el programa puede refrescar las fichas privadas de quienes ya están vinculados, revisando la revisión de la agenda dentro de una transacción y escribiendo solo si el estimado individual cambió. No altera horas, acuerdos ni estados de pago. La sincronización real requiere roles y reglas Firestore de producción correctas; la publicación de la interfaz no confirma por sí sola el funcionamiento de cuentas reales.
+
+
 ## Ficha de Jornada y reutilización de personal
 
 En `operaciones/index.html` y en la demostración local `operaciones/demo.html`, el panel **Por día** incluye el botón **Vista de jornada**. El cronograma también abre esta ficha para consulta. La pantalla privada de coordinación ofrece:
