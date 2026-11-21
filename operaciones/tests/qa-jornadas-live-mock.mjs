@@ -73,6 +73,7 @@ try{
   assert.ok((await page.locator("#j-home-pay").innerText()).includes("Estimado"),"Estimado no se confunde con autorizado");
   assert.ok(await page.locator("#j-home-pay").isVisible());
 
+  await page.locator('.staff-shortcuts summary').click();
   await page.locator('#staff-tabs [data-staff-tab="cronograma"]').click();
   await page.locator("#j-period").selectOption("14");
   await page.locator("#j-period").selectOption("30");
@@ -84,7 +85,6 @@ try{
   await page.locator("#j-download-calendar").click();
   const calendarFile=await calendar;
   assert.ok(calendarFile.suggestedFilename().endsWith(".ics"),"El staff puede exportar sus jornadas");
-  await page.locator('.staff-more-tools summary').click();
   await page.locator('.staff-more-tools [data-staff-tab="asistencia"]').click();
   assert.equal(new URL(page.url()).pathname,"/operaciones/visor.html","El staff permanece dentro del visor");
   assert.ok(await page.locator("#viewer-agenda").isHidden(),"Sin acceso a agenda administrativa");
