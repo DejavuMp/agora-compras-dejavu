@@ -7,7 +7,7 @@ const field = (object, allowed) => Object.fromEntries(allowed.filter(k => object
 const staffEventFields = [
   "id","seriesId","dayCount","dayIndex","title","project","campaign",
   "siteId","venueName","venueAddress","location","origin","stops",
-  "type","workMode","status","start","end","before","after","travelMin","routeBufferMin","notes"
+  "type","workMode","status","start","end","before","after","travelMin","routeBufferMin","notes","assignedByName"
 ];
 const staffSettings = ["dailyLimit","weeklyLimit","prepDefault","afterDefault","notificationMinutes","lateGraceMinutes","earlyGraceMinutes"];
 
@@ -38,7 +38,7 @@ export function projectStaffView(person, board) {
       ...field(e, staffEventFields),
       ownPay: ownPlannedPayment(person,e),
       vehicles: (e.vehicles || []).slice(0, 50),
-      staff: (e.staff || []).filter(a => a.personId === person.id).map(a => field(a, ["personId","start","end"]))
+      staff: (e.staff || []).filter(a => a.personId === person.id).map(a => field(a, ["personId","start","end","assignedByName"]))
     }));
   const units = new Set(mine.flatMap(e => e.vehicles || []));
   const siteIds = new Set(mine.map(e => e.siteId).filter(Boolean));
