@@ -224,6 +224,26 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
 #viewer-staff .staff-month-report label{font-size:12px;font-weight:700;min-width:180px}
 #viewer-staff .staff-month-report input{font:inherit;width:100%;margin-top:5px;border:1px solid #ccc;border-radius:8px;padding:9px;background:#fff}
 #viewer-staff #j-print-month{background:#222729;color:white;border:1px solid #222729;font-size:12px;min-height:40px}
+
+/* Acceso 2026: los tres datos esenciales del staff en una única pantalla. */
+#viewer-staff .staff-metrics{display:none}
+#viewer-staff .staff-reminders{margin-top:12px;padding:10px 14px}
+#viewer-staff .staff-tabs{gap:6px}
+#viewer-staff .staff-more-tools{border:1px solid #dedcd5;border-radius:10px;background:#fbfaf7;margin:10px 0 15px;padding:6px 12px;font-size:11px}
+#viewer-staff .staff-more-tools summary{cursor:pointer;font-weight:700;color:#756341;padding:6px}
+#viewer-staff .staff-more-tools>div{display:flex;flex-wrap:wrap;gap:8px;padding:6px 0}
+#viewer-staff .staff-more-tools button{background:#fff;border:1px solid #ddd;border-radius:7px;padding:8px 10px;cursor:pointer}
+#viewer-staff .staff-my-pay{margin-top:16px}
+#viewer-staff .own-pay-total{font-size:24px;font-weight:800;color:#202326;margin-bottom:4px}
+#viewer-staff .own-pay-sub{font-size:11px;line-height:1.6;color:#687177}
+#viewer-staff .own-pay-line{padding:10px 0;display:flex;justify-content:space-between;gap:12px;border-top:1px solid #eeeeea;font-size:12px}
+#viewer-staff .own-pay-line small{display:block;color:#85888b;font-size:10px;margin-top:3px}
+#viewer-staff .own-pay-line strong{text-align:right;white-space:nowrap}
+#viewer-staff .own-pay-pending{color:#9d773e}
+#viewer-staff #j-home-attendance>.panel{margin:15px 0}
+#viewer-staff [data-staff-panel="inicio"] .staff-dashboard{grid-template-columns:1fr}
+#viewer-staff [data-staff-panel="inicio"] .staff-dashboard>.panel:nth-child(2){display:none}
+@media(max-width:680px){#viewer-staff .staff-my-pay{margin-top:10px}#viewer-staff .own-pay-total{font-size:22px}}
 </style>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="../icons/icon-192.png">
@@ -270,15 +290,16 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
       <button type="button" id="j-reminders-enable">Activar avisos</button>
     </div><div id="j-summary" class="staff-metrics" aria-label="Resumen personal de actividades"></div>
     <nav id="staff-tabs" class="staff-tabs" aria-label="Secciones de Mis jornadas">
-      <button type="button" data-staff-tab="inicio" aria-selected="true" class="active">Inicio</button>
-      <button type="button" data-staff-tab="cronograma" aria-selected="false">Cronograma</button>
-      <button type="button" data-staff-tab="asistencia" aria-selected="false">Asistencia</button>
-      <button type="button" data-staff-tab="traslados" aria-selected="false">Traslados</button>
-      <button type="button" data-staff-tab="pagos" aria-selected="false">Comprobantes</button>
+      <button type="button" data-staff-tab="inicio" aria-selected="true" class="active">Mi día</button>
+      <button type="button" data-staff-tab="cronograma" aria-selected="false">Mi calendario</button>
+      
+      
+      <button type="button" data-staff-tab="pagos" aria-selected="false">Mis pagos</button>
     </nav>
+    <details class="staff-more-tools"><summary>Más opciones: traslados y asistencia detallada</summary><div><button type="button" data-staff-tab="traslados">Traslados</button><button type="button" data-staff-tab="asistencia">Ver marcajes completos</button></div></details>
     <section class="staff-tab-panel" data-staff-panel="inicio" aria-label="Resumen de mi jornada">
       <div class="staff-dashboard">
-        <section class="panel"><div class="staff-section-heading"><div><h3>Mi próxima jornada</h3><p>Consulta tu turno y accede al marcaje en un toque.</p></div></div><div id="j-today"></div></section>
+        <section class="panel"><div class="staff-section-heading"><div><h3>Mi jornada</h3><p>Tu lugar, horario y entrada/salida aquí mismo.</p></div></div><div id="j-today"></div></section><div id="j-home-attendance"></div><section class="panel staff-my-pay"><div class="staff-section-heading"><div><h3>¿Cuánto voy a cobrar?</h3><p>Solo tus jornadas y tus importes, sin información de otros integrantes.</p></div><button type="button" class="staff-subtle" data-staff-tab="pagos">Ver detalle</button></div><div id="j-home-pay"></div></section>
         <section class="panel"><div class="staff-section-heading"><div><h3>Enseguida</h3><p>Actividades asignadas para los próximos días.</p></div><button type="button" class="staff-subtle" data-staff-tab="cronograma">Ver todo el cronograma</button></div><div id="j-upcoming"></div></section>
       </div>
       <div class="staff-hint">Tus datos se actualizan desde Firebase. Solo tú y coordinación pueden consultar tus registros de asistencia y pagos.</div>
@@ -323,7 +344,7 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
     </section>
     <section class="staff-tab-panel" data-staff-panel="pagos" hidden aria-label="Mis comprobantes">
       <section class="panel">
-        <div class="staff-section-heading"><div><h3>Mis comprobantes de trabajo</h3><p>Consulta tus horas, descansos declarados y tiempo extraordinario pendiente de revisión.</p></div></div>
+        <div class="staff-section-heading"><div><h3>Mis pagos</h3><p>Cuánto tienes previsto cobrar, qué está aprobado y cuándo se programó.</p></div></div>
         <div class="staff-hint">Después de terminar tu actividad podrás declarar los minutos de descanso y crear un comprobante de trabajo. La entrada y salida provienen del registro de Firebase. El tiempo excedente se señala para revisión, no equivale a pago autorizado. El expediente bancario y la herramienta de pagos se administrarán por separado.</div>
         <div class="staff-pay-summary" id="j-pay-summary"></div>
         <div class="staff-month-report">
