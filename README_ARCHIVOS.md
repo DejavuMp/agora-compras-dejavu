@@ -107,3 +107,32 @@ Si un expediente tiene estado **Revocado**, ÁGORA ahora muestra:
 4. Prueba: carpeta privada creada, correo destinatario puede abrir la foto, tercero no autorizado no puede, expediente guardado y acuse existente sin cambios. Comprueba también editar el expediente, la caducidad del token y reintentar después de desconectarse.
 
 > Importante: la API solo se puede verificar de extremo a extremo con una cuenta real autorizada. Las pruebas automatizadas usan respuestas simuladas de Google Drive y no tocan Firebase de producción.
+
+
+## Correo Gmail con fotografías reales incrustadas · noviembre 2026
+
+ÁGORA conserva el flujo de correo con enlaces y agrega **Enviar por Gmail con fotografías**. Esta opción inserta copias privadas de imágenes de Drive en el correo con formato MIME multipart/related, Content-ID (CID), sin hacer públicos sus enlaces. Los originales permanecen en Drive y los registros/acuses permanecen en Firestore.
+
+### Cómo funciona
+1. El administrador o coordinador abre un expediente activo y selecciona **Vista previa del correo**.
+2. Pulsa **Mostrar fotografías reales** y autoriza Google Drive cuando se solicite. La vista previa muestra las fotografías privadas en el diseño institucional.
+3. ÁGORA comprueba el acceso a **todas** las imágenes, máximo 14 imágenes, 4 MB cada una y 9 MB en total. Si alguna no está accesible, bloquea el envío con fotos, muestra el error y mantiene disponible el método por enlaces.
+4. El usuario revisa el destinatario, pulsa **Enviar por Gmail con fotografías** y confirma. Google solicita permiso gmail.send de esa misma cuenta. ÁGORA prepara el HTML con imágenes CID y usa Gmail API para enviar. No lee el buzón.
+5. Solo indica envío realizado si Gmail devuelve un ID de mensaje. Si hay fallo o respuesta ambigua, indica revisar la carpeta Enviados antes de reintentar.
+
+**Privacidad:** recibir una foto incrustada equivale a recibir una copia: el destinatario podrá conservarla aunque se revoquen posteriormente los permisos de Drive. Por eso la acción requiere una segunda confirmación explícita. Nunca se envía nada al abrir vistas, conectar Drive ni copiar contenido.
+
+Los botones **Copiar correo (enlaces)** y **Abrir Gmail (enlaces)** permanecen disponibles, pero no incrustan imágenes. La confirmación de recibido, historial, tokens públicos y registros antiguos no se modifican.
+
+### Activación en Google Cloud (sin contratar Firebase Blaze)
+
+- Google Drive API ya puede estar habilitada; se requiere también habilitar **Gmail API** en el proyecto agora-dejavu-38b8c desde https://console.cloud.google.com/apis/library/gmail.googleapis.com?project=agora-dejavu-38b8c
+- En Google Auth Platform hay que permitir el permiso OAuth https://www.googleapis.com/auth/gmail.send y conservar https://www.googleapis.com/auth/drive.file. gmail.send autoriza enviar mensajes y no leer la bandeja.
+- Según la configuración de OAuth, podrían ser necesarios usuarios de prueba, configuración del consentimiento, verificación de Google o autorización del administrador Google Workspace. No se pueden omitir estas medidas ni garantizar que una cuenta externa pueda autorizarlo.
+- Probar primero el envío con un expediente de prueba al mismo correo del usuario autorizado. Confirmar que el mensaje llegó a Gmail con fotografías visibles, sin romper los botones de acuse y Drive.
+
+### Restricciones
+
+- Solo inserta imágenes individuales Drive JPG/PNG/WebP accesibles mediante el permiso drive.file de quien las cargó. Los enlaces de terceros sin permisos OAuth no se descargan ni se hacen públicos.
+- Los tokens OAuth y las imágenes descargadas permanecen únicamente en la memoria del navegador. Al cerrar la vista se liberan las URL temporales. No se almacenan nuevos secretos en GitHub o Firestore.
+- El código tiene pruebas automatizadas simuladas de recuperación de imágenes, estructura MIME, envío explícito y errores de permisos. La prueba real con Gmail sigue siendo obligatoria antes de asumir que funciona para proveedores.
