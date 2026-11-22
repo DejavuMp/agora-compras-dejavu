@@ -1,0 +1,30 @@
+name: "ÁGORA Archivos · fotografías Drive sin Blaze"
+on:
+  pull_request:
+    paths:
+      - "archivos/**"
+      - ".github/workflows/agora-archivos-drive-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "archivos/**"
+      - ".github/workflows/agora-archivos-drive-tests.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  drive-tests:
+    name: "Pruebas de fotos, permisos y regresión"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validar sintaxis
+        run: |
+          node --check archivos/drive-upload.js
+          node --check archivos/app.js
+          node --check archivos/recibir.js
+      - name: Probar Drive simulado sin consumir archivos reales
+        run: node --test archivos/tests/drive-upload.test.mjs

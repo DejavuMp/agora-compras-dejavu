@@ -1,15 +1,12 @@
 import {initializeApp,getApps} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js';
-import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
+import {getAuth,GoogleAuthProvider,signInWithPopup,reauthenticateWithPopup,signOut,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import {getFirestore,doc,getDoc,collection,collectionGroup,onSnapshot,serverTimestamp,Timestamp,setDoc,runTransaction} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
-import {getStorage,ref,uploadBytesResumable,getDownloadURL} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
+import {DRIVE_SCOPE,uploadDriveImages} from './drive-upload.js';
 import {galleryHtml,imageLinkInfo,preferredImageUrl} from './image-preview.js';
 
 // Usa el proyecto Firebase existente de ÁGORA Pedidos. Estas son claves de cliente públicas.
 const config={apiKey:'AIzaSyDPh-AFdST9Ax_Eoho-wT0shlWlCHad6Zg',authDomain:'agora-dejavu-38b8c.firebaseapp.com',projectId:'agora-dejavu-38b8c',storageBucket:'agora-dejavu-38b8c.firebasestorage.app',messagingSenderId:'775680965171',appId:'1:775680965171:web:274557c8c9c25ff304c146'};
-const app=getApps()[0]||initializeApp(config),auth=getAuth(app),db=getFirestore(app),storage=getStorage(app);
-// Limita los reintentos cuando Firebase Storage no está disponible o requiere facturación.
-storage.maxUploadRetryTime=18000;
-storage.maxOperationRetryTime=15000;
+const app=getApps()[0]||initializeApp(config),auth=getAuth(app),db=getFirestore(app);
 const $=id=>document.getElementById(id);
 window.__AGORA_FILES_BOOT?.mark('module-ready');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -190,64 +187,59 @@ function updateUploadStatus(label,progress=null,error=false){
   uploadMeter.hidden=false;
   uploadMeter.value=Math.max(0,Math.min(100,Math.round(progress)));
 }
-function explainStorageError(error){
-  const code=String(error?.code||'');
-  if(['storage/quota-exceeded','storage/unauthorized','storage/bucket-not-found','storage/project-not-found'].includes(code))
-    return 'Firebase Storage rechazó las imágenes ('+code+'). Comprueba que el proyecto tenga el plan Blaze, un bucket activo y las reglas de Storage publicadas. Los enlaces de Drive siguen disponibles.';
-  if(code==='storage/unauthenticated')return 'La sesión expiró mientras subías imágenes. Vuelve a iniciar sesión y prueba de nuevo.';
-  if(code==='storage/retry-limit-exceeded')return 'Firebase Storage no respondió. Comprueba que Storage esté habilitado y que tu conexión funcione.';
-  if(code==='storage/canceled')return 'Se canceló la subida de imágenes.';
-  return 'No se pudo subir una imagen: '+String(error?.message||error);
+let driveAccessToken='',driveTokenExpiry=0,driveOwnerUid='';
+function driveConnected(){return !!(driveAccessToken&&driveOwnerUid===auth.currentUser?.uid&&Date.now()<driveTokenExpiry);}
+function updateDriveConnectionStatus(){
+ const label=$('driveConnectionStatus');
+ if(label)label.textContent=driveConnected()?'● Google Drive conectado · permiso temporal':'Drive sin conectar · obligatorio para subir fotografías';
+ const button=$('connectDriveButton');
+ if(button)button.textContent=driveConnected()?'↻ Renovar acceso a Drive':'Conectar Google Drive';
 }
-function uploadBlob(blob,handle,section,onProgress){
-  return new Promise((resolve,reject)=>{
-    const task=uploadBytesResumable(handle,blob,{contentType:'image/jpeg',customMetadata:{section}});
-    task.on('state_changed',
-      snap=>onProgress(snap.bytesTransferred,Math.max(1,snap.totalBytes)),
-      reject,
-      resolve);
-  });
+async function connectDrive(){
+ try{
+  authRequired();
+  const provider=new GoogleAuthProvider();
+  provider.addScope(DRIVE_SCOPE);
+  const result=await reauthenticateWithPopup(auth.currentUser,provider);
+  if(result.user.uid!==user.uid)throw Error('La cuenta de Drive debe ser la misma cuenta autorizada de ÁGORA.');
+  const credential=GoogleAuthProvider.credentialFromResult(result);
+  if(!credential?.accessToken)throw Error('Google no entregó el permiso para Drive.');
+  driveAccessToken=credential.accessToken;
+  driveOwnerUid=result.user.uid;
+  driveTokenExpiry=Date.now()+45*60*1000;
+  updateDriveConnectionStatus();
+  notify('Drive conectado. Las imágenes se compartirán solo con el destinatario del expediente.');
+ }catch(e){const message='No se pudo conectar Drive: '+(e?.message||e);$('driveConnectionStatus').textContent=message;notify(message,true);}
 }
-async function uploadAllImages(samples,folders,id,version){
-  const jobs=[...samples.map((item,i)=>({item,group:'samples',section:'muestra',i})),
-              ...folders.map((item,i)=>({item,group:'folders',section:'carpeta',i}))];
-  const result={samples:new Array(samples.length),folders:new Array(folders.length)};
-  if(!jobs.length)return result;
-  const uploaded=new Array(jobs.length).fill(0),total=new Array(jobs.length).fill(0);
-  let completed=0,next=0,failed=false;
-  const refresh=()=>{
-    let partial=0;
-    for(let j=0;j<jobs.length;j++)partial+=total[j]?Math.min(1,uploaded[j]/total[j]):0;
-    const percent=Math.min(99,(partial/jobs.length)*100);
-    updateUploadStatus('Subiendo imágenes: '+completed+' de '+jobs.length+' completadas · '+Math.round(percent)+'%',percent);
-    $('saveButton').textContent='Subiendo '+completed+'/'+jobs.length+'…';
-  };
-  updateUploadStatus('Preparando '+jobs.length+' imágenes optimizadas…',0);
-  async function worker(){
-    while(next<jobs.length&&!failed){
-      const index=next++,job=jobs[index];
-      try{
-        const blob=await resize(job.item.file);
-        total[index]=blob.size;
-        refresh();
-        const path='agora-file-previews/'+id+'/v'+version+'/'+job.section+'-'+crypto.randomUUID()+'.jpg';
-        const handle=ref(storage,path);
-        await uploadBlob(blob,handle,job.section,(bytes,full)=>{
-          uploaded[index]=bytes;total[index]=full;refresh();
-        });
-        const url=await getDownloadURL(handle);
-        result[job.group][job.i]=url;
-        uploaded[index]=total[index];
-        completed++;refresh();
-      }catch(error){failed=true;throw error;}
-    }
+function currentDriveToken(){
+ if(!driveConnected()){updateDriveConnectionStatus();throw Error('Para adjuntar fotografías, primero pulsa «Conectar Google Drive». No se requiere Firebase Blaze.');}
+ return driveAccessToken;
+}
+async function uploadAllImages(samples,folders,id,version,project,recipientEmail){
+ const pending=[...samples.map(item=>({item,group:'samples',section:'muestra'})),
+                ...folders.map(item=>({item,group:'folders',section:'carpeta'}))];
+ if(!pending.length)return;
+ const token=currentDriveToken();
+ updateUploadStatus('Optimizando fotografías…',0);
+ const jobs=[];
+ for(const job of pending)jobs.push({...job,blob:await resize(job.item.file)});
+ const folder=await uploadDriveImages({
+  accessToken:token,project,deliveryId:id,version,recipientEmail,
+  uploaderEmail:user.email||'',items:jobs,
+  onStatus:(label,progress)=>{updateUploadStatus(label,progress);$('saveButton').textContent=label;},
+  onSaved:({item,group,url})=>{
+   // Cada enlace exitoso permanece en el formulario incluso si después falla Firestore.
+   const field=$(group==='samples'?'sampleUrls':'folderUrls');
+   field.value=(field.value.trim()?field.value.trim()+'\n':'')+url;
+   const selected=group==='samples'?sampleSelected:folderSelected;
+   const at=selected.indexOf(item);
+   if(at!==-1){URL.revokeObjectURL(item.preview);selected.splice(at,1);}
+   imagesToDisplay(selected,group==='samples'?'samplePreview':'folderPreview');
+   updateLinkPreviews();
   }
-  const settled=await Promise.allSettled(
-    Array.from({length:Math.min(3,jobs.length)},()=>worker()));
-  const error=settled.find(x=>x.status==='rejected');
-  if(error)throw Error(explainStorageError(error.reason));
-  updateUploadStatus('Imágenes listas: '+jobs.length+' de '+jobs.length+'. Guardando expediente…',100);
-  return result;
+ });
+ updateUploadStatus('Fotos guardadas en Drive. Publicando expediente…',100);
+ return folder;
 }
 function normalizeDrive(raw){const uri=safeHttps(String(raw||'').trim());if(!uri)throw Error('Agrega un enlace válido de Drive con https://');const host=new URL(uri).hostname;if(!['drive.google.com','docs.google.com'].includes(host))throw Error('El enlace debe ser de Google Drive o Google Docs.');return uri;}
 
@@ -260,14 +252,18 @@ async function saveDelivery(event){
   const fd=new FormData($('deliveryForm')),read=k=>String(fd.get(k)||'').trim();
   const recipientEmail=read('recipientEmail').toLowerCase();
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail))throw Error('Indica un correo válido.');
-  const validUntil=parseValidUntil(read('validUntil')),driveUrl=normalizeDrive(read('driveUrl'));
+  const validUntil=parseValidUntil(read('validUntil'));
+   let driveUrl=read('driveUrl')?normalizeDrive(read('driveUrl')):'';
+   if(!read('project')||!read('title')||!read('recipientName'))throw Error('Completa los campos obligatorios.');
+   if(!driveUrl&&!sampleSelected.length&&!folderSelected.length)throw Error('Agrega un enlace original de Drive o adjunta fotografías para crear una carpeta automáticamente.');
   const id=editRecord?.id||secret(),isEdit=!!editRecord&&editorMode==='edit';
   const version=isEdit?editRecord.version:(editRecord?.version||0)+1;
   let samples=readImageUrls('sampleUrls',8),folders=readImageUrls('folderUrls',6);
   if(samples.length+sampleSelected.length>8||folders.length+folderSelected.length>6)throw Error('Se superó el límite de imágenes por sección.');
   if(sampleSelected.length||folderSelected.length){
-   const prepared=await uploadAllImages(sampleSelected,folderSelected,id,version);
-   samples=[...samples,...prepared.samples];folders=[...folders,...prepared.folders];
+   const saved=await uploadAllImages(sampleSelected,folderSelected,id,version,read('project'),recipientEmail);
+   samples=readImageUrls('sampleUrls',8);folders=readImageUrls('folderUrls',6);
+   if(!driveUrl&&saved?.folderUrl){driveUrl=saved.folderUrl;$('deliveryForm').elements.driveUrl.value=driveUrl;}
   }
   const payload={project:read('project'),category:read('category'),title:read('title'),
    recipientName:read('recipientName'),recipientEmail,driveUrl,validUntil,
@@ -392,7 +388,8 @@ window.addEventListener('online',()=>{if(auth.currentUser&&retrySyncButton.hidde
 onAuthStateChanged(auth,async person=>{
   ++connectionSerial;
   stopListeners();
-  user=person;role=null;closeModals();
+  if(user?.uid!==person?.uid){driveAccessToken='';driveTokenExpiry=0;driveOwnerUid='';}
+  user=person;role=null;closeModals();updateDriveConnectionStatus();
   $('authButton').textContent=person?'Cerrar sesión':'Iniciar sesión';
   $('userLabel').textContent=person?.email||'Sin sesión';
   $('newButton').disabled=true;$('menuNew').disabled=true;
@@ -401,6 +398,7 @@ onAuthStateChanged(auth,async person=>{
   if(!person){$('syncState').textContent='Sin sesión';retrySyncButton.hidden=true;return;}
   await retryConnection();
 });
+$('connectDriveButton').addEventListener('click',connectDrive);
 $('authButton').addEventListener('click',async()=>{try{if(user)await signOut(auth);else await signInWithPopup(auth,new GoogleAuthProvider());}catch(e){notify('Error de autenticación: '+e.message,true);}});
 $('deliveryForm').addEventListener('submit',saveDelivery);$('sampleFiles').addEventListener('change',e=>addFiles(e.target,sampleSelected,'samplePreview',8));$('folderFiles').addEventListener('change',e=>addFiles(e.target,folderSelected,'folderPreview',6));$('search').addEventListener('input',renderList);$('filter').addEventListener('change',renderList);
 $('newButton').addEventListener('click',()=>openEditor());$('menuNew').addEventListener('click',()=>openEditor());$('menuHistory').addEventListener('click',()=>{$('search').focus();$('sidebar').classList.remove('mobile-open');});
@@ -408,6 +406,7 @@ for(const el of document.querySelectorAll('[data-close]'))el.addEventListener('c
 for(const name of ['editorOverlay','detailOverlay','emailOverlay'])$(name).addEventListener('click',e=>{if(e.target===$(name))closeModals();});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModals();});
 $('toggleSide').addEventListener('click',()=>{const side=$('sidebar');if(window.innerWidth<=760)side.classList.toggle('mobile-open');else side.classList.toggle('collapsed');});document.addEventListener('click',e=>{if(window.innerWidth<=760&&!e.target.closest('.sidebar,#toggleSide'))$('sidebar').classList.remove('mobile-open');});
 setupLinkPreviews();
+updateDriveConnectionStatus();
 
 $('copyEmailPreview').addEventListener('click',()=>{if(emailRecord)copyEmailEvidence(emailRecord);});
 $('openGmailPreview').addEventListener('click',()=>{if(emailRecord)prepareEmail(emailRecord);});
