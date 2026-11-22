@@ -4,7 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#141310"><title>ÁGORA · Archivos de producción</title>
   <link rel="icon" href="../icons/icon-192.png">
-  <link rel="stylesheet" href="./style.css?v=archivos-app-6-logo-correo">
+  <link rel="stylesheet" href="./style.css?v=archivos-app-7-fotos-drive">
 <link rel="manifest" href="./manifest.webmanifest"><script>if("serviceWorker" in navigator){navigator.serviceWorker.register("./sw.js",{scope:"./"}).catch(()=>{});}</script><script src="./brand.js?v=identidad-3" defer></script></head>
 <body data-view="admin">
 <div class="app-shell">
@@ -47,9 +47,16 @@
    <div class="form-grid"><label>Fecha de vigencia <input name="validUntil" type="date" required></label><label>Enlace a carpeta / archivo de Drive <input name="driveUrl" type="url" placeholder="https://drive.google.com/drive/folders/..." required></label></div>
    <label>Indicaciones para aplicar los artes en las muestras <textarea name="notes" rows="3" maxlength="3000" placeholder="Tamaño, ubicación, impresión, colores, diseño, instrucciones de fabricación y comentarios."></textarea></label>
    <div class="form-section-title">02 · Evidencia de los archivos compartidos</div>
+   <div class="notice" role="group" aria-label="Conexión con Google Drive">
+    <b>Fotografías directas a Google Drive · sin contratar Firebase Blaze</b>
+    <p>Antes de publicar con fotografías, conecta la misma cuenta de Google de ÁGORA. Se crea una carpeta por proyecto, expediente y versión en tu Drive, y se da acceso de lectura únicamente al destinatario indicado. No se publican imágenes para todo internet.</p>
+    <button type="button" class="btn btn-outline" id="connectDriveButton">Conectar Google Drive</button>
+    <span id="driveConnectionStatus" class="muted" role="status">Drive sin conectar</span>
+    <small>La autorización es temporal; quizá tengas que reconectar al volver a entrar. El resto de los expedientes sigue en Firestore.</small>
+   </div>
    <div class="form-grid"><div class="upload"><b>Vistas de artes / archivos de aplicación</b><small>Hasta 8 imágenes JPG, PNG o WEBP. Arte, mockup, plano o posición del diseño a imprimir.</small><input type="file" id="sampleFiles" accept="image/png,image/jpeg,image/webp" multiple><div id="samplePreview" class="preview-grid"></div><label class="mini-label">O pega el enlace de cada imagen de Drive, uno por línea<textarea id="sampleUrls" rows="3" placeholder="https://drive.google.com/file/d/ID/view"></textarea></label><small class="agora-url-help">Usa enlaces individuales a fotografías. No pegues aquí el enlace de una carpeta.</small></div><div class="upload"><b>Evidencia del envío de archivos</b><small>Hasta 6 capturas de la carpeta compartida, listado de archivos o pantalla del material enviado por Drive.</small><input type="file" id="folderFiles" accept="image/png,image/jpeg,image/webp" multiple><div id="folderPreview" class="preview-grid"></div><label class="mini-label">O pega los enlaces individuales de las capturas del Drive, uno por línea<textarea id="folderUrls" rows="3" placeholder="https://drive.google.com/file/d/ID/view"></textarea></label><small class="agora-url-help">Las imágenes se previsualizan automáticamente; el proveedor debe tener acceso a los archivos.</small></div></div>
    <div class="notice"><b>Fotografías por enlace:</b> usa un enlace individual por imagen, no una carpeta. En Drive, revisa <b>Compartir → Acceso general</b>: para mostrar la miniatura a cualquier visitante necesitas permitir acceso con el enlace; para artes confidenciales puedes dar acceso solamente al correo del proveedor, aunque la vista previa pública podría no mostrarse. En ambos casos el proveedor podrá abrir el original si tiene permiso.</div>
-   <div class="notice"><b>Evidencia documental:</b> la herramienta reduce las capturas antes de subirlas. Para subir archivos directamente, Firebase Storage debe estar habilitado y el proyecto en plan Blaze. Si utilizas Spark, puedes añadir enlaces HTTPS de imágenes o compartir el material desde Drive.</div>
+   <div class="notice"><b>Sin pago por Firebase Storage:</b> ÁGORA optimiza las imágenes antes de subirlas a <b>Google Drive</b>. Conserva los enlaces de Drive existentes. Para otros compañeros de Dejavú que necesiten ver las fotos, comparte las carpetas desde Drive con sus correos autorizados. Las miniaturas en el correo o vista pública podrían requerir iniciar sesión con la cuenta que recibió acceso. La cuenta que sube las fotografías es propietaria de sus carpetas.</div>
    <div class="notice"><b>El comprobante de recepción se genera cuando el destinatario confirma que tuvo acceso a los archivos.</b> Publicar el enlace no demuestra por sí solo que el correo fue enviado. <b>La publicación genera un enlace que no cambia.</b> Si se solicita una corrección, usa «Publicar nueva versión»: el destinatario verá la versión actual y se conservará el historial.</div>
    <div id="uploadProgress" class="upload-progress" role="status" aria-live="polite" hidden><div class="upload-progress-head"><b>Estado de carga</b><span id="uploadStatus">Preparando imágenes…</span></div><progress id="uploadMeter" max="100" value="0" aria-label="Porcentaje total de imágenes subidas"></progress></div>
    <div class="dialog-actions"><button class="btn btn-outline" type="button" data-close="editor">Cancelar</button><button class="btn btn-gold" type="submit" id="saveButton">Publicar envío</button></div>
@@ -86,7 +93,7 @@
   };
   const script=document.createElement('script');
   script.type='module';
-  script.src='./app.js?revision=archivos-app-6-logo-correo';
+  script.src='./app.js?revision=archivos-app-7-fotos-drive';
   script.addEventListener('error',()=>{
     state.textContent='No se pudo cargar el módulo';
     state.style.color='#9f3c2c';
