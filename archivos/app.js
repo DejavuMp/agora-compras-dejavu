@@ -2,7 +2,8 @@ import {initializeApp,getApps} from 'https://www.gstatic.com/firebasejs/13.1.0/f
 import {getAuth,GoogleAuthProvider,signInWithPopup,reauthenticateWithPopup,signOut,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import {getFirestore,doc,getDoc,collection,collectionGroup,onSnapshot,serverTimestamp,Timestamp,setDoc,runTransaction} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import {DRIVE_SCOPE,uploadDriveImages} from './drive-upload.js';
-import {galleryHtml,imageLinkInfo,preferredImageUrl} from './image-preview.js';
+import {galleryHtml,imageLinkInfo} from './image-preview.js';
+import {evidenceEmailHtml,evidenceEmailPlain} from './email-evidence.js';
 
 // Usa el proyecto Firebase existente de ÁGORA Pedidos. Estas son claves de cliente públicas.
 const config={apiKey:'AIzaSyDPh-AFdST9Ax_Eoho-wT0shlWlCHad6Zg',authDomain:'agora-dejavu-38b8c.firebaseapp.com',projectId:'agora-dejavu-38b8c',storageBucket:'agora-dejavu-38b8c.firebasestorage.app',messagingSenderId:'775680965171',appId:'1:775680965171:web:274557c8c9c25ff304c146'};
@@ -87,15 +88,6 @@ async function copyLink(url){try{await navigator.clipboard.writeText(url);notify
 
 function emailContent(r){
   const url=urlFor(r.id),confirmUrl=url+'&accion=recibido',drive=safeHttps(r.driveUrl);
-  const imageRows=(arr,heading)=>(arr||[]).length?
-    '<h3 style="font:700 14px Arial;color:#5a431f;margin:22px 0 10px">'+esc(heading)+'</h3>'+
-    '<div style="font-size:0">'+arr.slice(0,8).map((src,i)=>{
-      const photo=safeHttps(src);
-      if(!photo)return '';
-      return '<a href="'+esc(photo)+'" style="display:inline-block;vertical-align:top;width:130px;margin:0 9px 12px 0;text-decoration:none;color:#80622e;font:11px Arial">'+
-      '<img src="'+esc(preferredImageUrl(src)||src)+'" alt="Imagen de referencia '+(i+1)+'" width="128" style="width:128px;height:108px;object-fit:contain;border:1px solid #dfd5c5;background:#f7f5f1;display:block">'+
-      '<span style="display:block;margin-top:5px">Abrir imagen '+(i+1)+'</span></a>';
-    }).join('')+'</div>':'';
   const html='<div style="margin:auto;max-width:620px;background:#fff;font:14px/1.6 Arial,Helvetica,sans-serif;color:#29251f;border:1px solid #e4ddd1">'+
   '<div style="background:#181715;color:#e1c083;padding:22px 26px;border-bottom:3px solid #bd9656">'+
   '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%"><tr>'+
@@ -111,11 +103,13 @@ function emailContent(r){
   '<p style="margin:0 0 18px"><a href="'+esc(drive)+'" style="display:inline-block;padding:13px 22px;background:#24211c;color:#fff;border-radius:5px;text-decoration:none;font-weight:bold">↗ Abrir archivos en Drive</a></p>'+
   '<p style="font-size:12px;color:#756858">El primer botón abre el formulario de confirmación en ÁGORA; no registra una respuesta automáticamente.</p>'+
   '<p><b>Indicaciones de producción:</b> '+esc(r.notes||'Revisa las artes y confirma que recibiste los archivos.')+'</p>'+
-  imageRows(r.sampleImages,'Vistas de artes y aplicaciones')+imageRows(r.folderImages,'Evidencia de archivos compartidos')+
+  evidenceEmailHtml(r.sampleImages,'Vistas de artes y aplicaciones')+evidenceEmailHtml(r.folderImages,'Evidencia de archivos compartidos')+
   '<div style="border-top:1px solid #e9e1d4;margin-top:22px;padding-top:15px;font-size:12px;color:#73695d">Vigencia: '+esc(fmt(r.validUntil))+'. Si no puedes abrir los archivos o necesitas cambios, repórtalo desde el mismo expediente. <br>Dejavú Marketing · ÁGORA Archivos.</div>'+
   '</div></div>';
   const plain='ÁGORA · DEJAVÚ MARKETING\nEntrega de archivos: '+r.title+'\nProyecto: '+r.project+
     '\n\nConfirmar de recibido: '+confirmUrl+'\nAbrir archivos en Drive: '+drive+
+    evidenceEmailPlain(r.sampleImages,'Vistas de artes y aplicaciones')+
+    evidenceEmailPlain(r.folderImages,'Evidencia de archivos compartidos')+
     '\n\nIndicaciones: '+(r.notes||'Revisar los archivos')+'\nVigencia: '+fmt(r.validUntil);
   return {html,plain,confirmUrl,drive};
 }
@@ -139,14 +133,14 @@ async function copyEmailEvidence(r){
         'text/html':new Blob([html],{type:'text/html'}),
         'text/plain':new Blob([plain],{type:'text/plain'})
       })]);
-      notify('Correo visual copiado. Pégalo en Gmail y comprueba imágenes y botones antes de enviar.');
+      notify('Correo visual copiado. Pégalo en Gmail: incluye botones para abrir cada fotografía privada sin miniaturas rotas.');
     }else{
       await navigator.clipboard.writeText(plain);
       notify('Se copió el correo en texto con ambos enlaces. Pégalo en Gmail.');
     }
   }catch(err){notify('No fue posible copiar el correo: '+err.message,true);}
 }
-function prepareEmail(r){const url=urlFor(r.id);const subject=`ÁGORA · Archivos de aplicación para muestras · ${r.folio}`;const content=`Hola ${r.recipientName},\n\nDejavú Marketing te comparte los artes y archivos de producción para ${r.project}.\n\n1. Abre el enlace de ÁGORA para ver las capturas de evidencia y las indicaciones:\n${url}\n\n2. Accede a los archivos originales en Google Drive:\n${safeHttps(r.driveUrl)}\n\n3. Confirma de recibido desde ÁGORA para generar el comprobante digital. Si falta algún archivo o no puedes abrirlo, repórtalo en el mismo formulario.\n\nVigencia: ${fmt(r.validUntil)}\nVersión: ${r.version}\n\nSaludos,\nDejavú Marketing`;const gmail='https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(r.recipientEmail)+'&su='+encodeURIComponent(subject)+'&body='+encodeURIComponent(content);window.open(gmail,'_blank','noopener,noreferrer');notify('Abrimos Gmail con los enlaces. Revisa y envía. Puedes pegar el correo visual si deseas mostrar las capturas dentro del mensaje.');}
+function prepareEmail(r){const url=urlFor(r.id);const subject=`ÁGORA · Archivos de aplicación para muestras · ${r.folio}`;const content=`Hola ${r.recipientName},\n\nDejavú Marketing te comparte los artes y archivos de producción para ${r.project}.\n\n1. Abre el enlace de ÁGORA para ver las capturas de evidencia y las indicaciones:\n${url}\n\n2. Accede a los archivos originales en Google Drive:\n${safeHttps(r.driveUrl)}\n\n3. Confirma de recibido desde ÁGORA para generar el comprobante digital. Si falta algún archivo o no puedes abrirlo, repórtalo en el mismo formulario.\n\nVigencia: ${fmt(r.validUntil)}\nVersión: ${r.version}\n\nSaludos,\nDejavú Marketing`;const extra=evidenceEmailPlain(r.sampleImages,'Vistas de artes y aplicaciones')+evidenceEmailPlain(r.folderImages,'Evidencia de archivos compartidos');const gmail='https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(r.recipientEmail)+'&su='+encodeURIComponent(subject)+'&body='+encodeURIComponent(content+extra);window.open(gmail,'_blank','noopener,noreferrer');notify('Abrimos Gmail con los enlaces. Revisa y envía. Puedes pegar el correo visual si deseas mostrar las capturas dentro del mensaje.');}
 function revoke(r){if(!confirm('¿Revocar este enlace? El destinatario dejará de poder abrirlo o responder. La información del expediente se conservará.'))return;authRequired();runTransaction(db,async tx=>{const refDoc=doc(db,'agora_file_deliveries',r.id),s=await tx.get(refDoc);if(!s.exists()||!s.data().active)throw Error('El envío ya fue revocado o no existe.');tx.update(refDoc,{active:false,updatedAt:serverTimestamp()});}).then(()=>{closeModals();notify('Enlace revocado. El expediente permanece en el historial.');}).catch(e=>notify(e.message,true));}
 function parseValidUntil(value){const d=new Date(value+'T23:59:59');if(Number.isNaN(+d)||d.getTime()<=Date.now())throw Error('Selecciona una vigencia futura.');return Timestamp.fromDate(d);}
 // Los originales permanecen en Drive; aquí guardamos vistas optimizadas.
