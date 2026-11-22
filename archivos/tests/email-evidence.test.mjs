@@ -19,7 +19,7 @@ test('sanea URL maliciosa, evita atributos HTML inyectados',()=>{
    'https://example.com/hello?x="><script>alert(1)</script>'],'<img src=1 onerror=alert(1)>');
  assert.doesNotMatch(html,/<img\b|<script\b/i);
  assert.match(html,/&lt;img src=1 onerror=alert\(1\)&gt;/);
- assert.match(html,/&quot;&gt;&lt;script&gt;/);
+ assert.match(html,/%22%3E%3Cscript%3E/);
  assert.equal(safeEvidenceUrl('javascript:alert(1)'),'');
 });
 test('el texto plano incluye enlaces individuales para Gmail',()=>{
