@@ -223,7 +223,7 @@ async function uploadAllImages(samples,folders,id,version,project,recipientEmail
  updateUploadStatus('Optimizando fotografías…',0);
  const jobs=[];
  for(const job of pending)jobs.push({...job,blob:await resize(job.item.file)});
- await uploadDriveImages({
+ const folder=await uploadDriveImages({
   accessToken:token,project,deliveryId:id,version,recipientEmail,
   uploaderEmail:user.email||'',items:jobs,
   onStatus:(label,progress)=>{updateUploadStatus(label,progress);$('saveButton').textContent=label;},
@@ -239,6 +239,7 @@ async function uploadAllImages(samples,folders,id,version,project,recipientEmail
   }
  });
  updateUploadStatus('Fotos guardadas en Drive. Publicando expediente…',100);
+ return folder;
 }
 function normalizeDrive(raw){const uri=safeHttps(String(raw||'').trim());if(!uri)throw Error('Agrega un enlace válido de Drive con https://');const host=new URL(uri).hostname;if(!['drive.google.com','docs.google.com'].includes(host))throw Error('El enlace debe ser de Google Drive o Google Docs.');return uri;}
 
@@ -251,14 +252,18 @@ async function saveDelivery(event){
   const fd=new FormData($('deliveryForm')),read=k=>String(fd.get(k)||'').trim();
   const recipientEmail=read('recipientEmail').toLowerCase();
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail))throw Error('Indica un correo válido.');
-  const validUntil=parseValidUntil(read('validUntil')),driveUrl=normalizeDrive(read('driveUrl'));
+  const validUntil=parseValidUntil(read('validUntil'));
+   let driveUrl=read('driveUrl')?normalizeDrive(read('driveUrl')):'';
+   if(!read('project')||!read('title')||!read('recipientName'))throw Error('Completa los campos obligatorios.');
+   if(!driveUrl&&!sampleSelected.length&&!folderSelected.length)throw Error('Agrega un enlace original de Drive o adjunta fotografías para crear una carpeta automáticamente.');
   const id=editRecord?.id||secret(),isEdit=!!editRecord&&editorMode==='edit';
   const version=isEdit?editRecord.version:(editRecord?.version||0)+1;
   let samples=readImageUrls('sampleUrls',8),folders=readImageUrls('folderUrls',6);
   if(samples.length+sampleSelected.length>8||folders.length+folderSelected.length>6)throw Error('Se superó el límite de imágenes por sección.');
   if(sampleSelected.length||folderSelected.length){
-   await uploadAllImages(sampleSelected,folderSelected,id,version,read('project'),recipientEmail);
+   const saved=await uploadAllImages(sampleSelected,folderSelected,id,version,read('project'),recipientEmail);
    samples=readImageUrls('sampleUrls',8);folders=readImageUrls('folderUrls',6);
+   if(!driveUrl&&saved?.folderUrl){driveUrl=saved.folderUrl;$('deliveryForm').elements.driveUrl.value=driveUrl;}
   }
   const payload={project:read('project'),category:read('category'),title:read('title'),
    recipientName:read('recipientName'),recipientEmail,driveUrl,validUntil,
