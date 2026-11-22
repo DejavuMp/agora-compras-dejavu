@@ -113,8 +113,9 @@ export async function buildGmailMime({from,to,subject,html,plain,images=[]}){
  for(const [i,image] of images.entries()){
   if(!allowedTypes.has(image.mime)||!/^[a-z0-9@.-]+$/i.test(image.cid))throw Error('Imagen adjunta no válida.');
   const bytes=new Uint8Array(await image.blob.arrayBuffer());
-  lines.push('','--'+related,'Content-Type: '+image.mime+'; name="evidencia-'+(i+1)+'.jpg"',
-    'Content-Transfer-Encoding: base64','Content-Disposition: inline; filename="evidencia-'+(i+1)+'.jpg"',
+  const extension=image.mime==='image/png'?'png':image.mime==='image/webp'?'webp':'jpg';
+  lines.push('','--'+related,'Content-Type: '+image.mime+'; name="evidencia-'+(i+1)+'.'+extension+'"',
+    'Content-Transfer-Encoding: base64','Content-Disposition: inline; filename="evidencia-'+(i+1)+'.'+extension+'"',
     'Content-ID: <'+image.cid+'>','',
     base64Bytes(bytes).replace(/.{1,76}/g,'$&\r\n').trimEnd());
  }
