@@ -208,7 +208,7 @@ async function sendEmailWithPhotos(){
   $('emailPhotosStatus').textContent='Confirmando que el expediente siga vigente…';
   const fresh=await getDoc(doc(db,'agora_file_deliveries',r.id));
   if(!fresh.exists()||fresh.data().active!==true||fresh.data().version!==r.version||
-     fresh.data().recipientEmail!==r.recipientEmail||fresh.data().validUntil?.toMillis?.()<=Date.now())
+     fresh.data().recipientEmail!==r.recipientEmail||fresh.data().updatedAt?.toMillis?.()!==r.updatedAt?.toMillis?.()||fresh.data().validUntil?.toMillis?.()<=Date.now())
    throw Error('El expediente cambió, fue revocado o venció. Recarga antes de enviarlo.');
   $('emailPhotosStatus').textContent='Preparando correo con imágenes incrustadas…';
   const {html,plain}=emailContent(r,{images:emailImages,mode:'email'});
