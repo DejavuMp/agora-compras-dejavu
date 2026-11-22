@@ -209,7 +209,7 @@ async function connectDrive(){
   driveTokenExpiry=Date.now()+45*60*1000;
   updateDriveConnectionStatus();
   notify('Drive conectado. Las imágenes se compartirán solo con el destinatario del expediente.');
- }catch(e){notify('No se pudo conectar Drive: '+(e?.message||e),true);}
+ }catch(e){const message='No se pudo conectar Drive: '+(e?.message||e);$('driveConnectionStatus').textContent=message;notify(message,true);}
 }
 function currentDriveToken(){
  if(!driveConnected()){updateDriveConnectionStatus();throw Error('Para adjuntar fotografías, primero pulsa «Conectar Google Drive». No se requiere Firebase Blaze.');}
