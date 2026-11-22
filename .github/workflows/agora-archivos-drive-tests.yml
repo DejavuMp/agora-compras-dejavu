@@ -25,6 +25,7 @@ jobs:
         run: |
           node --check archivos/drive-upload.js
           node --check archivos/email-evidence.js
+          node --check archivos/email-inline.js
           node --check archivos/app.js
           node --check archivos/recibir.js
       - name: Probar Drive simulado sin consumir archivos reales
