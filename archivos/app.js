@@ -4,6 +4,7 @@ import {getFirestore,doc,getDoc,collection,collectionGroup,onSnapshot,serverTime
 import {DRIVE_SCOPE,uploadDriveImages} from './drive-upload.js';
 import {galleryHtml,imageLinkInfo} from './image-preview.js';
 import {evidenceEmailHtml,evidenceEmailPlain} from './email-evidence.js';
+import {GMAIL_SEND_SCOPE,loadInlineImages,renderEmailEvidence,imageEvidenceCount,buildGmailMime,sendGmailInline} from './email-inline.js';
 
 // Usa el proyecto Firebase existente de ÁGORA Pedidos. Estas son claves de cliente públicas.
 const config={apiKey:'AIzaSyDPh-AFdST9Ax_Eoho-wT0shlWlCHad6Zg',authDomain:'agora-dejavu-38b8c.firebaseapp.com',projectId:'agora-dejavu-38b8c',storageBucket:'agora-dejavu-38b8c.firebasestorage.app',messagingSenderId:'775680965171',appId:'1:775680965171:web:274557c8c9c25ff304c146'};
@@ -21,6 +22,7 @@ const urlFor=id=>new URL('./recibir.html',location.href).href+'#t='+id;
 const assetHtml=(arr,heading)=>galleryHtml(arr,heading);
 let user=null,role=null,deliveries=[],responses=new Map(),editRecord=null,openRecord=null,subscriptions=[],readyDeliveries=false,readyResponses=false,firstResponses=true;
 let sampleSelected=[],folderSelected=[],editorMode='new',emailRecord=null;
+let emailImages=[],emailFailures=[],emailPreviewUrls=[],emailLoadSerial=0,emailSending=false,emailSent=false;
 function notify(msg,error=false){$('alert').textContent=msg;$('alert').className='alert'+(error?' error':'');$('alert').hidden=false;setTimeout(()=>{if($('alert').textContent===msg)$('alert').hidden=true;},8500);}
 function authRequired(){if(!user||!['admin','coordinador'].includes(role))throw new Error('Inicia sesión con una cuenta de ÁGORA autorizada (admin o coordinador).');}
 function responseFor(id,version){return responses.get(`${id}_v${version}`)||null;}
@@ -63,7 +65,8 @@ function openEditor(record=null,mode='revision'){try{authRequired();}catch(e){no
      sessionStorage.removeItem('agora_sample_file_context');
    }
  }updateLinkPreviews();$('editorOverlay').hidden=false;document.body.style.overflow='hidden';}
-function closeModals(){for(const id of ['editorOverlay','detailOverlay','emailOverlay'])$(id).hidden=true;document.body.style.overflow='';}
+function disposeEmailPhotos(){++emailLoadSerial;for(const url of emailPreviewUrls)URL.revokeObjectURL(url);emailPreviewUrls=[];emailImages=[];emailFailures=[];emailSent=false;}
+function closeModals(){disposeEmailPhotos();emailRecord=null;for(const id of ['editorOverlay','detailOverlay','emailOverlay'])$(id).hidden=true;document.body.style.overflow='';}
 function recordLine(r){const state=statusFor(r);const recipient=r.recipientName||'—';return `<tr><td><strong>${esc(r.title)}</strong><small>${esc(r.folio||'Sin folio')} · Versión ${r.version}</small></td><td>${esc(r.project)}<br><small>${esc(r.category)}</small></td><td>${esc(recipient)}<br><small>${esc(r.recipientEmail)}</small></td><td>${fmt(r.validUntil)}</td><td><span class="status-pill ${state}">${statuses[state]}</span></td><td><button class="table-action" type="button" data-detail="${r.id}">Ver expediente</button></td></tr>`;}
 function updateCounters(){const results={};for(const r of deliveries)results[statusFor(r)]=(results[statusFor(r)]||0)+1;$('statTotal').textContent=deliveries.length;$('statPending').textContent=results.pendiente||0;$('statChanges').textContent=results.cambios||0;$('statReceived').textContent=(results.recibido||0)+(results.aprobado||0);}
 function renderList(){if(!readyDeliveries||!readyResponses)return;updateCounters();const q=$('search').value.toLowerCase().trim(),f=$('filter').value;const rows=deliveries.filter(r=>(f==='all'||statusFor(r)===f)&&[r.title,r.project,r.recipientName,r.recipientEmail,r.folio,r.category].join(' ').toLowerCase().includes(q));$('deliveryRows').innerHTML=rows.length?rows.map(recordLine).join(''):'<tr><td colspan="6" class="empty-cell">No se encontraron envíos con estos filtros.</td></tr>';$('syncState').textContent='● Firebase · actualizado';$('syncState').style.color='#2a7355';retrySyncButton.hidden=true;$('deliveryRows').querySelectorAll('[data-detail]').forEach(el=>el.addEventListener('click',()=>openDetail(el.dataset.detail)));if(openRecord&&!$('detailOverlay').hidden){const updated=deliveries.find(r=>r.id===openRecord);if(updated)renderDetail(updated);}}
@@ -86,7 +89,7 @@ function renderDetail(r){const state=statusFor(r),res=responseFor(r.id,r.version
 function openDetail(id){const r=deliveries.find(d=>d.id===id);if(!r)return;openRecord=r.id;renderDetail(r);$('detailOverlay').hidden=false;document.body.style.overflow='hidden';}
 async function copyLink(url){try{await navigator.clipboard.writeText(url);notify('Enlace copiado. Puedes enviarlo por correo o mensaje.');}catch(e){notify('No se pudo copiar el enlace: '+e.message,true);}}
 
-function emailContent(r){
+function emailContent(r,{images=[],mode='email'}={}){
   const url=urlFor(r.id),confirmUrl=url+'&accion=recibido',drive=safeHttps(r.driveUrl);
   const html='<div style="margin:auto;max-width:620px;background:#fff;font:14px/1.6 Arial,Helvetica,sans-serif;color:#29251f;border:1px solid #e4ddd1">'+
   '<div style="background:#181715;color:#e1c083;padding:22px 26px;border-bottom:3px solid #bd9656">'+
@@ -103,7 +106,8 @@ function emailContent(r){
   '<p style="margin:0 0 18px"><a href="'+esc(drive)+'" style="display:inline-block;padding:13px 22px;background:#24211c;color:#fff;border-radius:5px;text-decoration:none;font-weight:bold">↗ Abrir archivos en Drive</a></p>'+
   '<p style="font-size:12px;color:#756858">El primer botón abre el formulario de confirmación en ÁGORA; no registra una respuesta automáticamente.</p>'+
   '<p><b>Indicaciones de producción:</b> '+esc(r.notes||'Revisa las artes y confirma que recibiste los archivos.')+'</p>'+
-  evidenceEmailHtml(r.sampleImages,'Vistas de artes y aplicaciones')+evidenceEmailHtml(r.folderImages,'Evidencia de archivos compartidos')+
+  (images.length?renderEmailEvidence(r.sampleImages,'Vistas de artes y aplicaciones',images,mode):evidenceEmailHtml(r.sampleImages,'Vistas de artes y aplicaciones'))+
+  (images.length?renderEmailEvidence(r.folderImages,'Evidencia de archivos compartidos',images,mode):evidenceEmailHtml(r.folderImages,'Evidencia de archivos compartidos'))+
   '<div style="border-top:1px solid #e9e1d4;margin-top:22px;padding-top:15px;font-size:12px;color:#73695d">Vigencia: '+esc(fmt(r.validUntil))+'. Si no puedes abrir los archivos o necesitas cambios, repórtalo desde el mismo expediente. <br>Dejavú Marketing · ÁGORA Archivos.</div>'+
   '</div></div>';
   const plain='ÁGORA · DEJAVÚ MARKETING\nEntrega de archivos: '+r.title+'\nProyecto: '+r.project+
