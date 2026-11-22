@@ -117,17 +117,110 @@ function emailContent(r,{images=[],mode='email'}={}){
     '\n\nIndicaciones: '+(r.notes||'Revisar los archivos')+'\nVigencia: '+fmt(r.validUntil);
   return {html,plain,confirmUrl,drive};
 }
+function updateInlineSendButton(){
+ const total=imageEvidenceCount(emailRecord);
+ const ready=!!emailRecord?.active&&total>0&&emailImages.length===total&&!emailFailures.length&&!emailSending&&!emailSent;
+ $('sendGmailInline').disabled=!ready;
+ $('sendGmailInline').textContent=emailSent?'✓ Correo enviado':emailSending?'Enviando correo…':'Enviar por Gmail con fotografías';
+}
+function currentEmailPreview(){
+ const r=emailRecord;
+ if(!r)return;
+ const content=emailContent(r,{images:emailImages,mode:'preview'});
+ $('emailPreviewContent').innerHTML=(!r.active?'<p class="notice"><b>Expediente revocado.</b> No se puede enviar este correo. Duplica el expediente y publica un enlace nuevo.</p>':'')+content.html;
+}
+async function loadEmailPhotos(){
+ const r=emailRecord;
+ if(!r?.active)return;
+ const total=imageEvidenceCount(r);
+ if(!total){$('emailPhotosStatus').textContent='Este expediente no contiene fotografías para incrustar.';return;}
+ if(!driveConnected()){
+  $('emailPhotosStatus').textContent='Conecta Google Drive para mostrar las imágenes reales y preparar su envío privado.';
+  updateInlineSendButton();return;
+ }
+ const stamp=++emailLoadSerial;
+ $('emailLoadPhotos').disabled=true;
+ $('emailPhotosStatus').textContent='Consultando las fotografías privadas en Drive…';
+ for(const url of emailPreviewUrls)URL.revokeObjectURL(url);
+ emailPreviewUrls=[];emailImages=[];emailFailures=[];
+ updateInlineSendButton();
+ try{
+  const result=await loadInlineImages({
+   urls:[...(r.sampleImages||[]),...(r.folderImages||[])],
+   accessToken:currentDriveToken(),
+   onProgress:status=>{if(stamp===emailLoadSerial)$('emailPhotosStatus').textContent=status;}
+  });
+  if(stamp!==emailLoadSerial||emailRecord!==r)return;
+  emailImages=result.images.map(image=>{
+   const previewUrl=URL.createObjectURL(image.blob);
+   emailPreviewUrls.push(previewUrl);
+   return {...image,previewUrl};
+  });
+  emailFailures=result.failures;
+  currentEmailPreview();
+  $('emailPhotosStatus').textContent=emailFailures.length?
+   'Se pudieron cargar '+emailImages.length+' de '+total+' fotografías. No se enviará un correo incompleto. '+emailFailures.join(' '):
+   '✓ '+total+' fotografías visibles y preparadas como imágenes incrustadas. Tamaño total: '+Math.round(result.totalBytes/1024)+' KB.';
+ }catch(e){
+  if(stamp===emailLoadSerial){emailFailures=[e?.message||String(e)];$('emailPhotosStatus').textContent='Error al leer Drive: '+emailFailures[0];currentEmailPreview();}
+ }finally{
+  if(stamp===emailLoadSerial){$('emailLoadPhotos').disabled=false;updateInlineSendButton();}
+ }
+}
 function openEmailPreview(r){
-  emailRecord=r;
-  const content=emailContent(r);
-  $('emailRecipient').textContent=r.recipientEmail;
-  $('emailSubject').textContent='ÁGORA · Archivos de producción · '+r.folio;
-  $('emailPreviewTitle').textContent=r.active?'Vista previa del correo':'Vista previa del correo · expediente revocado';
-  $('copyEmailPreview').disabled=!r.active;
-  $('openGmailPreview').disabled=!r.active;
-  $('emailPreviewContent').innerHTML=(r.active?'':'<p class="notice"><b>Expediente revocado.</b> Este correo solo se muestra como referencia. Para poder enviarlo, duplica el expediente y publica un enlace nuevo.</p>')+content.html;
-  $('emailOverlay').hidden=false;
-  document.body.style.overflow='hidden';
+ disposeEmailPhotos();
+ emailRecord=r;
+ $('emailRecipient').textContent=r.recipientEmail;
+ $('emailSubject').textContent='ÁGORA · Archivos de producción · '+r.folio;
+ $('emailPreviewTitle').textContent=r.active?'Vista previa del correo':'Vista previa del correo · expediente revocado';
+ $('copyEmailPreview').disabled=!r.active;
+ $('openGmailPreview').disabled=!r.active;
+ $('emailLoadPhotos').disabled=!r.active;
+ $('emailPhotosStatus').textContent=r.active?'Pulsa «Mostrar fotografías» para ver las imágenes reales y preparar su envío.':'Este expediente está revocado: no se puede enviar.';
+ currentEmailPreview();
+ updateInlineSendButton();
+ $('emailOverlay').hidden=false;
+ document.body.style.overflow='hidden';
+ if(r.active&&driveConnected())loadEmailPhotos();
+}
+async function sendEmailWithPhotos(){
+ const r=emailRecord;
+ if(!r)return;
+ const total=imageEvidenceCount(r);
+ if(emailSending||emailSent||!r.active||total===0||emailImages.length!==total||emailFailures.length){
+  $('emailPhotosStatus').textContent='Primero carga correctamente todas las fotografías para enviarlas incrustadas.';
+  updateInlineSendButton();return;
+ }
+ try{authRequired();}catch(e){$('emailPhotosStatus').textContent=e.message;return;}
+ // Este segundo consentimiento autoriza enviar un mensaje, no leer el buzón.
+ if(!confirm('¿Enviar el correo a '+r.recipientEmail+' con '+total+' fotografías incrustadas?\n\nEl destinatario conservará las imágenes que reciba en su correo, incluso si después revocas permisos en Drive. Esta acción realmente envía el mensaje.'))return;
+ emailSending=true;updateInlineSendButton();
+ $('emailPhotosStatus').textContent='Solicitando permiso para enviar desde Gmail…';
+ try{
+  const sender=user?.email||'';
+  const senderUid=user?.uid;
+  const provider=new GoogleAuthProvider();
+  provider.addScope(GMAIL_SEND_SCOPE);
+  const credentials=await reauthenticateWithPopup(auth.currentUser,provider);
+  if(!emailRecord||emailRecord!==r||!r.active||user?.uid!==senderUid||credentials.user.uid!==senderUid)throw Error('La sesión o el expediente cambió durante la autorización.');
+  const gmailToken=GoogleAuthProvider.credentialFromResult(credentials)?.accessToken;
+  if(!gmailToken)throw Error('Google no proporcionó el permiso gmail.send. Revisa la configuración de Google Auth Platform.');
+  $('emailPhotosStatus').textContent='Confirmando que el expediente siga vigente…';
+  const fresh=await getDoc(doc(db,'agora_file_deliveries',r.id));
+  if(!fresh.exists()||fresh.data().active!==true||fresh.data().version!==r.version||
+     fresh.data().recipientEmail!==r.recipientEmail||fresh.data().validUntil?.toMillis?.()<=Date.now())
+   throw Error('El expediente cambió, fue revocado o venció. Recarga antes de enviarlo.');
+  $('emailPhotosStatus').textContent='Preparando correo con imágenes incrustadas…';
+  const {html,plain}=emailContent(r,{images:emailImages,mode:'email'});
+  const raw=await buildGmailMime({from:sender,to:r.recipientEmail,subject:$('emailSubject').textContent,html,plain,images:emailImages});
+  $('emailPhotosStatus').textContent='Enviando mediante Gmail…';
+  const messageId=await sendGmailInline({accessToken:gmailToken,raw});
+  emailSent=true;
+  $('emailPhotosStatus').textContent='✓ Enviado correctamente desde '+sender+' a '+r.recipientEmail+' · ID Gmail: '+messageId+'. Revisa «Enviados».';
+  notify('Correo enviado mediante Gmail con '+total+' fotografías incrustadas. No se modificaron los acuses ni el expediente.');
+ }catch(e){
+  $('emailPhotosStatus').textContent='No se confirmó el envío: '+(e?.message||e)+'. Revisa «Enviados» antes de reintentar si la conexión se interrumpió.';
+ }finally{emailSending=false;updateInlineSendButton();}
 }
 async function copyEmailEvidence(r){
   const {html,plain}=emailContent(r);
