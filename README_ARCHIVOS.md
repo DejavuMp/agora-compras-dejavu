@@ -83,3 +83,27 @@ Si un expediente tiene estado **Revocado**, ÁGORA ahora muestra:
 - El acceso al correo para un expediente revocado se oculta para evitar enviar un enlace inactivo.
 
 **Necesario:** después de actualizar el código de GitHub, publica la nueva `firestore.rules` en Firebase Console. Las reglas publicadas previamente para editar expedientes pendientes no habilitan por sí solas la edición de los revocados. La duplicación a un envío nuevo utiliza el permiso de creación ya existente.
+
+
+## Fotografías directas a Google Drive (sin pagar Firebase Storage)
+
+**Estado técnico:** el módulo de Drive se incluye en la aplicación. Requiere **activar la API de Google Drive** en el proyecto Google Cloud asociado a Firebase `agora-dejavu-38b8c`, comprobar que la pantalla de consentimiento OAuth permite `https://www.googleapis.com/auth/drive.file` y hacer una prueba real antes de declarar la integración operativa.
+
+- El usuario de ÁGORA con rol `admin` o `coordinador` inicia sesión y pulsa **Conectar Google Drive** en Nuevo envío. El consentimiento de Google se solicita explícitamente y el token temporal se conserva solo en memoria del navegador. No requiere plan Blaze.
+- Al seleccionar fotos JPG/PNG/WEBP, ÁGORA las convierte a JPG reducido y las guarda con la cuenta Google del **usuario que las sube**, dentro de `Mi unidad/ÁGORA Dejavú/Archivos de producción/<proyecto>/<token-de-expediente>/vN/`.
+- La carpeta de versión se comparte mediante permiso de **lector exclusivamente con el correo destinatario** del expediente; **no** se usa acceso «cualquier persona con enlace». Quien reciba el acuse podría necesitar iniciar sesión en Google con esa misma cuenta para ver las fotos, y las miniaturas del correo no siempre se mostrarán.
+- Si no se proporcionó carpeta original, el enlace a la carpeta creada por ÁGORA rellena automáticamente el campo del expediente. Si ya existía una carpeta original, se conserva; las fotos nuevas quedan vinculadas individualmente en los mismos campos de evidencia que ya usa la aplicación.
+- Si una subida termina y más tarde falla Firestore, la URL de esa foto permanece en el formulario para reintentar **sin volver a subir la misma imagen**. Un fallo de conexión durante la carga puede dejar una foto suelta en Drive que un coordinador debe revisar, sin cambiar datos anteriores.
+- Envíos, registros, historial, confirmaciones, usuarios, reglas, tokens públicos de recepción y enlaces anteriores siguen en Firestore sin migraciones.
+- Esta versión **no** comparte automáticamente las fotos con todos los coordinadores: el propietario debe compartir las carpetas desde Drive con los correos internos correspondientes, o operar desde la cuenta dedicada de Dejavú. Los destinatarios externos reciben acceso únicamente a las versiones que les corresponden.
+- La API de Drive está sujeta a cuotas de Google y al espacio de almacenamiento de la cuenta propietaria. El plan Spark no se modifica.
+- Si Google Cloud impide activar la API o el permiso OAuth, sigue funcionando la alternativa de pegar URL individuales de fotografías en Drive. El cambio no hace que Firebase Storage funcione en Spark.
+
+### Activación una sola vez (administración)
+
+1. Abre [Google Cloud API Library](https://console.cloud.google.com/apis/library/drive.googleapis.com?project=agora-dejavu-38b8c), verifica que el proyecto sea `agora-dejavu-38b8c` y habilita **Google Drive API**. No es necesario cambiar el plan de Firebase.
+2. En [Google Auth Platform](https://console.cloud.google.com/auth/overview?project=agora-dejavu-38b8c), comprueba configuración de consentimiento, usuarios autorizados y scope `https://www.googleapis.com/auth/drive.file`. Configura la pantalla de consentimiento si Google la solicita; no publiques secretos en GitHub.
+3. Verifica que la cuenta de coordinador puede autenticarse con el mismo Google que ya se usa en ÁGORA, consentir Drive y subir una foto de prueba.
+4. Prueba: carpeta privada creada, correo destinatario puede abrir la foto, tercero no autorizado no puede, expediente guardado y acuse existente sin cambios. Comprueba también editar el expediente, la caducidad del token y reintentar después de desconectarse.
+
+> Importante: la API solo se puede verificar de extremo a extremo con una cuenta real autorizada. Las pruebas automatizadas usan respuestas simuladas de Google Drive y no tocan Firebase de producción.
