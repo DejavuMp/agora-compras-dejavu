@@ -230,14 +230,14 @@ async function copyEmailEvidence(r){
         'text/html':new Blob([html],{type:'text/html'}),
         'text/plain':new Blob([plain],{type:'text/plain'})
       })]);
-      notify('Correo visual copiado. Pégalo en Gmail: incluye botones para abrir cada fotografía privada sin miniaturas rotas.');
+      notify('Correo visual copiado con enlaces privados. Para incrustar las fotos reales, usa «Enviar por Gmail con fotografías».');
     }else{
       await navigator.clipboard.writeText(plain);
       notify('Se copió el correo en texto con ambos enlaces. Pégalo en Gmail.');
     }
   }catch(err){notify('No fue posible copiar el correo: '+err.message,true);}
 }
-function prepareEmail(r){const url=urlFor(r.id);const subject=`ÁGORA · Archivos de aplicación para muestras · ${r.folio}`;const content=`Hola ${r.recipientName},\n\nDejavú Marketing te comparte los artes y archivos de producción para ${r.project}.\n\n1. Abre el enlace de ÁGORA para ver las capturas de evidencia y las indicaciones:\n${url}\n\n2. Accede a los archivos originales en Google Drive:\n${safeHttps(r.driveUrl)}\n\n3. Confirma de recibido desde ÁGORA para generar el comprobante digital. Si falta algún archivo o no puedes abrirlo, repórtalo en el mismo formulario.\n\nVigencia: ${fmt(r.validUntil)}\nVersión: ${r.version}\n\nSaludos,\nDejavú Marketing`;const extra=evidenceEmailPlain(r.sampleImages,'Vistas de artes y aplicaciones')+evidenceEmailPlain(r.folderImages,'Evidencia de archivos compartidos');const gmail='https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(r.recipientEmail)+'&su='+encodeURIComponent(subject)+'&body='+encodeURIComponent(content+extra);window.open(gmail,'_blank','noopener,noreferrer');notify('Abrimos Gmail con los enlaces. Revisa y envía. Puedes pegar el correo visual si deseas mostrar las capturas dentro del mensaje.');}
+function prepareEmail(r){const url=urlFor(r.id);const subject=`ÁGORA · Archivos de aplicación para muestras · ${r.folio}`;const content=`Hola ${r.recipientName},\n\nDejavú Marketing te comparte los artes y archivos de producción para ${r.project}.\n\n1. Abre el enlace de ÁGORA para ver las capturas de evidencia y las indicaciones:\n${url}\n\n2. Accede a los archivos originales en Google Drive:\n${safeHttps(r.driveUrl)}\n\n3. Confirma de recibido desde ÁGORA para generar el comprobante digital. Si falta algún archivo o no puedes abrirlo, repórtalo en el mismo formulario.\n\nVigencia: ${fmt(r.validUntil)}\nVersión: ${r.version}\n\nSaludos,\nDejavú Marketing`;const extra=evidenceEmailPlain(r.sampleImages,'Vistas de artes y aplicaciones')+evidenceEmailPlain(r.folderImages,'Evidencia de archivos compartidos');const gmail='https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(r.recipientEmail)+'&su='+encodeURIComponent(subject)+'&body='+encodeURIComponent(content+extra);window.open(gmail,'_blank','noopener,noreferrer');notify('Gmail abrió un mensaje con enlaces. Para enviar fotografías reales incrustadas, usa el botón «Enviar por Gmail con fotografías» de la vista previa.');}
 function revoke(r){if(!confirm('¿Revocar este enlace? El destinatario dejará de poder abrirlo o responder. La información del expediente se conservará.'))return;authRequired();runTransaction(db,async tx=>{const refDoc=doc(db,'agora_file_deliveries',r.id),s=await tx.get(refDoc);if(!s.exists()||!s.data().active)throw Error('El envío ya fue revocado o no existe.');tx.update(refDoc,{active:false,updatedAt:serverTimestamp()});}).then(()=>{closeModals();notify('Enlace revocado. El expediente permanece en el historial.');}).catch(e=>notify(e.message,true));}
 function parseValidUntil(value){const d=new Date(value+'T23:59:59');if(Number.isNaN(+d)||d.getTime()<=Date.now())throw Error('Selecciona una vigencia futura.');return Timestamp.fromDate(d);}
 // Los originales permanecen en Drive; aquí guardamos vistas optimizadas.
@@ -300,7 +300,8 @@ async function connectDrive(){
   driveTokenExpiry=Date.now()+45*60*1000;
   updateDriveConnectionStatus();
   notify('Drive conectado. Las imágenes se compartirán solo con el destinatario del expediente.');
- }catch(e){const message='No se pudo conectar Drive: '+(e?.message||e);$('driveConnectionStatus').textContent=message;notify(message,true);}
+  return true;
+ }catch(e){const message='No se pudo conectar Drive: '+(e?.message||e);$('driveConnectionStatus').textContent=message;notify(message,true);return false;}
 }
 function currentDriveToken(){
  if(!driveConnected()){updateDriveConnectionStatus();throw Error('Para adjuntar fotografías, primero pulsa «Conectar Google Drive». No se requiere Firebase Blaze.');}
@@ -501,3 +502,5 @@ updateDriveConnectionStatus();
 
 $('copyEmailPreview').addEventListener('click',()=>{if(emailRecord)copyEmailEvidence(emailRecord);});
 $('openGmailPreview').addEventListener('click',()=>{if(emailRecord)prepareEmail(emailRecord);});
+$('emailLoadPhotos').addEventListener('click',async()=>{if(!driveConnected()&&!await connectDrive())return;await loadEmailPhotos();});
+$('sendGmailInline').addEventListener('click',sendEmailWithPhotos);
