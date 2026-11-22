@@ -67,17 +67,19 @@
 <div class="modal-backdrop" id="emailOverlay" hidden>
   <section class="dialog email-dialog" role="dialog" aria-modal="true" aria-labelledby="emailPreviewTitle">
     <div class="dialog-header"><div><div class="eyebrow">ÁGORA · ENVÍO AL DESTINATARIO</div>
-    <h2 id="emailPreviewTitle">Vista previa del correo</h2><p>Revisa cómo se verá el mensaje antes de copiarlo a Gmail.</p></div>
+    <h2 id="emailPreviewTitle">Vista previa del correo</h2><p>Revisa las fotos reales y decide si quieres enviarlas directamente desde Gmail.</p></div>
     <button class="icon-button" data-close="email" aria-label="Cerrar">✕</button></div>
     <div class="dialog-content">
       <div class="email-address"><b>Para:</b> <span id="emailRecipient"></span></div>
       <div class="email-address"><b>Asunto:</b> <span id="emailSubject"></span></div>
-      <div id="emailPreviewContent" class="email-preview-body"></div>
-      <p class="tip-small">Los botones del correo abren ÁGORA para confirmar el recibido y Google Drive para consultar los originales. La confirmación requiere que el destinatario complete el formulario; abrir el mensaje no crea ningún acuse. Algunas imágenes privadas de Drive no se incrustan en Gmail, pero siguen accesibles en el expediente.</p>
+      <div class="notice" style="margin:12px 0"><b>Fotografías reales, sin enlaces públicos</b><p>ÁGORA muestra aquí las fotos privadas usando tu permiso de Drive. Para enviarlas visibles en el correo, solicitará además tu autorización para <b>enviar este mensaje desde Gmail</b> (sin leer tu bandeja de entrada).</p><button class="btn btn-outline" id="emailLoadPhotos" type="button">Mostrar fotografías reales</button><p id="emailPhotosStatus" role="status" aria-live="polite" style="font-size:12px;line-height:1.5">Fotografías pendientes de cargar</p></div>
+       <div id="emailPreviewContent" class="email-preview-body"></div>
+      <p class="tip-small">Los botones del correo abren ÁGORA para confirmar el recibido y Google Drive para consultar los originales. La confirmación requiere que el destinatario complete el formulario; abrir el mensaje no crea ningún acuse. La opción «Enviar por Gmail con fotografías» incluye copias de las imágenes dentro del mensaje: el destinatario podrá conservarlas incluso si después se revocan sus permisos de Drive. «Copiar» y «Abrir Gmail» mantienen la alternativa de enlaces sin incrustar imágenes.</p>
       <div class="dialog-actions">
         <button class="btn btn-outline" data-close="email" type="button">Volver al expediente</button>
-        <button class="btn btn-gold" id="copyEmailPreview" type="button">Copiar correo visual</button>
-        <button class="btn btn-dark" id="openGmailPreview" type="button">Abrir Gmail</button>
+        <button class="btn btn-outline" id="copyEmailPreview" type="button">Copiar correo (enlaces)</button>
+        <button class="btn btn-outline" id="openGmailPreview" type="button">Abrir Gmail (enlaces)</button>
+        <button class="btn btn-gold" id="sendGmailInline" type="button" disabled>Enviar por Gmail con fotografías</button>
       </div>
     </div>
   </section>
@@ -93,7 +95,7 @@
   };
   const script=document.createElement('script');
   script.type='module';
-  script.src='./app.js?revision=archivos-app-8-correo-evidencia-privada';
+  script.src='./app.js?revision=archivos-app-9-fotos-cid-gmail';
   script.addEventListener('error',()=>{
     state.textContent='No se pudo cargar el módulo';
     state.style.color='#9f3c2c';

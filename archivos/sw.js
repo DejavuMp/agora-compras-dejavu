@@ -1,6 +1,6 @@
 // ÁGORA Archivos · caché propio, independiente de Compras & Producción
-const CACHE='agora-archivos-web-v8-correo-drive';
-const ASSETS=['./','./index.html','./app.js','./drive-upload.js','./email-evidence.js','./style.css','./recibir.html','./recibir.js','./image-preview.js','./brand.js','./dejavu-logo-oficial.png','./manifest.webmanifest'];
+const CACHE='agora-archivos-web-v9-fotos-cid-gmail';
+const ASSETS=['./','./index.html','./app.js','./drive-upload.js','./email-evidence.js','./email-inline.js','./style.css','./recibir.html','./recibir.js','./image-preview.js','./brand.js','./dejavu-logo-oficial.png','./manifest.webmanifest'];
 self.addEventListener('install',event=>event.waitUntil(
   caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())
 ));

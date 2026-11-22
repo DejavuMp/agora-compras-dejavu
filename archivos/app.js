@@ -4,6 +4,7 @@ import {getFirestore,doc,getDoc,collection,collectionGroup,onSnapshot,serverTime
 import {DRIVE_SCOPE,uploadDriveImages} from './drive-upload.js';
 import {galleryHtml,imageLinkInfo} from './image-preview.js';
 import {evidenceEmailHtml,evidenceEmailPlain} from './email-evidence.js';
+import {GMAIL_SEND_SCOPE,loadInlineImages,renderEmailEvidence,imageEvidenceCount,buildGmailMime,sendGmailInline} from './email-inline.js';
 
 // Usa el proyecto Firebase existente de ÁGORA Pedidos. Estas son claves de cliente públicas.
 const config={apiKey:'AIzaSyDPh-AFdST9Ax_Eoho-wT0shlWlCHad6Zg',authDomain:'agora-dejavu-38b8c.firebaseapp.com',projectId:'agora-dejavu-38b8c',storageBucket:'agora-dejavu-38b8c.firebasestorage.app',messagingSenderId:'775680965171',appId:'1:775680965171:web:274557c8c9c25ff304c146'};
@@ -21,6 +22,7 @@ const urlFor=id=>new URL('./recibir.html',location.href).href+'#t='+id;
 const assetHtml=(arr,heading)=>galleryHtml(arr,heading);
 let user=null,role=null,deliveries=[],responses=new Map(),editRecord=null,openRecord=null,subscriptions=[],readyDeliveries=false,readyResponses=false,firstResponses=true;
 let sampleSelected=[],folderSelected=[],editorMode='new',emailRecord=null;
+let emailImages=[],emailFailures=[],emailPreviewUrls=[],emailLoadSerial=0,emailSending=false,emailSent=false;
 function notify(msg,error=false){$('alert').textContent=msg;$('alert').className='alert'+(error?' error':'');$('alert').hidden=false;setTimeout(()=>{if($('alert').textContent===msg)$('alert').hidden=true;},8500);}
 function authRequired(){if(!user||!['admin','coordinador'].includes(role))throw new Error('Inicia sesión con una cuenta de ÁGORA autorizada (admin o coordinador).');}
 function responseFor(id,version){return responses.get(`${id}_v${version}`)||null;}
@@ -63,7 +65,8 @@ function openEditor(record=null,mode='revision'){try{authRequired();}catch(e){no
      sessionStorage.removeItem('agora_sample_file_context');
    }
  }updateLinkPreviews();$('editorOverlay').hidden=false;document.body.style.overflow='hidden';}
-function closeModals(){for(const id of ['editorOverlay','detailOverlay','emailOverlay'])$(id).hidden=true;document.body.style.overflow='';}
+function disposeEmailPhotos(){++emailLoadSerial;for(const url of emailPreviewUrls)URL.revokeObjectURL(url);emailPreviewUrls=[];emailImages=[];emailFailures=[];emailSent=false;}
+function closeModals(){disposeEmailPhotos();emailRecord=null;for(const id of ['editorOverlay','detailOverlay','emailOverlay'])$(id).hidden=true;document.body.style.overflow='';}
 function recordLine(r){const state=statusFor(r);const recipient=r.recipientName||'—';return `<tr><td><strong>${esc(r.title)}</strong><small>${esc(r.folio||'Sin folio')} · Versión ${r.version}</small></td><td>${esc(r.project)}<br><small>${esc(r.category)}</small></td><td>${esc(recipient)}<br><small>${esc(r.recipientEmail)}</small></td><td>${fmt(r.validUntil)}</td><td><span class="status-pill ${state}">${statuses[state]}</span></td><td><button class="table-action" type="button" data-detail="${r.id}">Ver expediente</button></td></tr>`;}
 function updateCounters(){const results={};for(const r of deliveries)results[statusFor(r)]=(results[statusFor(r)]||0)+1;$('statTotal').textContent=deliveries.length;$('statPending').textContent=results.pendiente||0;$('statChanges').textContent=results.cambios||0;$('statReceived').textContent=(results.recibido||0)+(results.aprobado||0);}
 function renderList(){if(!readyDeliveries||!readyResponses)return;updateCounters();const q=$('search').value.toLowerCase().trim(),f=$('filter').value;const rows=deliveries.filter(r=>(f==='all'||statusFor(r)===f)&&[r.title,r.project,r.recipientName,r.recipientEmail,r.folio,r.category].join(' ').toLowerCase().includes(q));$('deliveryRows').innerHTML=rows.length?rows.map(recordLine).join(''):'<tr><td colspan="6" class="empty-cell">No se encontraron envíos con estos filtros.</td></tr>';$('syncState').textContent='● Firebase · actualizado';$('syncState').style.color='#2a7355';retrySyncButton.hidden=true;$('deliveryRows').querySelectorAll('[data-detail]').forEach(el=>el.addEventListener('click',()=>openDetail(el.dataset.detail)));if(openRecord&&!$('detailOverlay').hidden){const updated=deliveries.find(r=>r.id===openRecord);if(updated)renderDetail(updated);}}
@@ -86,7 +89,7 @@ function renderDetail(r){const state=statusFor(r),res=responseFor(r.id,r.version
 function openDetail(id){const r=deliveries.find(d=>d.id===id);if(!r)return;openRecord=r.id;renderDetail(r);$('detailOverlay').hidden=false;document.body.style.overflow='hidden';}
 async function copyLink(url){try{await navigator.clipboard.writeText(url);notify('Enlace copiado. Puedes enviarlo por correo o mensaje.');}catch(e){notify('No se pudo copiar el enlace: '+e.message,true);}}
 
-function emailContent(r){
+function emailContent(r,{images=[],mode='email'}={}){
   const url=urlFor(r.id),confirmUrl=url+'&accion=recibido',drive=safeHttps(r.driveUrl);
   const html='<div style="margin:auto;max-width:620px;background:#fff;font:14px/1.6 Arial,Helvetica,sans-serif;color:#29251f;border:1px solid #e4ddd1">'+
   '<div style="background:#181715;color:#e1c083;padding:22px 26px;border-bottom:3px solid #bd9656">'+
@@ -103,7 +106,8 @@ function emailContent(r){
   '<p style="margin:0 0 18px"><a href="'+esc(drive)+'" style="display:inline-block;padding:13px 22px;background:#24211c;color:#fff;border-radius:5px;text-decoration:none;font-weight:bold">↗ Abrir archivos en Drive</a></p>'+
   '<p style="font-size:12px;color:#756858">El primer botón abre el formulario de confirmación en ÁGORA; no registra una respuesta automáticamente.</p>'+
   '<p><b>Indicaciones de producción:</b> '+esc(r.notes||'Revisa las artes y confirma que recibiste los archivos.')+'</p>'+
-  evidenceEmailHtml(r.sampleImages,'Vistas de artes y aplicaciones')+evidenceEmailHtml(r.folderImages,'Evidencia de archivos compartidos')+
+  (images.length?renderEmailEvidence(r.sampleImages,'Vistas de artes y aplicaciones',images,mode):evidenceEmailHtml(r.sampleImages,'Vistas de artes y aplicaciones'))+
+  (images.length?renderEmailEvidence(r.folderImages,'Evidencia de archivos compartidos',images,mode):evidenceEmailHtml(r.folderImages,'Evidencia de archivos compartidos'))+
   '<div style="border-top:1px solid #e9e1d4;margin-top:22px;padding-top:15px;font-size:12px;color:#73695d">Vigencia: '+esc(fmt(r.validUntil))+'. Si no puedes abrir los archivos o necesitas cambios, repórtalo desde el mismo expediente. <br>Dejavú Marketing · ÁGORA Archivos.</div>'+
   '</div></div>';
   const plain='ÁGORA · DEJAVÚ MARKETING\nEntrega de archivos: '+r.title+'\nProyecto: '+r.project+
@@ -113,17 +117,110 @@ function emailContent(r){
     '\n\nIndicaciones: '+(r.notes||'Revisar los archivos')+'\nVigencia: '+fmt(r.validUntil);
   return {html,plain,confirmUrl,drive};
 }
+function updateInlineSendButton(){
+ const total=imageEvidenceCount(emailRecord);
+ const ready=!!emailRecord?.active&&total>0&&emailImages.length===total&&!emailFailures.length&&!emailSending&&!emailSent;
+ $('sendGmailInline').disabled=!ready;
+ $('sendGmailInline').textContent=emailSent?'✓ Correo enviado':emailSending?'Enviando correo…':'Enviar por Gmail con fotografías';
+}
+function currentEmailPreview(){
+ const r=emailRecord;
+ if(!r)return;
+ const content=emailContent(r,{images:emailImages,mode:'preview'});
+ $('emailPreviewContent').innerHTML=(!r.active?'<p class="notice"><b>Expediente revocado.</b> No se puede enviar este correo. Duplica el expediente y publica un enlace nuevo.</p>':'')+content.html;
+}
+async function loadEmailPhotos(){
+ const r=emailRecord;
+ if(!r?.active)return;
+ const total=imageEvidenceCount(r);
+ if(!total){$('emailPhotosStatus').textContent='Este expediente no contiene fotografías para incrustar.';return;}
+ if(!driveConnected()){
+  $('emailPhotosStatus').textContent='Conecta Google Drive para mostrar las imágenes reales y preparar su envío privado.';
+  updateInlineSendButton();return;
+ }
+ const stamp=++emailLoadSerial;
+ $('emailLoadPhotos').disabled=true;
+ $('emailPhotosStatus').textContent='Consultando las fotografías privadas en Drive…';
+ for(const url of emailPreviewUrls)URL.revokeObjectURL(url);
+ emailPreviewUrls=[];emailImages=[];emailFailures=[];
+ updateInlineSendButton();
+ try{
+  const result=await loadInlineImages({
+   urls:[...(r.sampleImages||[]),...(r.folderImages||[])],
+   accessToken:currentDriveToken(),
+   onProgress:status=>{if(stamp===emailLoadSerial)$('emailPhotosStatus').textContent=status;}
+  });
+  if(stamp!==emailLoadSerial||emailRecord!==r)return;
+  emailImages=result.images.map(image=>{
+   const previewUrl=URL.createObjectURL(image.blob);
+   emailPreviewUrls.push(previewUrl);
+   return {...image,previewUrl};
+  });
+  emailFailures=result.failures;
+  currentEmailPreview();
+  $('emailPhotosStatus').textContent=emailFailures.length?
+   'Se pudieron cargar '+emailImages.length+' de '+total+' fotografías. No se enviará un correo incompleto. '+emailFailures.join(' '):
+   '✓ '+total+' fotografías visibles y preparadas como imágenes incrustadas. Tamaño total: '+Math.round(result.totalBytes/1024)+' KB.';
+ }catch(e){
+  if(stamp===emailLoadSerial){emailFailures=[e?.message||String(e)];$('emailPhotosStatus').textContent='Error al leer Drive: '+emailFailures[0];currentEmailPreview();}
+ }finally{
+  if(stamp===emailLoadSerial){$('emailLoadPhotos').disabled=false;updateInlineSendButton();}
+ }
+}
 function openEmailPreview(r){
-  emailRecord=r;
-  const content=emailContent(r);
-  $('emailRecipient').textContent=r.recipientEmail;
-  $('emailSubject').textContent='ÁGORA · Archivos de producción · '+r.folio;
-  $('emailPreviewTitle').textContent=r.active?'Vista previa del correo':'Vista previa del correo · expediente revocado';
-  $('copyEmailPreview').disabled=!r.active;
-  $('openGmailPreview').disabled=!r.active;
-  $('emailPreviewContent').innerHTML=(r.active?'':'<p class="notice"><b>Expediente revocado.</b> Este correo solo se muestra como referencia. Para poder enviarlo, duplica el expediente y publica un enlace nuevo.</p>')+content.html;
-  $('emailOverlay').hidden=false;
-  document.body.style.overflow='hidden';
+ disposeEmailPhotos();
+ emailRecord=r;
+ $('emailRecipient').textContent=r.recipientEmail;
+ $('emailSubject').textContent='ÁGORA · Archivos de producción · '+r.folio;
+ $('emailPreviewTitle').textContent=r.active?'Vista previa del correo':'Vista previa del correo · expediente revocado';
+ $('copyEmailPreview').disabled=!r.active;
+ $('openGmailPreview').disabled=!r.active;
+ $('emailLoadPhotos').disabled=!r.active;
+ $('emailPhotosStatus').textContent=r.active?'Pulsa «Mostrar fotografías» para ver las imágenes reales y preparar su envío.':'Este expediente está revocado: no se puede enviar.';
+ currentEmailPreview();
+ updateInlineSendButton();
+ $('emailOverlay').hidden=false;
+ document.body.style.overflow='hidden';
+ if(r.active&&driveConnected())loadEmailPhotos();
+}
+async function sendEmailWithPhotos(){
+ const r=emailRecord;
+ if(!r)return;
+ const total=imageEvidenceCount(r);
+ if(emailSending||emailSent||!r.active||total===0||emailImages.length!==total||emailFailures.length){
+  $('emailPhotosStatus').textContent='Primero carga correctamente todas las fotografías para enviarlas incrustadas.';
+  updateInlineSendButton();return;
+ }
+ try{authRequired();}catch(e){$('emailPhotosStatus').textContent=e.message;return;}
+ // Este segundo consentimiento autoriza enviar un mensaje, no leer el buzón.
+ if(!confirm('¿Enviar el correo a '+r.recipientEmail+' con '+total+' fotografías incrustadas?\n\nEl destinatario conservará las imágenes que reciba en su correo, incluso si después revocas permisos en Drive. Esta acción realmente envía el mensaje.'))return;
+ emailSending=true;updateInlineSendButton();
+ $('emailPhotosStatus').textContent='Solicitando permiso para enviar desde Gmail…';
+ try{
+  const sender=user?.email||'';
+  const senderUid=user?.uid;
+  const provider=new GoogleAuthProvider();
+  provider.addScope(GMAIL_SEND_SCOPE);
+  const credentials=await reauthenticateWithPopup(auth.currentUser,provider);
+  if(!emailRecord||emailRecord!==r||!r.active||user?.uid!==senderUid||credentials.user.uid!==senderUid)throw Error('La sesión o el expediente cambió durante la autorización.');
+  const gmailToken=GoogleAuthProvider.credentialFromResult(credentials)?.accessToken;
+  if(!gmailToken)throw Error('Google no proporcionó el permiso gmail.send. Revisa la configuración de Google Auth Platform.');
+  $('emailPhotosStatus').textContent='Confirmando que el expediente siga vigente…';
+  const fresh=await getDoc(doc(db,'agora_file_deliveries',r.id));
+  if(!fresh.exists()||fresh.data().active!==true||fresh.data().version!==r.version||
+     fresh.data().recipientEmail!==r.recipientEmail||fresh.data().updatedAt?.toMillis?.()!==r.updatedAt?.toMillis?.()||fresh.data().validUntil?.toMillis?.()<=Date.now())
+   throw Error('El expediente cambió, fue revocado o venció. Recarga antes de enviarlo.');
+  $('emailPhotosStatus').textContent='Preparando correo con imágenes incrustadas…';
+  const {html,plain}=emailContent(r,{images:emailImages,mode:'email'});
+  const raw=await buildGmailMime({from:sender,to:r.recipientEmail,subject:$('emailSubject').textContent,html,plain,images:emailImages});
+  $('emailPhotosStatus').textContent='Enviando mediante Gmail…';
+  const messageId=await sendGmailInline({accessToken:gmailToken,raw});
+  emailSent=true;
+  $('emailPhotosStatus').textContent='✓ Enviado correctamente desde '+sender+' a '+r.recipientEmail+' · ID Gmail: '+messageId+'. Revisa «Enviados».';
+  notify('Correo enviado mediante Gmail con '+total+' fotografías incrustadas. No se modificaron los acuses ni el expediente.');
+ }catch(e){
+  $('emailPhotosStatus').textContent='No se confirmó el envío: '+(e?.message||e)+'. Revisa «Enviados» antes de reintentar si la conexión se interrumpió.';
+ }finally{emailSending=false;updateInlineSendButton();}
 }
 async function copyEmailEvidence(r){
   const {html,plain}=emailContent(r);
@@ -133,14 +230,14 @@ async function copyEmailEvidence(r){
         'text/html':new Blob([html],{type:'text/html'}),
         'text/plain':new Blob([plain],{type:'text/plain'})
       })]);
-      notify('Correo visual copiado. Pégalo en Gmail: incluye botones para abrir cada fotografía privada sin miniaturas rotas.');
+      notify('Correo visual copiado con enlaces privados. Para incrustar las fotos reales, usa «Enviar por Gmail con fotografías».');
     }else{
       await navigator.clipboard.writeText(plain);
       notify('Se copió el correo en texto con ambos enlaces. Pégalo en Gmail.');
     }
   }catch(err){notify('No fue posible copiar el correo: '+err.message,true);}
 }
-function prepareEmail(r){const url=urlFor(r.id);const subject=`ÁGORA · Archivos de aplicación para muestras · ${r.folio}`;const content=`Hola ${r.recipientName},\n\nDejavú Marketing te comparte los artes y archivos de producción para ${r.project}.\n\n1. Abre el enlace de ÁGORA para ver las capturas de evidencia y las indicaciones:\n${url}\n\n2. Accede a los archivos originales en Google Drive:\n${safeHttps(r.driveUrl)}\n\n3. Confirma de recibido desde ÁGORA para generar el comprobante digital. Si falta algún archivo o no puedes abrirlo, repórtalo en el mismo formulario.\n\nVigencia: ${fmt(r.validUntil)}\nVersión: ${r.version}\n\nSaludos,\nDejavú Marketing`;const extra=evidenceEmailPlain(r.sampleImages,'Vistas de artes y aplicaciones')+evidenceEmailPlain(r.folderImages,'Evidencia de archivos compartidos');const gmail='https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(r.recipientEmail)+'&su='+encodeURIComponent(subject)+'&body='+encodeURIComponent(content+extra);window.open(gmail,'_blank','noopener,noreferrer');notify('Abrimos Gmail con los enlaces. Revisa y envía. Puedes pegar el correo visual si deseas mostrar las capturas dentro del mensaje.');}
+function prepareEmail(r){const url=urlFor(r.id);const subject=`ÁGORA · Archivos de aplicación para muestras · ${r.folio}`;const content=`Hola ${r.recipientName},\n\nDejavú Marketing te comparte los artes y archivos de producción para ${r.project}.\n\n1. Abre el enlace de ÁGORA para ver las capturas de evidencia y las indicaciones:\n${url}\n\n2. Accede a los archivos originales en Google Drive:\n${safeHttps(r.driveUrl)}\n\n3. Confirma de recibido desde ÁGORA para generar el comprobante digital. Si falta algún archivo o no puedes abrirlo, repórtalo en el mismo formulario.\n\nVigencia: ${fmt(r.validUntil)}\nVersión: ${r.version}\n\nSaludos,\nDejavú Marketing`;const extra=evidenceEmailPlain(r.sampleImages,'Vistas de artes y aplicaciones')+evidenceEmailPlain(r.folderImages,'Evidencia de archivos compartidos');const gmail='https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(r.recipientEmail)+'&su='+encodeURIComponent(subject)+'&body='+encodeURIComponent(content+extra);window.open(gmail,'_blank','noopener,noreferrer');notify('Gmail abrió un mensaje con enlaces. Para enviar fotografías reales incrustadas, usa el botón «Enviar por Gmail con fotografías» de la vista previa.');}
 function revoke(r){if(!confirm('¿Revocar este enlace? El destinatario dejará de poder abrirlo o responder. La información del expediente se conservará.'))return;authRequired();runTransaction(db,async tx=>{const refDoc=doc(db,'agora_file_deliveries',r.id),s=await tx.get(refDoc);if(!s.exists()||!s.data().active)throw Error('El envío ya fue revocado o no existe.');tx.update(refDoc,{active:false,updatedAt:serverTimestamp()});}).then(()=>{closeModals();notify('Enlace revocado. El expediente permanece en el historial.');}).catch(e=>notify(e.message,true));}
 function parseValidUntil(value){const d=new Date(value+'T23:59:59');if(Number.isNaN(+d)||d.getTime()<=Date.now())throw Error('Selecciona una vigencia futura.');return Timestamp.fromDate(d);}
 // Los originales permanecen en Drive; aquí guardamos vistas optimizadas.
@@ -203,7 +300,8 @@ async function connectDrive(){
   driveTokenExpiry=Date.now()+45*60*1000;
   updateDriveConnectionStatus();
   notify('Drive conectado. Las imágenes se compartirán solo con el destinatario del expediente.');
- }catch(e){const message='No se pudo conectar Drive: '+(e?.message||e);$('driveConnectionStatus').textContent=message;notify(message,true);}
+  return true;
+ }catch(e){const message='No se pudo conectar Drive: '+(e?.message||e);$('driveConnectionStatus').textContent=message;notify(message,true);return false;}
 }
 function currentDriveToken(){
  if(!driveConnected()){updateDriveConnectionStatus();throw Error('Para adjuntar fotografías, primero pulsa «Conectar Google Drive». No se requiere Firebase Blaze.');}
@@ -404,3 +502,5 @@ updateDriveConnectionStatus();
 
 $('copyEmailPreview').addEventListener('click',()=>{if(emailRecord)copyEmailEvidence(emailRecord);});
 $('openGmailPreview').addEventListener('click',()=>{if(emailRecord)prepareEmail(emailRecord);});
+$('emailLoadPhotos').addEventListener('click',async()=>{if(!driveConnected()&&!await connectDrive())return;await loadEmailPhotos();});
+$('sendGmailInline').addEventListener('click',sendEmailWithPhotos);
