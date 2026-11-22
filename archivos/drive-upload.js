@@ -62,7 +62,10 @@ async function ensureFolder(token, name, parent=null) {
 }
 async function grantRecipientAccess(token,folderId,recipientEmail,uploaderEmail){
   if(recipientEmail.toLowerCase()===String(uploaderEmail||'').toLowerCase())return;
-  await driveFetch(token,DRIVE_BASE+'/'+assertId(folderId)+'/permissions?sendNotificationEmail=false&fields=id',{
+  const endpoint=DRIVE_BASE+'/'+assertId(folderId)+'/permissions';
+  const existing=await driveFetch(token,endpoint+'?fields=nextPageToken,permissions(id,type,emailAddress,role)&pageSize=100');
+  if(existing.permissions?.some(p=>p.type==='user'&&p.emailAddress?.toLowerCase()===recipientEmail.toLowerCase()))return;
+  await driveFetch(token,endpoint+'?sendNotificationEmail=false&fields=id',{
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({type:'user',role:'reader',emailAddress:recipientEmail})
   });
