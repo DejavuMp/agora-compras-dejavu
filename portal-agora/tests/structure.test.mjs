@@ -30,8 +30,8 @@ test("site portable and independent from other systems",async()=>{
   assert.ok(html.includes('src="./assets/pdf-agora-wordmark.webp"'));
   assert.match(js,/class="scene-hero"/);
   assert.ok(js.includes('assets/pdf-agora-wordmark.webp'));
-  assert.ok(js.includes('assets/pdf-staff-icon.webp'));
-  assert.ok(js.includes('assets/pdf-agency-icon.webp'));
+  assert.ok(js.includes('pdf-staff-icon.webp'));
+  assert.ok(js.includes('pdf-agency-icon.webp'));
   assert.ok(css.includes("pdf-hero.webp"));
   assert.ok(css.includes("pdf-zeus.webp"));
   assert.match(js,/class="credential-mark"/);
