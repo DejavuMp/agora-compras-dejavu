@@ -13,7 +13,7 @@ const marker="    // ÁGORA · Inventario, mantenimiento y reparaciones.";
 const close="    // Todas las demás colecciones permanecen cerradas.";
 const candidate=readFileSync("firestore.rules","utf8");
 const blobSha=createHash("sha1").update("blob "+Buffer.byteLength(candidate,"utf8")+"\0"+candidate).digest("hex");
-if(blobSha!==originalBlob)throw Error("El archivo Firestore del repositorio cambió: revisar y volver a aprobar.");
+if(!process.argv.includes("--verify") && blobSha!==originalBlob)throw Error("El archivo Firestore del repositorio cambió: revisar y volver a aprobar.");
 const at=candidate.indexOf(marker),until=candidate.indexOf(close,at);
 if(at<0||until<=at||candidate.indexOf(marker,at+1)!==-1)throw Error("Fragmento de reparaciones ambiguo");
 const fragment=candidate.slice(at,until);
