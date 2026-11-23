@@ -1461,10 +1461,10 @@ match /agora_finance_requests/{requestId} {
         exists(repairRequestPath(request.resource.data.requestId)) &&
         request.resource.data.snapshot is map &&
         request.resource.data.snapshot.keys().hasOnly([
-          'project','asset','area','problem','scope','priority','dueDate','materialLink'
+          'project','asset','area','problem','scope','priority','dueDate','materialLink','photoPreview'
         ]) &&
         request.resource.data.snapshot.keys().hasAll([
-          'project','asset','area','problem','scope','priority','dueDate','materialLink'
+          'project','asset','area','problem','scope','priority','dueDate','materialLink','photoPreview'
         ]) &&
         request.resource.data.snapshot.project is string &&
         request.resource.data.snapshot.project.size() <= 120 &&
@@ -1482,6 +1482,10 @@ match /agora_finance_requests/{requestId} {
         request.resource.data.snapshot.dueDate.size() <= 10 &&
         request.resource.data.snapshot.materialLink is string &&
         request.resource.data.snapshot.materialLink.size() <= 1000 &&
+        request.resource.data.snapshot.photoPreview is string &&
+        request.resource.data.snapshot.photoPreview.size() <= 150000 &&
+        (request.resource.data.snapshot.photoPreview == '' ||
+          request.resource.data.snapshot.photoPreview.matches('data:image/jpeg;base64,[A-Za-z0-9+/=]+')) &&
         request.resource.data.supplierHint is string &&
         request.resource.data.supplierHint.size() <= 160 &&
         request.resource.data.createdBy == request.auth.uid &&
