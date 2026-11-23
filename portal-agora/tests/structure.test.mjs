@@ -119,6 +119,15 @@ test("original high resolution Dejavú images embedded",async()=>{
   }
 });
 
+test("quick access links show before the digital credential without bypassing roles",async()=>{
+  const app=await read("app.js"),css=await read("style.css");
+  assert.ok(app.includes('function quickAccess()'));
+  assert.ok(app.includes('adminRoleNotice()+quickAccess()+'));
+  assert.ok(app.includes('state.space==="staff"'));
+  assert.ok(app.includes('rel="noopener noreferrer"'));
+  assert.ok(css.includes(".quick-access"));
+});
+
 test("firestore SMS rules are limited to identity and own UID",async()=>{
   const rules=await readFile(new URL("../../firestore.rules",import.meta.url),"utf8");
   assert.match(rules,/function identitySignedIn\(\)/);
