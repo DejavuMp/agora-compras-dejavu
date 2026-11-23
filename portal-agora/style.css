@@ -404,3 +404,15 @@ footer{
  html{scroll-behavior:auto}
  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+
+/* Marca oficial sobre la credencial: fuente original de Dejavú Marketing. */
+.credential-mark{
+ position:absolute;right:1.8rem;top:1.35rem;width:46px;height:66px;object-fit:contain;
+ filter:drop-shadow(0 0 15px rgba(222,175,79,.2));z-index:2;pointer-events:none;
+}
+.credential-verify{
+ color:#f0d495;font-size:.78rem;letter-spacing:.02em;
+ text-decoration:none;border-bottom:1px solid rgba(242,205,143,.35);padding-bottom:3px;
+}
+.credential-verify:hover{color:#fff0cf;border-color:#fff0cf}
