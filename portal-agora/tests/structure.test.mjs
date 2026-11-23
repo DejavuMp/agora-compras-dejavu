@@ -28,7 +28,17 @@ test("site portable and independent from other systems",async()=>{
   assert.match(css,/@keyframes orbit/);
   assert.match(css,/prefers-reduced-motion:reduce/);
   assert.ok(html.includes('src="./assets/pdf-agora-wordmark.webp"'));
-  assert.match(js,/class="scene-hero"/);
+  assert.match(js,/class="cinema-login"/);
+  assert.ok(css.includes("escena-login-agora.webp"));
+  assert.match(css,/@keyframes cinema-drift/);
+  assert.match(html,/<body class="login-mode">/);
+  const initialLogin=js.slice(js.indexOf("function login(){"),js.indexOf("function loading(){"));
+  assert.doesNotMatch(initialLogin,/space-preview|class="preview"/);
+  assert.match(initialLogin,/id="phone-send"/);
+  assert.match(initialLogin,/id="email-send"/);
+  assert.match(initialLogin,/data-method/);
+  assert.match(initialLogin,/data-action/);
+  assert.match(js,/const phone=input\.startsWith\("\+"\)\?input:"\+52"\+input/);
   assert.ok(js.includes('assets/pdf-agora-wordmark.webp'));
   assert.ok(js.includes('pdf-staff-icon.webp'));
   assert.ok(js.includes('pdf-agency-icon.webp'));
@@ -57,6 +67,13 @@ test("official reference PDF imagery bundled as real WebP assets",async()=>{
     assert.equal(bytes.subarray(8,12).toString(),"WEBP",filename+" should be WebP");
     assert.ok(bytes.byteLength>4000,filename+" should not be a placeholder");
   }
+});
+
+test("original generated cinematic login background is bundled",async()=>{
+ const bytes=await readFile(new URL("../assets/escena-login-agora.webp",import.meta.url));
+ assert.equal(bytes.subarray(0,4).toString(),"RIFF");
+ assert.equal(bytes.subarray(8,12).toString(),"WEBP");
+ assert.ok(bytes.length>100000);
 });
 
 test("firestore SMS rules are limited to identity and own UID",async()=>{
