@@ -1270,6 +1270,316 @@ match /agora_finance_requests/{requestId} {
     }
 
 
+    // ÁGORA · Inventario, mantenimiento y reparaciones.
+    // Colecciones nuevas: no migran ni modifican los datos de otros módulos.
+    function repairUser() { return canEdit() || opsStaff(); }
+    function repairRequestPath(id) {
+      return /databases/$(database)/documents/agora_repair_requests/$(id);
+    }
+    function repairAllowedFields() {
+      return [
+        'id','assetId','project','asset','scope','area','cause','problem','solutionMode',
+        'instructions','materialLink','dueDate','priority','createdBy',
+        'createdByEmail','createdByName','createdAt','updatedAt','status',
+        'repairRoute','assignedTo','assignedUid','decisionBy','decisionNote','estimatedCost',
+        'quotes','selectedQuoteId','photos','revision'
+      ];
+    }
+    function repairDocumentValid(id) {
+      return request.resource.data.keys().hasOnly(repairAllowedFields()) &&
+        request.resource.data.keys().hasAll(repairAllowedFields()) &&
+        request.resource.data.id == id &&
+        request.resource.data.assetId is string &&
+        request.resource.data.assetId.size() <= 36 &&
+        request.resource.data.project is string &&
+        request.resource.data.project.size() > 0 &&
+        request.resource.data.project.size() <= 120 &&
+        request.resource.data.asset is string &&
+        request.resource.data.asset.size() > 0 &&
+        request.resource.data.asset.size() <= 120 &&
+        request.resource.data.area is string &&
+        request.resource.data.area.size() > 0 &&
+        request.resource.data.area.size() <= 120 &&
+        request.resource.data.problem is string &&
+        request.resource.data.problem.size() > 0 &&
+        request.resource.data.problem.size() <= 2000 &&
+        request.resource.data.scope in [
+          'Área del stand','Elemento específico','Stand completo','Mueble suelto'
+        ] &&
+        request.resource.data.cause is string &&
+        request.resource.data.cause.size() <= 250 &&
+        request.resource.data.instructions is string &&
+        request.resource.data.instructions.size() <= 2000 &&
+        request.resource.data.materialLink is string &&
+        request.resource.data.materialLink.size() <= 1000 &&
+        request.resource.data.dueDate is string &&
+        request.resource.data.dueDate.size() <= 10 &&
+        request.resource.data.priority in ['Normal','Alta','Urgente'] &&
+        request.resource.data.solutionMode in ['propuesta','instrucciones'] &&
+        request.resource.data.createdBy is string &&
+        request.resource.data.createdByEmail is string &&
+        request.resource.data.createdByEmail.size() <= 240 &&
+        request.resource.data.createdByName is string &&
+        request.resource.data.createdByName.size() <= 120 &&
+        request.resource.data.status in [
+          'pendiente','revision','cotizando','autorizado',
+          'reparacion','terminado','entregado'
+        ] &&
+        request.resource.data.repairRoute in [
+          'pendiente','staff','agencia','proveedor','nuevo','cotizar','comparar'
+        ] &&
+        request.resource.data.assignedTo is string &&
+        request.resource.data.assignedTo.size() <= 160 &&
+        request.resource.data.assignedUid is string &&
+        request.resource.data.assignedUid.size() <= 128 &&
+        request.resource.data.decisionBy is string &&
+        request.resource.data.decisionBy.size() <= 120 &&
+        request.resource.data.decisionNote is string &&
+        request.resource.data.decisionNote.size() <= 2000 &&
+        request.resource.data.estimatedCost is number &&
+        request.resource.data.estimatedCost >= 0 &&
+        request.resource.data.estimatedCost <= 99999999 &&
+        request.resource.data.quotes is list &&
+        request.resource.data.quotes.size() <= 8 &&
+        request.resource.data.selectedQuoteId is string &&
+        request.resource.data.selectedQuoteId.size() <= 36 &&
+        request.resource.data.photos is list &&
+        request.resource.data.photos.size() <= 12 &&
+        request.resource.data.revision is int &&
+        request.resource.data.revision >= 1;
+    }
+    // Inventario de piezas reutilizables, accesible solo a ÁGORA autorizado.
+    function repairAssetValid(id) {
+      return request.resource.data.keys().hasOnly([
+        'id','project','stand','piece','description','materialLink','condition',
+        'photoPaths','createdBy','createdAt','updatedAt','revision'
+      ]) &&
+      request.resource.data.keys().hasAll([
+        'id','project','stand','piece','description','materialLink','condition',
+        'photoPaths','createdBy','createdAt','updatedAt','revision'
+      ]) &&
+      request.resource.data.id == id &&
+      request.resource.data.project is string &&
+      request.resource.data.project.size() > 0 &&
+      request.resource.data.project.size() <= 120 &&
+      request.resource.data.stand is string &&
+      request.resource.data.stand.size() > 0 &&
+      request.resource.data.stand.size() <= 120 &&
+      request.resource.data.piece is string &&
+      request.resource.data.piece.size() > 0 &&
+      request.resource.data.piece.size() <= 120 &&
+      request.resource.data.description is string &&
+      request.resource.data.description.size() <= 800 &&
+      request.resource.data.materialLink is string &&
+      request.resource.data.materialLink.size() <= 1000 &&
+      request.resource.data.condition in [
+        'Por revisar','Disponible','Requiere reparación','En reparación'
+      ] &&
+      request.resource.data.photoPaths is list &&
+      request.resource.data.photoPaths.size() <= 20 &&
+      request.resource.data.createdBy is string &&
+      request.resource.data.revision is int &&
+      request.resource.data.revision > 0;
+    }
+    match /agora_repair_assets/{id} {
+      allow get, list: if repairUser();
+      allow create: if canEdit() &&
+        id.matches('^[a-f0-9-]{36}$') &&
+        repairAssetValid(id) &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.revision == 1 &&
+        request.resource.data.photoPaths.size() == 0;
+      allow update: if canEdit() &&
+        repairAssetValid(id) &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.revision == resource.data.revision + 1 &&
+        request.resource.data.photoPaths.size() >= resource.data.photoPaths.size() &&
+        request.resource.data.photoPaths.hasAll(resource.data.photoPaths);
+      allow delete: if false;
+    }
+    match /agora_repair_requests/{id} {
+      allow get, list: if canEdit() || (opsStaff() && (
+        resource.data.createdBy == request.auth.uid ||
+        resource.data.assignedUid == request.auth.uid));
+      allow create: if repairUser() &&
+        id.matches('^[a-f0-9-]{36}$') &&
+        repairDocumentValid(id) &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.createdByEmail == request.auth.token.email &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.revision == 1 &&
+        request.resource.data.status == 'pendiente' &&
+        request.resource.data.repairRoute == 'pendiente' &&
+        request.resource.data.assignedTo == '' &&
+        request.resource.data.assignedUid == '' &&
+        request.resource.data.decisionBy == '' &&
+        request.resource.data.decisionNote == '' &&
+        request.resource.data.estimatedCost == 0 &&
+        request.resource.data.quotes.size() == 0 &&
+        request.resource.data.photos.size() == 0 &&
+        request.resource.data.selectedQuoteId == '';
+      allow update: if repairUser() &&
+        repairDocumentValid(id) &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.revision == resource.data.revision + 1 &&
+        (
+          canEdit() ||
+          (opsStaff() && (resource.data.createdBy == request.auth.uid ||
+              resource.data.assignedUid == request.auth.uid) &&
+            request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['photos','revision','updatedAt']) &&
+            request.resource.data.photos.size() == resource.data.photos.size() + 1 &&
+            request.resource.data.photos.hasAll(resource.data.photos) &&
+            request.resource.data.photos[request.resource.data.photos.size() - 1].path
+              .matches('^agora-repairs/' + id + '/' + request.auth.uid + '/[a-f0-9-]{36}\\.jpg$'))
+        );
+      allow delete: if false;
+    }
+
+    // Invitación externa por token de 256 bits: única, con caducidad y sin listados.
+    function repairInviteCreate(token) {
+      return canEdit() && token.size() == 43 &&
+        token.matches('[A-Za-z0-9_-]+') &&
+        request.resource.data.keys().hasOnly([
+          'requestId','snapshot','supplierHint','createdBy','createdAt',
+          'updatedAt','expiresAt','status','response','submittedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'requestId','snapshot','supplierHint','createdBy','createdAt',
+          'updatedAt','expiresAt','status','response','submittedAt'
+        ]) &&
+        request.resource.data.requestId is string &&
+        request.resource.data.requestId.size() == 36 &&
+        exists(repairRequestPath(request.resource.data.requestId)) &&
+        request.resource.data.snapshot is map &&
+        request.resource.data.snapshot.keys().hasOnly([
+          'project','asset','area','problem','scope','priority','dueDate','materialLink','photoPreview'
+        ]) &&
+        request.resource.data.snapshot.keys().hasAll([
+          'project','asset','area','problem','scope','priority','dueDate','materialLink','photoPreview'
+        ]) &&
+        request.resource.data.snapshot.project is string &&
+        request.resource.data.snapshot.project.size() <= 120 &&
+        request.resource.data.snapshot.asset is string &&
+        request.resource.data.snapshot.asset.size() <= 120 &&
+        request.resource.data.snapshot.area is string &&
+        request.resource.data.snapshot.area.size() <= 120 &&
+        request.resource.data.snapshot.problem is string &&
+        request.resource.data.snapshot.problem.size() <= 2000 &&
+        request.resource.data.snapshot.scope is string &&
+        request.resource.data.snapshot.scope.size() <= 60 &&
+        request.resource.data.snapshot.priority is string &&
+        request.resource.data.snapshot.priority.size() <= 10 &&
+        request.resource.data.snapshot.dueDate is string &&
+        request.resource.data.snapshot.dueDate.size() <= 10 &&
+        request.resource.data.snapshot.materialLink is string &&
+        request.resource.data.snapshot.materialLink.size() <= 1000 &&
+        request.resource.data.snapshot.photoPreview is string &&
+        request.resource.data.snapshot.photoPreview.size() <= 150000 &&
+        (request.resource.data.snapshot.photoPreview == '' ||
+          request.resource.data.snapshot.photoPreview.matches('data:image/jpeg;base64,[A-Za-z0-9+/=]+')) &&
+        request.resource.data.supplierHint is string &&
+        request.resource.data.supplierHint.size() <= 160 &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.expiresAt is timestamp &&
+        request.resource.data.expiresAt > request.time &&
+        request.resource.data.expiresAt <= request.time + duration.value(21,'d') &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.response == null &&
+        request.resource.data.submittedAt == null;
+    }
+    function repairInviteSubmit(token) {
+      return token.size() == 43 &&
+        token.matches('[A-Za-z0-9_-]+') &&
+        resource.data.status == 'pending' &&
+        resource.data.expiresAt > request.time &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status','response','submittedAt','updatedAt']) &&
+        request.resource.data.status == 'submitted' &&
+        request.resource.data.submittedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.response is map &&
+        request.resource.data.response.keys().hasOnly([
+          'provider','email','amount','scope','note','link'
+        ]) &&
+        request.resource.data.response.keys().hasAll([
+          'provider','email','amount','scope','note','link'
+        ]) &&
+        request.resource.data.response.provider is string &&
+        request.resource.data.response.provider.size() > 1 &&
+        request.resource.data.response.provider.size() <= 160 &&
+        request.resource.data.response.email is string &&
+        request.resource.data.response.email.size() <= 240 &&
+        request.resource.data.response.amount is number &&
+        request.resource.data.response.amount >= 0 &&
+        request.resource.data.response.amount <= 99999999 &&
+        request.resource.data.response.scope is string &&
+        request.resource.data.response.scope.size() > 0 &&
+        request.resource.data.response.scope.size() <= 500 &&
+        request.resource.data.response.note is string &&
+        request.resource.data.response.note.size() <= 500 &&
+        request.resource.data.response.link is string &&
+        request.resource.data.response.link.size() <= 1000;
+    }
+    match /agora_repair_invites/{token} {
+      allow get: if canEdit() ||
+        (token.size() == 43 && token.matches('[A-Za-z0-9_-]+') &&
+         resource.data.expiresAt > request.time &&
+         resource.data.status in ['pending','submitted']);
+      allow list: if canEdit();
+      allow create: if repairInviteCreate(token);
+      allow update: if repairInviteSubmit(token) ||
+        (canEdit() && resource.data.status in ['pending','submitted'] &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['status','updatedAt']) &&
+         request.resource.data.status == 'revoked' &&
+         request.resource.data.updatedAt == request.time);
+      allow delete: if false;
+    }
+    match /agora_repair_events/{eventId} {
+      allow get, list: if canEdit() || (opsStaff() && resource.data.actorUid == request.auth.uid);
+      allow create: if repairUser() &&
+        request.resource.data.keys().hasOnly([
+          'requestId','actorUid','actorEmail','action','detail','createdAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'requestId','actorUid','actorEmail','action','detail','createdAt'
+        ]) &&
+        request.resource.data.actorUid == request.auth.uid &&
+        request.resource.data.actorEmail == request.auth.token.email &&
+        request.resource.data.requestId is string &&
+        request.resource.data.action in [
+          'creada','decisión','cotización','selección de cotización','evidencia',
+          'invitación','cotización externa','avance'
+        ] &&
+        request.resource.data.detail is string &&
+        request.resource.data.detail.size() <= 500 &&
+        request.resource.data.createdAt == request.time &&
+        existsAfter(repairRequestPath(request.resource.data.requestId)) &&
+        (canEdit() || (opsStaff() &&
+           request.resource.data.action in ['creada','evidencia','avance'] &&
+           (getAfter(repairRequestPath(request.resource.data.requestId)).data.createdBy == request.auth.uid ||
+            getAfter(repairRequestPath(request.resource.data.requestId)).data.assignedUid == request.auth.uid) &&
+           (request.resource.data.action != 'creada' ||
+             (!exists(repairRequestPath(request.resource.data.requestId)) &&
+               getAfter(repairRequestPath(request.resource.data.requestId)).data.createdAt == request.time)) &&
+           (request.resource.data.action != 'evidencia' ||
+             (exists(repairRequestPath(request.resource.data.requestId)) &&
+               getAfter(repairRequestPath(request.resource.data.requestId)).data.photos.size() ==
+                 get(repairRequestPath(request.resource.data.requestId)).data.photos.size() + 1))));
+      allow update, delete: if false;
+    }
+
     // Todas las demás colecciones permanecen cerradas.
     match /{document=**} {
       allow read, write: if false;

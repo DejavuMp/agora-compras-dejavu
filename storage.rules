@@ -20,6 +20,65 @@ service firebase.storage {
       // No permitir lectura por listado ni acceso directo sin el token de descarga.
       allow read: if canEdit();
     }
+    // Reparaciones: acceso privado a evidencias por rol y folio.
+    function opsMember(uid) {
+      return /databases/(default)/documents/agora_ops_members/$(uid);
+    }
+    function repairDoc(id) {
+      return /databases/(default)/documents/agora_repair_requests/$(id);
+    }
+    function repairAssetDoc(id) {
+      return /databases/(default)/documents/agora_repair_assets/$(id);
+    }
+    function isOpsStaff() {
+      return signedIn() &&
+        firestore.exists(opsMember(request.auth.uid)) &&
+        firestore.get(opsMember(request.auth.uid)).data.active == true &&
+        firestore.get(opsMember(request.auth.uid)).data.role == 'staff';
+    }
+    function canReadRepair(id) {
+      return signedIn() &&
+        firestore.exists(repairDoc(id)) &&
+        (canEdit() ||
+          (isOpsStaff() &&
+            (firestore.get(repairDoc(id)).data.createdBy == request.auth.uid ||
+             firestore.get(repairDoc(id)).data.assignedUid == request.auth.uid)));
+    }
+    match /agora-repair-assets/{assetId}/{uploaderUid}/{fileName} {
+      allow get: if fileName.matches('^[a-f0-9-]{36}\\.jpg$') &&
+        firestore.exists(repairAssetDoc(assetId)) &&
+        (canEdit() || isOpsStaff());
+      allow list: if false;
+      allow create: if canEdit() &&
+        resource == null &&
+        request.auth.uid == uploaderUid &&
+        fileName.matches('^[a-f0-9-]{36}\\.jpg$') &&
+        firestore.exists(repairAssetDoc(assetId)) &&
+        request.resource.size > 0 &&
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType == 'image/jpeg';
+      allow update: if false;
+      allow delete: if canEdit();
+    }
+    match /agora-repairs/{requestId}/{uploaderUid}/{fileName} {
+      allow get: if fileName.matches('^[a-f0-9-]{36}\\.jpg$') &&
+        canReadRepair(requestId);
+      allow list: if false;
+      allow create: if signedIn() &&
+        resource == null &&
+        request.auth.uid == uploaderUid &&
+        fileName.matches('^[a-f0-9-]{36}\\.jpg$') &&
+        firestore.exists(repairDoc(requestId)) &&
+        (canEdit() ||
+          (isOpsStaff() &&
+            (firestore.get(repairDoc(requestId)).data.createdBy == request.auth.uid ||
+             firestore.get(repairDoc(requestId)).data.assignedUid == request.auth.uid))) &&
+        request.resource.size > 0 &&
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType == 'image/jpeg';
+      allow update: if false;
+      allow delete: if canEdit();
+    }
     match /{allPaths=**} { allow read, write: if false; }
   }
 }

@@ -1,0 +1,107 @@
+name: "ÁGORA · Activación única de Reparaciones con respaldo"
+on:
+  push:
+    branches: [main]
+    paths:
+      - "security/storage-before-reparaciones.rules"
+  workflow_dispatch:
+    inputs:
+      project_confirmation:
+        description: "Escribe agora-dejavu-38b8c para reintentar la publicación"
+        required: true
+        type: string
+concurrency:
+  group: agora-reparaciones-produccion-exclusiva
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  predeploy-tests:
+    name: "Probar respaldos y permisos sin producción"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: |
+          node .github/firebase-staff/test-preflight.mjs
+          node .github/firebase-staff/test-storage-preflight.mjs
+          node .github/firebase-staff/test-bucket-cors.mjs
+      - name: Probar roles de reparaciones con Firestore de prueba
+        run: |
+          npm install --no-save 'firebase@^12.0.0' '@firebase/rules-unit-testing@^5.0.0' firebase-tools
+          npx firebase emulators:exec --only firestore --project demo-agora-repairs --non-interactive 'node .github/firebase-staff/test-repair-rules.mjs'
+      - name: Probar fotografías con Storage de prueba
+        run: npx firebase emulators:exec --only firestore,storage --project demo-agora-repairs-storage --non-interactive 'node .github/firebase-staff/test-repair-storage-rules.mjs'
+  activate:
+    name: "Respaldo real, comprobación y activación"
+    needs: predeploy-tests
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.project_confirmation == 'agora-dejavu-38b8c')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      FIREBASE_PROJECT_ID: agora-dejavu-38b8c
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exigir identidad confiable del repositorio
+        env:
+          WIF_PROVIDER: ${{ vars.DEJAVU_FIREBASE_WIF_PROVIDER }}
+          WIF_SERVICE_ACCOUNT: ${{ vars.DEJAVU_FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$WIF_PROVIDER" ] || [ -z "$WIF_SERVICE_ACCOUNT" ]; then
+            echo "::error::No hay identidad federada configurada; no se modifica Firebase."
+            exit 1
+          fi
+      - id: google_auth
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: agora-dejavu-38b8c
+          workload_identity_provider: ${{ vars.DEJAVU_FIREBASE_WIF_PROVIDER }}
+          service_account: ${{ vars.DEJAVU_FIREBASE_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_lifetime: "600s"
+      - name: Respaldar y validar reglas activas de Firestore
+        env:
+          FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
+        run: node .github/firebase-staff/safe-rules-preflight.mjs
+      - name: Respaldar y validar reglas activas de Storage
+        env:
+          FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
+        run: node .github/firebase-staff/safe-storage-preflight.mjs
+      - name: Respaldar CORS vigente, sin modificar bucket
+        env:
+          FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
+        run: node .github/firebase-staff/safe-bucket-cors.mjs
+      - name: Almacenar respaldo previo OBLIGATORIO de ambos servicios
+        uses: actions/upload-artifact@v4
+        with:
+          name: respaldo-firebase-reparaciones-preproduccion
+          path: .github/firebase-staff/.preflight/
+          include-hidden-files: true
+          retention-days: 30
+          if-no-files-found: error
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Instalar Firebase CLI
+        run: npm install --global firebase-tools
+      - name: Añadir origen de ÁGORA a CORS conservando todos los existentes
+        env:
+          FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
+        run: node .github/firebase-staff/safe-bucket-cors.mjs --apply
+      - name: Publicar SOLO reglas de Storage (no archivos ni datos)
+        run: firebase deploy --only storage --project agora-dejavu-38b8c --non-interactive
+      - name: Publicar SOLO reglas de Firestore (sin migración de datos)
+        run: firebase deploy --only firestore:rules --project agora-dejavu-38b8c --non-interactive
+      - name: Comprobar ambas versiones activas tras desplegar
+        env:
+          FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
+        run: node .github/firebase-staff/verify-repair-release.mjs

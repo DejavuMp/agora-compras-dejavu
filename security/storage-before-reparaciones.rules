@@ -1,0 +1,25 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
+    function staffPath() { return /databases/(default)/documents/agora_users/$(request.auth.uid); }
+    function canEdit() {
+      return signedIn() &&
+        firestore.exists(staffPath()) &&
+        firestore.get(staffPath()).data.active == true &&
+        firestore.get(staffPath()).data.role in ['admin','coordinador'];
+    }
+    match /agora-file-previews/{deliveryId}/{version}/{fileName} {
+      allow write: if canEdit() &&
+        deliveryId.matches('^[A-Za-z0-9_-]{43}$') &&
+        version.matches('^v[0-9]{1,2}$') &&
+        fileName.matches('^(muestra|carpeta)-[a-f0-9-]{36}\\.jpg$') &&
+        request.resource.size < 6 * 1024 * 1024 &&
+        request.resource.contentType == 'image/jpeg';
+      // Las previsualizaciones se comparten mediante getDownloadURL (URL con token).
+      // No permitir lectura por listado ni acceso directo sin el token de descarga.
+      allow read: if canEdit();
+    }
+    match /{allPaths=**} { allow read, write: if false; }
+  }
+}

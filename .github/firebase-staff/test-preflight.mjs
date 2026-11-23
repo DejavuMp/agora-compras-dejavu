@@ -25,6 +25,10 @@ assert.ok(clockAt>opsAt&&clockAt<endAt,"La nueva ampliación de marcajes está d
 const beforeClock=candidate.slice(0,clockAt-1)+candidate.slice(endAt);
 const withoutOps=candidate.slice(0,opsAt-1)+candidate.slice(endAt);
 const legacy=candidate.slice(0,financeAt)+candidate.slice(endAt);
+const repairMarker="    // ÁGORA · Inventario, mantenimiento y reparaciones.";
+const repairAt=candidate.indexOf(repairMarker);
+assert.ok(repairAt>clockAt&&repairAt<endAt,"El módulo está aislado antes del cierre, sin modificar módulos previos");
+const beforeRepairs=candidate.slice(0,repairAt)+candidate.slice(endAt);
 const identityMarker="    // AGORA - Identidad Unica y RH. Fragmento para insertar dentro de";
 const identityAt=candidate.indexOf(identityMarker);
 assert.ok(identityAt>clockAt&&identityAt<endAt,"Identidad debe estar después de marcajes");
@@ -67,12 +71,14 @@ async function verify(label,live,shouldPass){
 }
 try{
   await verify("repositorio actual",candidate,true);
+  await verify("última versión main antes de reparaciones",beforeRepairs,true);
   await verify("versión publicada antes del arreglo de coordinación",beforeCoordinatorListFix,true);
   await verify("versión legítima anterior a Identidad",beforeIdentity,true);
   await verify("producción actual con Operaciones y sin marcajes",beforeClock,true);
   await verify("producción anterior a Operaciones",withoutOps,true);
   await verify("versión histórica sin Finanzas",legacy,true);
   await verify("diferencias desconocidas",drift,false);
+  await verify("deriva antes de reparaciones",beforeRepairs.replace("allow list: if false;","allow list: if true;"),false);
   await verify("deriva anterior a Identidad",beforeIdentity.replace("allow list: if false;","allow list: if true;"),false);
   await verify("deriva sobre versión anterior del directorio",beforeCoordinatorListFix.replace("allow list: if false;","allow list: if true;"),false);
 }finally{
