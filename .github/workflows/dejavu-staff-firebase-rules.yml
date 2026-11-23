@@ -62,6 +62,9 @@ jobs:
       - name: Probar Operaciones - roles, cronograma, horas y sueldos
         run: npx firebase emulators:exec --only firestore --project demo-agora-ops --non-interactive 'node .github/firebase-staff/test-ops-rules.mjs'
 
+      - name: Probar Inventario y Reparaciones con roles ficticios
+        run: npx firebase emulators:exec --only firestore --project demo-agora-repairs --non-interactive 'node .github/firebase-staff/test-repair-rules.mjs'
+
       - name: Probar Identidad Unica - alta, privacidad, credencial y auditoria
         run: npx firebase emulators:exec --only firestore --project demo-agora-identity --non-interactive 'node .github/firebase-staff/test-identity-rules.mjs'
 
