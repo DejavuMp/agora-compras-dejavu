@@ -987,3 +987,49 @@ body.login-mode .cinema-subtitle{
     max-width:min(289px,82vw);
   }
 }
+
+
+/* Simplificación de acceso: ID Dejavú + contraseña (pendiente de backend), o Google. */
+.cinema-card .id-entry{
+ display:flex;align-items:stretch;gap:.65rem;
+}
+.cinema-card .id-prefix{
+ display:flex;align-items:center;justify-content:center;flex:0 0 95px;
+ min-height:59px;border:1px solid rgba(240,211,165,.39);border-radius:12px;
+ background:rgba(8,9,12,.62);color:#f8d9a2;font-weight:800;
+ letter-spacing:.11em;font-size:1.02rem;
+}
+.cinema-card .id-entry input{min-width:0;flex:1;text-transform:uppercase}
+.cinema-card .login-pending{
+ color:#ead4ac;line-height:1.55;font-size:.76rem;text-align:left;
+ padding:.7rem .9rem;border-radius:.6rem;
+ background:rgba(241,190,101,.07);
+ border:1px solid rgba(241,190,101,.25);margin:1rem 0 .75rem;
+}
+.cinema-card .btn.gold.full:disabled{
+ opacity:.67;cursor:not-allowed;
+ box-shadow:none;background:linear-gradient(125deg,#8f7658,#c4aa86);
+}
+.cinema-card .login-separator{
+ display:flex;align-items:center;gap:.85rem;color:#c6b79f;
+ font-size:.79rem;letter-spacing:.04em;margin:.9rem 0;
+}
+.cinema-card .login-separator::before,.cinema-card .login-separator::after{
+ content:"";height:1px;flex:1;background:rgba(226,187,114,.3);
+}
+.cinema-card .google-login.full{
+ width:100%;display:flex;justify-content:center;align-items:center;gap:.8rem;
+ min-height:54px;font-size:1rem;border:1px solid rgba(245,211,154,.5);
+ border-radius:11px;background:rgba(18,16,14,.82);color:#f7ecd7;
+}
+.cinema-card .google-login.full:hover{background:rgba(51,38,21,.8)}
+.cinema-card .google-g{
+ display:inline-flex;align-items:center;justify-content:center;
+ font-weight:800;font-size:1.25rem;border-radius:100%;background:#fff;color:#4285f4;
+ width:1.65rem;height:1.65rem;
+}
+@media(max-width:400px){
+ .cinema-card .id-entry{gap:.4rem}
+ .cinema-card .id-prefix{flex-basis:70px;font-size:.85rem}
+ .cinema-card .google-login.full{font-size:.88rem}
+}
