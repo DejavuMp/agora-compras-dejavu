@@ -50,61 +50,52 @@ async function action(fn,success){
 function resetCaptcha(){
   if(state.captcha){try{state.captcha.clear()}catch(e){console.warn("captcha",e)}state.captcha=null}
 }
-function preview(name,asset,sub,index){
- return '<div class="preview"><div class="preview-art">'+
-  '<img src="./assets/'+asset+'" alt="" loading="eager"></div>'+
-  '<div class="preview-copy"><span class="preview-number">ÁGORA · 0'+index+'</span>'+
-  '<b>'+name+'</b><small>'+sub+'</small></div></div>';
-}
 function login(){
+  document.body.classList.add("login-mode");
   resetCaptcha();
   const request=state.page==="request";
   const inputs=state.method==="google"?
-    '<button class="btn gold full" data-action="google" type="button">Continuar con Google <span aria-hidden="true">↗</span></button>':
+    '<button class="btn gold full" data-action="google" type="button">Continuar con Google <span aria-hidden="true">→</span></button>':
     state.method==="email"?
       '<form id="email-send"><div class="field"><label for="email">Correo electrónico</label>'+
-        '<input type="email" id="email" name="email" autocomplete="email" required placeholder="tucorreo@ejemplo.com"></div>'+
-        '<button class="btn gold full" type="submit">Enviarme un enlace de acceso <span aria-hidden="true">↗</span></button></form>':
-      '<form id="phone-send"><div class="field"><label for="phone">Número celular con clave de país</label>'+
-        '<input type="tel" id="phone" name="phone" autocomplete="tel" required placeholder="+52 55 1234 5678"></div>'+
-        '<div id="recaptcha"></div><button class="btn gold full" type="submit">Enviar código SMS <span aria-hidden="true">↗</span></button></form>'+
-      '<form id="phone-confirm" hidden><div class="field"><label for="sms">Código de verificación</label>'+
-        '<input type="text" id="sms" name="sms" required inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}"></div>'+
-        '<button class="btn gold full" type="submit">Verificar e ingresar <span aria-hidden="true">↗</span></button></form>';
-  app.innerHTML=
-    '<div class="landing">'+
-      '<section class="intro" aria-label="Imagen de ÁGORA, Ecosistema Central de Dejavú Marketing">'+
-        '<div class="scene-hero" role="img" aria-label="ÁGORA por Dejavú Marketing, escultura clásica con esfera orbital dorada"></div>'+
-        '<div class="scene-top"><span class="scene-index">UN UNIVERSO · UNA IDENTIDAD</span><span class="scene-dot" aria-hidden="true"></span></div>'+
-        '<div class="scene-bottom"><span class="scene-eyebrow">PORTAL DE IDENTIDAD</span>'+
-          '<h1>Bienvenido al <em>ecosistema ÁGORA.</em></h1>'+
-          '<p>Una credencial digital. Tres espacios. Tu ID Dejavú te identifica.</p>'+
-        '</div>'+
-        '<div class="space-preview" aria-label="Espacios disponibles según acreditación">'+
-          preview("Agencia","pdf-agency-icon.webp","Mi identidad en Dejavú",1)+
-          preview("Staff","pdf-staff-icon.webp","Mi ID y credencial",2)+
-          preview("Administrador","pdf-agora-icon.webp","Mi acceso autorizado",3)+
+        '<input type="email" id="email" name="email" autocomplete="email" required placeholder="tu@correo.com"></div>'+
+        '<button class="btn gold full" type="submit">Enviarme un enlace <span aria-hidden="true">→</span></button></form>':
+      '<form id="phone-send"><div class="field"><label for="phone">Número de celular</label>'+
+        '<div class="phone-entry"><span class="phone-country" aria-label="Clave de México">+52</span>'+
+        '<input type="tel" id="phone" name="phone" autocomplete="tel-national" required inputmode="tel" placeholder="Número de celular"></div></div>'+
+        '<div id="recaptcha"></div><button class="btn gold full" type="submit">Ingresar <span aria-hidden="true">→</span></button></form>'+
+      '<form id="phone-confirm" hidden><div class="field"><label for="sms">Código de verificación SMS</label>'+
+        '<input type="text" id="sms" name="sms" required inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="Los 6 dígitos"></div>'+
+        '<button class="btn gold full" type="submit">Verificar e ingresar <span aria-hidden="true">→</span></button></form>';
+  app.innerHTML='<div class="cinema-login">'+
+    '<div class="cinema-backdrop" aria-hidden="true"></div>'+
+    '<div class="cinema-stars" aria-hidden="true"></div>'+
+    '<div class="cinema-content">'+
+      '<div class="cinema-brand">'+
+        '<img src="./assets/pdf-agora-wordmark.webp" alt="ÁGORA por Dejavú Marketing" width="440" height="165">'+
+        '<div class="cinema-subtitle"><span aria-hidden="true"></span>IDENTIDAD ÚNICA · DEJAVÚ MARKETING<span aria-hidden="true"></span></div>'+
+      '</div>'+
+      '<section class="cinema-card" aria-label="Acceso ÁGORA">'+
+        '<div class="cinema-inner">'+
+          '<h1 class="sr-only">'+(request?"Solicitar ID Dejavú":"Iniciar sesión en ÁGORA")+'</h1>'+
+          '<div class="methods" role="tablist" aria-label="Método de acceso">'+
+          [["phone","Celular","▯"],["email","Correo","✉"],["google","Google","G"]].map(([m,label,ico])=>
+            '<button type="button" role="tab" data-method="'+m+'" aria-selected="'+String(state.method===m)+'"><span aria-hidden="true" class="method-icon">'+ico+'</span>'+label+'</button>').join("")+
+          '</div>'+
+          (request?'<p class="cinema-info">Verifica tu contacto para solicitar un ID Dejavú.</p>':'')+
+          inputs+
+          '<div class="cinema-secondary"><button class="text-btn" type="button" data-action="'+(request?"login":"request")+'">'+
+            (request?"Volver al acceso":"<span aria-hidden='true'>▤</span> Solicitar mi ID Dejavú")+
+          '</button></div>'+
+          '<div class="cinema-card-footer"><span>Agencia · Staff · Administrador</span>'+
+            '<small>Tu acceso depende de tu acreditación y permisos.</small></div>'+
         '</div>'+
       '</section>'+
-      '<section class="panel access-panel">'+
-        '<div class="panel-top"><span class="eyebrow">ÁGORA · IDENTIDAD ÚNICA</span><span class="panel-step">ACCESO 01 / 03</span></div>'+
-        '<div class="access-ornament" aria-hidden="true">✦</div>'+
-        '<h2>'+(request?"Solicita tu <em>ID Dejavú.</em>":"Tu puerta de <em>entrada.</em>")+'</h2>'+
-        '<p>'+(request?"Verifica tu celular o correo y solicita tu acreditación digital.":"Ingresa con tu celular o correo verificado para consultar tu espacio y credencial Dejavú.")+'</p>'+
-        '<div class="methods" role="tablist" aria-label="Método de acceso">'+
-          [["phone","Celular"],["email","Correo"],["google","Google"]].map(([m,label])=>
-            '<button type="button" role="tab" data-method="'+m+'" aria-selected="'+String(state.method===m)+'">'+label+'</button>').join("")+
-        '</div>'+
-        inputs+
-        '<p class="help">El ID Dejavú identifica tu credencial; no reemplaza la verificación de tu cuenta.</p>'+
-        '<div class="switch"><span>'+(request?"¿Ya tienes una cuenta?":"¿Aún no tienes ID Dejavú?")+'</span>'+
-          '<button class="text-btn" type="button" data-action="'+(request?"login":"request")+'">'+(request?"Regresar al acceso":"Solicitar mi ID")+'</button></div>'+
-        '<hr><div class="note">Si ya cuentas con ID en otro correo o celular, entra con el acceso original para conservarlo.</div>'+
-        '<div class="access-footer"><span>ÁGORA POR DEJAVÚ MARKETING</span><span>ACCESO CIFRADO · FIREBASE</span></div>'+
-      '</section>'+
-    '</div>';
+    '</div>'+
+  '</div>';
 }
 function loading(){
+  document.body.classList.remove("login-mode");
   app.innerHTML='<p class="loading">Comprobando tu ID y permisos en Firebase…</p>';
 }
 async function readOwnIdentity(user){
@@ -263,6 +254,7 @@ function emailPrompt(){
     '<button type="submit" class="btn gold full">Terminar verificación</button></form></section>';
 }
 function render(){
+  document.body.classList.toggle("login-mode",!state.user);
   if(state.page==="email-prompt"){emailPrompt();return}
   if(!state.user){login();return}
   if(!state.identity){loading();return}
@@ -309,7 +301,8 @@ async function sendEmail(raw){
   if(form)form.innerHTML='<div class="note success">Enlace enviado. Abre el mensaje desde tu correo y termina la verificación.</div>';
 }
 async function phoneSend(raw){
-  const phone=safePhone(raw);
+  const input=safePhone(raw);
+  const phone=input.startsWith("+")?input:"+52"+input;
   if(!/^\+[1-9]\d{9,14}$/.test(phone))throw Error("Escribe tu número con clave internacional, por ejemplo +525512345678.");
   if(!state.captcha)state.captcha=new RecaptchaVerifier(auth,"recaptcha",{size:"normal"});
   await state.captcha.render();
