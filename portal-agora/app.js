@@ -50,40 +50,58 @@ async function action(fn,success){
 function resetCaptcha(){
   if(state.captcha){try{state.captcha.clear()}catch(e){console.warn("captcha",e)}state.captcha=null}
 }
-function preview(name,letter,sub){
-  return '<div class="preview"><span class="preview-icon">'+letter+'</span><div><b>'+name+'</b><small>'+sub+'</small></div></div>';
+function preview(name,number,sub){
+  return '<div class="preview"><div class="preview-top">'+
+    '<span class="preview-icon">'+number+'</span><span class="preview-num">ÁGORA / '+number+'</span></div>'+
+    '<b>'+name+'</b><small>'+sub+'</small></div>';
 }
 function login(){
   resetCaptcha();
   const request=state.page==="request";
   const inputs=state.method==="google"?
-    '<button class="btn gold full" data-action="google" type="button">Entrar con Google</button>':
+    '<button class="btn gold full" data-action="google" type="button">Continuar con Google <span aria-hidden="true">↗</span></button>':
     state.method==="email"?
-      '<form id="email-send"><div class="field"><label for="email">Correo electrónico</label>'+
+      '<form id="email-send"><div class="field"><label for="email">Tu correo electrónico</label>'+
         '<input type="email" id="email" name="email" autocomplete="email" required placeholder="correo@ejemplo.com"></div>'+
-        '<button class="btn gold full" type="submit">Enviarme un enlace de acceso</button></form>':
-      '<form id="phone-send"><div class="field"><label for="phone">Celular con clave internacional</label>'+
+        '<button class="btn gold full" type="submit">Recibir enlace de acceso <span aria-hidden="true">↗</span></button></form>':
+      '<form id="phone-send"><div class="field"><label for="phone">Tu número celular</label>'+
         '<input type="tel" id="phone" name="phone" autocomplete="tel" required placeholder="+52 55 1234 5678"></div>'+
-        '<div id="recaptcha"></div><button class="btn gold full" type="submit">Enviar código SMS</button></form>'+
+        '<div id="recaptcha"></div><button class="btn gold full" type="submit">Enviar código de acceso <span aria-hidden="true">↗</span></button></form>'+
       '<form id="phone-confirm" hidden><div class="field"><label for="sms">Código de verificación</label>'+
         '<input type="text" id="sms" name="sms" required inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}"></div>'+
-        '<button class="btn gold full" type="submit">Verificar código e ingresar</button></form>';
-  app.innerHTML='<div class="landing"><section class="intro"><div class="eyebrow">DEJAVÚ MARKETING · PORTAL ÁGORA</div>'+
-    '<h1>Una identidad.<br>Tres espacios.</h1>'+
-    '<p>Tu ID Dejavú y tu credencial digital permanecen contigo. Cada espacio se habilita de acuerdo con tu acreditación y permisos.</p>'+
-    '<div class="space-preview">'+preview("Agencia","A","Espacio reservado para el equipo interno")+
-    preview("Staff","S","Espacio personal de colaboradores")+
-    preview("Administrador","✓","Control de la identidad digital")+'</div></section>'+
-    '<section class="panel"><div class="eyebrow">Identidad Dejavú</div><h2>'+(request?"Solicitar mi ID":"Acceso a ÁGORA")+'</h2>'+
-    '<p>'+(request?"Primero verifica tu correo o celular. Después podrás enviar la solicitud de acreditación.":"Ingresa con un correo o celular verificado para consultar tu identidad.")+'</p>'+
-    '<div class="methods" role="tablist" aria-label="Método de acceso">'+
-    [["phone","Celular"],["email","Correo"],["google","Google"]].map(([m,label])=>
-      '<button type="button" role="tab" data-method="'+m+'" aria-selected="'+String(state.method===m)+'">'+label+'</button>').join("")+'</div>'+
-    inputs+
-    '<p class="help">El ID Dejavú no es una contraseña. Se requiere verificar que eres titular de la cuenta.</p>'+
-    '<div class="switch"><span>'+(request?"¿Ya tienes acceso?":"¿Aún no tienes ID?")+'</span>'+
-    '<button class="text-btn" type="button" data-action="'+(request?"login":"request")+'">'+(request?"Volver a ingresar":"Solicitar ID Dejavú")+'</button></div>'+
-    '<hr><div class="note">Si ya te emitieron un ID con otro teléfono o correo, entra con ese acceso original. Podrás vincular el nuevo contacto sin perder tu credencial.</div></section></div>';
+        '<button class="btn gold full" type="submit">Confirmar e ingresar <span aria-hidden="true">↗</span></button></form>';
+  app.innerHTML=
+    '<div class="landing"><section class="intro">'+
+      '<div class="intro-kicker"><span class="live-pulse" aria-hidden="true"></span> DEJAVÚ MARKETING <span aria-hidden="true"> / </span> IDENTIDAD ÁGORA</div>'+
+      '<h1>Tu identidad.<span class="accent">En movimiento.</span></h1>'+
+      '<p class="intro-copy">Un solo ID Dejavú. Una credencial digital. Tres espacios que reconocen quién eres, sin empezar de cero.</p>'+
+      '<div class="brand-stage" aria-hidden="true">'+
+        '<span class="orbit orbit-one"></span><span class="orbit orbit-two"></span><span class="orbit orbit-three"></span>'+
+        '<span class="stage-code">DJV · IDENTIDAD ÚNICA</span>'+
+        '<div class="stage-core"><img src="./assets/dejavu-logo-oficial.png" alt="" loading="eager"></div>'+
+        '<span class="stage-hint">ACREDITACIÓN DIGITAL / 2026</span>'+
+      '</div>'+
+      '<div class="space-preview" aria-label="Los tres espacios del portal">'+
+        preview("Agencia","01","Identidad del equipo")+
+        preview("Staff","02","Mi credencial personal")+
+        preview("Administrador","03","Identidad autorizada")+
+      '</div>'+
+    '</section>'+
+    '<section class="panel access-panel">'+
+      '<div class="panel-top"><span class="eyebrow">ÁGORA / ACCESO SEGURO</span><span class="panel-step">ID DEJAVÚ <span aria-hidden="true">◆</span> 01</span></div>'+
+      '<div class="eyebrow">TU PUNTO DE ENTRADA</div>'+
+      '<h2>'+(request?"Tu identidad comienza <em>aquí.</em>":"Bienvenido a <em>ÁGORA.</em>")+'</h2>'+
+      '<p>'+(request?"Verifica primero tu celular o correo y solicita la acreditación de tu ID Dejavú.":"Usa el celular o correo asociado a tu cuenta. Al ingresar, verás únicamente tu espacio y tu credencial.")+'</p>'+
+      '<div class="methods" role="tablist" aria-label="Método de acceso">'+
+        [["phone","Celular"],["email","Correo"],["google","Google"]].map(([m,label])=>
+          '<button type="button" role="tab" data-method="'+m+'" aria-selected="'+String(state.method===m)+'">'+label+'</button>').join("")+
+      '</div>'+
+      inputs+
+      '<p class="help">Tu ID identifica tu credencial; tu celular o correo verificado protege el acceso.</p>'+
+      '<div class="switch"><span>'+(request?"¿Ya tienes una cuenta?":"¿Todavía no tienes ID?")+'</span>'+
+        '<button class="text-btn" type="button" data-action="'+(request?"login":"request")+'">'+(request?"Volver al acceso":"Solicitar mi ID Dejavú")+'</button></div>'+
+      '<hr><div class="note">Si tu ID está vinculado con otro contacto, inicia sesión con el original para conservar la misma identidad.</div>'+
+    '</section></div>';
 }
 function loading(){
   app.innerHTML='<p class="loading">Comprobando tu ID y permisos en Firebase…</p>';
@@ -166,13 +184,14 @@ function credential(){
   const href=new URL("./verificar.html",location.href);
   href.searchParams.set("id",reg.credentialId);
   return '<section class="credential" aria-label="Credencial digital de Dejavú">'+
-    '<div class="eyebrow">ÁGORA · CREDENCIAL DIGITAL</div>'+
+    '<img class="credential-mark" src="./assets/dejavu-logo-oficial.png" alt="" aria-hidden="true">'+
+    '<div class="eyebrow">DEJAVÚ MARKETING · IDENTIDAD</div>'+
     '<h2>'+esc(reg.displayName||state.user?.displayName||"Colaborador")+'</h2>'+
     '<p class="job">'+esc(reg.jobTitle||"Colaborador")+'</p>'+
     '<div class="credential-bottom"><div><div class="id">'+esc(reg.agoraId)+'</div>'+
-    '<small>'+ (reg.credentialActive?"VIGENTE":"NO VIGENTE")+'</small>'+
-    '<p><a style="color:#efdaa9;font-size:.8rem" href="'+esc(href.href)+'" target="_blank" rel="noopener">Verificar mi credencial</a></p></div>'+
-    '<div id="credential-qr" class="qr"><a href="'+esc(href.href)+'">Abrir</a></div></div></section>';
+    '<small>'+ (reg.credentialActive?"CREDENCIAL VIGENTE":"CREDENCIAL NO VIGENTE")+'</small>'+
+    '<p><a class="credential-verify" href="'+esc(href.href)+'" target="_blank" rel="noopener">Verificar mi credencial <span aria-hidden="true">↗</span></a></p></div>'+
+    '<div id="credential-qr" class="qr"><a href="'+esc(href.href)+'">Verificar</a></div></div></section>';
 }
 function drawQr(){
   const qr=document.getElementById("credential-qr");
@@ -186,10 +205,10 @@ function drawQr(){
 function spaceContent(){
   const name=state.space==="admin"?"Administrador":state.space==="agency"?"Agencia":"Staff";
   let copy=state.space==="admin"?
-    "Espacio administrativo creado. Por ahora únicamente permite verificar la identidad del administrador y su credencial Dejavú.":
+    "Tu identidad de Administrador está reconocida. Aquí encontrarás únicamente tu ID y credencial digital Dejavú.":
     state.space==="agency"?
-    "Espacio de Agencia creado. Por ahora únicamente está habilitada la identidad digital de la persona acreditada.":
-    "Espacio personal de Staff creado. Por ahora únicamente está habilitada tu credencial digital Dejavú.";
+    "Este es tu punto de entrada como parte de Agencia. Por ahora se muestra únicamente tu identidad digital acreditada.":
+    "Este es tu espacio personal. Tu ID y credencial Dejavú están listos para identificarte de forma segura.";
   const otherOptions=[];
   if(state.user?.email)otherOptions.push("Correo verificado: "+state.user.email);
   if(state.user?.phoneNumber)otherOptions.push("Celular verificado: "+state.user.phoneNumber);
@@ -205,8 +224,10 @@ function spaceContent(){
 function dashboard(){
   resetCaptcha();selectSpace();
   const name=state.identity?.registry?.displayName||state.user?.displayName||"tu espacio";
-  app.innerHTML='<div class="workspace-header"><div><div class="eyebrow">ÁGORA · ESPACIOS</div><h1>Hola, '+esc(name)+'</h1>'+
-    '<p>Tu acreditación digital abre el espacio autorizado.</p></div><span class="id-pill">'+esc(state.identity.registry.agoraId)+'</span></div>'+
+  app.innerHTML='<div class="workspace-header"><div><div class="eyebrow">TU IDENTIDAD · DEJAVÚ MARKETING</div>'+
+    '<h1>Hola, '+esc(name)+'.</h1>'+
+    '<p>Tu credencial está activa. Este es tu espacio personal dentro de ÁGORA.</p></div>'+
+    '<span class="id-pill">'+esc(state.identity.registry.agoraId)+'</span></div>'+
     '<nav class="space-nav" aria-label="Cambiar espacio">'+spaces().map(([id,label])=>
       '<button type="button" data-space="'+id+'" aria-pressed="'+String(state.space===id)+'">'+label+'</button>').join("")+'</nav>'+
     '<div class="workspace">'+credential()+spaceContent()+'</div>';
