@@ -255,6 +255,27 @@ function sites(){
     '<p>Abre cada sitio con tu cuenta acreditada. Sus permisos se verifican en la aplicación de destino.</p>'+
     '<div class="sites-grid">'+entries.map(x=>siteTile(...x)).join("")+'</div></section>';
 }
+function quickAccess(){
+  if(!verifiedId())return "";
+  const staff=state.space==="staff";
+  const all=staff?[
+    ["Mis jornadas",SITE_URLS.visor],
+    ["Mi expediente",SITE_URLS.identidad]
+  ]:[
+    ["Operaciones",SITE_URLS.operaciones],
+    ["Compras",SITE_URLS.compras],
+    ["Archivos",SITE_URLS.archivos],
+    ["Fichas",SITE_URLS.fichas],
+    ["Identidad",SITE_URLS.identidad]
+  ];
+  if(!staff&&(state.space==="admin"||userRole()==="coordinador"))
+    all.splice(3,0,["Recursos",SITE_URLS.recursos]);
+  return '<nav class="quick-access" aria-label="Accesos rápidos a ÁGORA">'+
+    '<span>ACCESOS RÁPIDOS</span>'+
+    all.map(([name,url])=>'<a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+
+      esc(name)+' <span aria-hidden="true">↗</span></a>').join("")+'</nav>';
+}
+
 function adminRoleNotice(){
   if(!mainAdmin(state.user)||canAdmin())return "";
   const uid=state.user?.uid||"";
@@ -291,7 +312,7 @@ function dashboard(){
     '<span class="id-pill">'+esc(state.identity.registry.agoraId)+'</span></div>'+
     '<nav class="space-nav" aria-label="Cambiar espacio">'+spaces().map(([id,label])=>
       '<button type="button" data-space="'+id+'" aria-pressed="'+String(state.space===id)+'">'+label+'</button>').join("")+'</nav>'+
-    adminRoleNotice()+
+    adminRoleNotice()+quickAccess()+
     '<div class="workspace">'+credential()+spaceContent()+'</div>'+
     sites()+credentialDialog();
   drawQr();
