@@ -550,7 +550,8 @@ function staffOperationsSpace(){
     (staff?assigned.length?'<div class="role-jornada-list">'+assigned.map(staffJornadaCard).join("")+'</div>':
       '<p class="role-empty">No hay jornadas vigentes o próximas en tu ficha personal.</p>':
       '<p class="role-empty">Todavía no encontramos una ficha de Operaciones vinculada a tu cuenta. Coordinación debe vincular tu UID al personal asignado.</p>')+
-    '<p class="role-transition">Los marcajes oficiales de entrada y salida siguen en el módulo seguro de Jornadas mientras se termina su integración. No se alteran tus horas anteriores.</p>'+
+    '<div class="role-legacy-links"><a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/visor.html"))+'" target="_blank" rel="noopener noreferrer">Registrar entrada / salida · sistema actual ↗</a></div>'+
+    '<p class="role-transition">El marcaje oficial sigue en Jornadas mientras se integra en esta pantalla. Se conserva tu historial.</p>'+
   '</section>';
 }
 function scheduleCard(item){
@@ -614,7 +615,9 @@ function coordinationOperationsSpace(admin=false){
       '<div><small>Personal asignado (turnos)</small><strong>'+totals.assignments+'</strong></div></div>'+
       (list.length?'<div class="role-jornada-list">'+list.slice(0,20).map(scheduleCard).join("")+'</div>':
        '<p class="role-empty">No hay jornadas próximas en el cronograma operativo.</p>')+
-      '<p class="role-transition">Estos datos se leen del cronograma original. Las solicitudes nuevas son borradores hasta contar con el flujo seguro de autorización y evidencias.</p>'+
+      '<div class="role-legacy-links"><a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/"))+'" target="_blank" rel="noopener noreferrer">Editar agenda vigente ↗</a>'+
+        '<a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/control-jornadas.html"))+'" target="_blank" rel="noopener noreferrer">Control de asistencia ↗</a></div>'+
+      '<p class="role-transition">El cronograma original continúa como fuente oficial de asignaciones. Las solicitudes nuevas permanecen en borrador hasta habilitar su registro y aprobación seguros.</p>'+
       assignmentDialog():
       '<p class="role-empty">Esta cuenta tiene permisos de consulta, no de coordinación. No puede crear ni modificar asignaciones.</p>')+
   '</section>';
