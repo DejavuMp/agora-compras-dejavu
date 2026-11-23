@@ -81,8 +81,18 @@ function safeVariants(text){
   text.slice(0,evidenceAt)+text.slice(c)
  ];
 }
-// Solo admitir reglas idénticas a versiones conocidas de Staff (con o sin el
-// NUEVO bloque financiero). Cualquier edición ajena cancela el despliegue.
+// El módulo de reparaciones sólo añade un bloque ANTES del cierre general.
+ // Exigir reconstruir exactamente la versión anterior de main, sin cambios
+ // permisivos en ningún otro módulo. Esto permite una primera activación segura.
+ const repairMarker='    // ÁGORA · Inventario, mantenimiento y reparaciones.';
+ const repairAt=candidate.indexOf(repairMarker);
+ const repairEnd=candidate.indexOf(end,repairAt);
+ if(repairAt<0||repairEnd<=repairAt||candidate.indexOf(repairMarker,repairAt+1)!==-1){
+  throw Error('El bloque de reparaciones no está delimitado exactamente; cancelar.');
+ }
+ const beforeRepairs=candidate.slice(0,repairAt)+candidate.slice(repairEnd);
+ // Solo admitir reglas idénticas a versiones conocidas de Staff (con o sin el
+ // NUEVO bloque financiero). Cualquier edición ajena cancela el despliegue.
 const headers={Authorization:'Bearer '+token,Accept:'application/json'};
 async function getJson(path){
  const url='https://firebaserules.googleapis.com/v1/'+path;
@@ -104,7 +114,7 @@ mkdirSync('.github/firebase-staff/.preflight',{recursive:true});
 writeFileSync('.github/firebase-staff/.preflight/antes-dejavu.rules',live,'utf8');
 writeFileSync('.github/firebase-staff/.preflight/ruleset-name.txt',release.rulesetName+'\n','utf8');
 // Conservar el respaldo antes incluso si fallan los chequeos de variantes.
-const allowed=new Set([...safeVariants(candidate),...safeVariants(beforeCoordinatorListFix),...safeVariants(beforeIdentity),...safeVariants(oldOps),...safeVariants(withoutOps),...safeVariants(legacy)].map(normalize));
+const allowed=new Set([...safeVariants(candidate),...safeVariants(beforeCoordinatorListFix),...safeVariants(beforeIdentity),...safeVariants(oldOps),...safeVariants(withoutOps),...safeVariants(legacy),...safeVariants(beforeRepairs)].map(normalize));
 if(!allowed.has(normalize(live))){
  throw Error('REGLAS DISTINTAS EN PRODUCCIÓN. Se guardó respaldo. Se detiene para NO modificar permisos de Ágora Compras, Archivos u otros módulos.');
 }
