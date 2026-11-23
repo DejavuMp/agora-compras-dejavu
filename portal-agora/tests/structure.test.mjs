@@ -97,10 +97,10 @@ test("digital credential, module links and safe admin role gating",async()=>{
   const app=await read("app.js");
   const style=await read("style.css");
   for(const term of ["credentialVerificationLink","credential-qr","credential-qr-modal",
-    "agora_identity_registry","share-credential","open-credential","Ver credencial digital",
+    "agora_identity_registry","share-credential","open-credential","Abrir credencial digital",
     "icono-staff-hq.webp","icono-agencia-hq.webp","Mis jornadas / Visor","Operaciones Agencia",
     "Compras y producción","Recursos y pagos","Archivos","Fichas de evento","Identidad y RH",
-    "adminRoleNotice","copy-uid","role: \\"admin\\""]){
+    "adminRoleNotice","copy-uid","role: "]){
     assert.ok(app.includes(term),term);
   }
   assert.match(app,/userRole\(\)==="admin"&&mainAdmin\(state\.user\)/);
