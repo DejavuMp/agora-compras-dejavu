@@ -128,13 +128,22 @@ const candidateDigest=createHash('sha256').update(candidate,'utf8').digest('hex'
 // Si cambia el archivo candidato tras la auditoría, exigir conciliación de nuevo.
 const recognizedProductionSnapshot=liveDigest===verifiedProductionDigest &&
   candidateDigest===verifiedCandidateDigest;
-if(!allowed.has(normalize(live)) && !recognizedProductionSnapshot){
+// Una huella conocida NO basta para autorizar sobrescritura. La versión real
+// incluye ajustes de otros módulos que se perderían al publicar el candidato.
+// Exigir que las reglas destino se generen preservando literalmente la versión
+// viva y añadiendo ÚNICAMENTE el bloque nuevo de reparaciones.
+const additiveOnly=recognizedProductionSnapshot &&
+  process.env.AGORA_REPAIR_ADDITIVE_ONLY === 'yes' &&
+  process.env.AGORA_REPAIR_MERGED_HASH === createHash('sha256').update(candidate,'utf8').digest('hex') &&
+  candidate.startsWith(live.slice(0,live.indexOf('    // Todas las demás colecciones permanecen cerradas.'))) &&
+  candidate.endsWith(live.slice(live.indexOf('    // Todas las demás colecciones permanecen cerradas.')));
+if(!allowed.has(normalize(live)) && !additiveOnly){
  throw Error('REGLAS DISTINTAS EN PRODUCCIÓN. Se guardó respaldo. Se detiene para NO modificar permisos de Ágora Compras, Archivos u otros módulos.');
 }
 if(normalize(live)===normalize(candidate)){
  console.log('Las reglas de ÁGORA coinciden con el repositorio. No se requiere cambiar contenido.');
-}else if(recognizedProductionSnapshot){
- console.log('Producción coincide exactamente con el respaldo verificado el 23-11-2026 (SHA-256 completo). La actualización incluiría las ampliaciones versionadas, sin tocar otros documentos.');
+}else if(additiveOnly){
+ console.log('Las reglas destino son una ampliación exacta de producción: los bloques previos permanecen idénticos.');
 }else{
  console.log('Las reglas activas de ÁGORA coinciden con una versión conocida; es seguro ampliar los permisos sin modificar las demás colecciones.');
 }
