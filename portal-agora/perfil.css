@@ -921,3 +921,15 @@ body:not(.login-mode) footer{
 @media(prefers-reduced-motion:reduce){
  .role-proposal-form,.role-add-activity,.role-activity-inputs{animation:none;transition:none}
 }
+
+.role-legacy-links{
+ display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+ margin:5px 0 0;
+}
+.role-legacy-links a{
+ display:inline-flex;white-space:normal;font-size:12px;max-width:100%;
+}
+@media(max-width:500px){
+ .role-legacy-links{display:grid}
+ .role-legacy-links a{width:100%}
+}
