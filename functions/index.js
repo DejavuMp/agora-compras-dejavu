@@ -38,3 +38,34 @@ exports.deliveryResponded=onDocumentCreated({document:'agora_file_responses/{id}
   // Nunca enviar a receiverEmail: es un dato introducido por el visitante, no verificado.
   await send([d.createdByEmail,d.recipientEmail],`ÁGORA · ${options[r.status]||'Respuesta registrada'} · ${d.folio}`,frame('Respuesta registrada',body),event.id+'-responded');
 });
+
+
+// ÁGORA · aviso mínimo de solicitudes de ID, sin transmitir expedientes sensibles.
+const idPortalUrl=()=>new URL('inicio/',baseUrl.value().replace(/\\/?$/,'/')).toString();
+exports.identityRegistrationRequested=onDocumentCreated({
+  document:'agora_identity_registrations/{uid}',region:'us-central1',secrets:[apiKey]
+},async event=>{
+  const record=event.data?.data();
+  if(!record||record.status!=='pending'||record.privacyAccepted!==true)return;
+  const html=frame('Nueva solicitud de credencial digital',
+    '<p>Una persona verificada inició una solicitud de ID Dejavú.</p>'+
+    '<p><b>Nombre:</b> '+escape(record.displayName)+
+    '<br><b>Actividad:</b> '+escape(record.requestedJobTitle)+
+    '<br><b>Contacto declarado:</b> '+escape(record.telephone||record.email||'No indicado')+'</p>'+
+    '<p><a href="'+escape(idPortalUrl())+'">Entrar a ÁGORA</a> y abrir Identidad / RH para revisarla.</p>');
+  await send(['admi.agora@gmail.com'],'ÁGORA · Nueva solicitud de ID',html,event.id+'-identity-request');
+});
+exports.identityRegistrationApproved=onDocumentUpdated({
+  document:'agora_identity_registrations/{uid}',region:'us-central1',secrets:[apiKey]
+},async event=>{
+  const before=event.data?.before?.data(),after=event.data?.after?.data();
+  if(!before||!after||before.status==='approved'||after.status!=='approved')return;
+  // Si la cuenta se abrió por SMS y no hay correo verificado, la notificación
+  // permanece en el portal; no usamos un teléfono arbitrario para SMS automático.
+  if(!validEmail(after.email))return;
+  const html=frame('Tu ID Dejavú está disponible',
+    '<p>Tu solicitud ha sido revisada y aprobada.</p>'+
+    '<p><b>ID:</b> '+escape(after.agoraId)+'</p>'+
+    '<p><a href="'+escape(idPortalUrl())+'">Ingresar a mi espacio en ÁGORA</a></p>');
+  await send([after.email],'ÁGORA · Tu credencial digital está lista',html,event.id+'-identity-approved');
+});
