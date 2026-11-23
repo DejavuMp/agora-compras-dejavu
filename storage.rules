@@ -41,7 +41,8 @@ service firebase.storage {
         firestore.exists(repairDoc(id)) &&
         (canEdit() ||
           (isOpsStaff() &&
-            firestore.get(repairDoc(id)).data.createdBy == request.auth.uid));
+            (firestore.get(repairDoc(id)).data.createdBy == request.auth.uid ||
+             firestore.get(repairDoc(id)).data.assignedUid == request.auth.uid)));
     }
     match /agora-repair-assets/{assetId}/{uploaderUid}/{fileName} {
       allow get: if fileName.matches('^[a-f0-9-]{36}\\.jpg$') &&
@@ -70,7 +71,8 @@ service firebase.storage {
         firestore.exists(repairDoc(requestId)) &&
         (canEdit() ||
           (isOpsStaff() &&
-            firestore.get(repairDoc(requestId)).data.createdBy == request.auth.uid)) &&
+            (firestore.get(repairDoc(requestId)).data.createdBy == request.auth.uid ||
+             firestore.get(repairDoc(requestId)).data.assignedUid == request.auth.uid))) &&
         request.resource.size > 0 &&
         request.resource.size < 5 * 1024 * 1024 &&
         request.resource.contentType == 'image/jpeg';
