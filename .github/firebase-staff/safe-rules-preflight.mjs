@@ -122,8 +122,12 @@ const allowed=new Set([...safeVariants(candidate),...safeVariants(beforeCoordina
 // Aceptar EXCLUSIVAMENTE este SHA-256 de contenido íntegro, no versiones próximas.
 // Si alguien cambia una sola línea en Firebase, detener en lugar de sobrescribir.
 const verifiedProductionDigest='99e2bd8de21c8a67c4cd4afe3e30cc235fd3eee52f15187544da0cd6a4a5f994';
+const verifiedCandidateDigest='9c23bee64e225f7212348cdd0c889168a0ab5b695e708d9750234cd148484204';
 const liveDigest=createHash('sha256').update(live,'utf8').digest('hex');
-const recognizedProductionSnapshot=liveDigest===verifiedProductionDigest;
+const candidateDigest=createHash('sha256').update(candidate,'utf8').digest('hex');
+// Si cambia el archivo candidato tras la auditoría, exigir conciliación de nuevo.
+const recognizedProductionSnapshot=liveDigest===verifiedProductionDigest &&
+  candidateDigest===verifiedCandidateDigest;
 if(!allowed.has(normalize(live)) && !recognizedProductionSnapshot){
  throw Error('REGLAS DISTINTAS EN PRODUCCIÓN. Se guardó respaldo. Se detiene para NO modificar permisos de Ágora Compras, Archivos u otros módulos.');
 }
