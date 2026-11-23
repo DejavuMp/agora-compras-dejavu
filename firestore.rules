@@ -1382,91 +1382,7 @@ match /agora_finance_requests/{requestId} {
     match /agora_repair_assets/{id} {
       allow get, list: if repairUser();
       allow create: if canEdit() &&
-        id.matches('^[a-f0-9-]{36}
-      allow get: if canEdit() || (opsStaff() && resource.data.createdBy == request.auth.uid);
-      // Las consultas staff DEBEN filtrar createdBy == auth.uid.
-      allow list: if canEdit() || (opsStaff() && resource.data.createdBy == request.auth.uid);
-      allow create: if repairUser() &&
-        id.matches('^[a-f0-9-]{36}
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
-) &&
-        repairDocumentValid(id) &&
-        request.resource.data.createdBy == request.auth.uid &&
-        request.resource.data.createdByEmail == request.auth.token.email &&
-        request.resource.data.createdAt == request.time &&
-        request.resource.data.updatedAt == request.time &&
-        request.resource.data.revision == 1 &&
-        request.resource.data.status == 'pendiente' &&
-        request.resource.data.repairRoute == 'pendiente' &&
-        request.resource.data.assignedTo == '' &&
-        request.resource.data.decisionBy == '' &&
-        request.resource.data.decisionNote == '' &&
-        request.resource.data.estimatedCost == 0 &&
-        request.resource.data.quotes.size() == 0 &&
-        request.resource.data.photos.size() == 0 &&
-        request.resource.data.selectedQuoteId == '';
-      allow update: if repairUser() &&
-        repairDocumentValid(id) &&
-        request.resource.data.createdBy == resource.data.createdBy &&
-        request.resource.data.createdAt == resource.data.createdAt &&
-        request.resource.data.id == resource.data.id &&
-        request.resource.data.updatedAt == request.time &&
-        request.resource.data.revision == resource.data.revision + 1 &&
-        (
-          canEdit() ||
-          (opsStaff() && resource.data.createdBy == request.auth.uid &&
-            request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['photos','revision','updatedAt']) &&
-            request.resource.data.photos.size() == resource.data.photos.size() + 1 &&
-            request.resource.data.photos.hasAll(resource.data.photos) &&
-            request.resource.data.photos[request.resource.data.photos.size() - 1].path
-              .matches('^agora-repairs/' + id + '/' + request.auth.uid + '/[a-f0-9-]{36}\\.jpg
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
-))
-        );
-      allow delete: if false;
-    }
-    match /agora_repair_events/{eventId} {
-      allow get, list: if canEdit();
-      allow create: if repairUser() &&
-        request.resource.data.keys().hasOnly([
-          'requestId','actorUid','actorEmail','action','detail','createdAt'
-        ]) &&
-        request.resource.data.keys().hasAll([
-          'requestId','actorUid','actorEmail','action','detail','createdAt'
-        ]) &&
-        request.resource.data.actorUid == request.auth.uid &&
-        request.resource.data.actorEmail == request.auth.token.email &&
-        request.resource.data.requestId is string &&
-        request.resource.data.action in [
-          'creada','decisión','cotización','selección de cotización','evidencia'
-        ] &&
-        request.resource.data.detail is string &&
-        request.resource.data.detail.size() <= 500 &&
-        request.resource.data.createdAt == request.time &&
-        existsAfter(repairRequestPath(request.resource.data.requestId)) &&
-        (canEdit() || getAfter(repairRequestPath(request.resource.data.requestId)).data.createdBy == request.auth.uid);
-      allow update, delete: if false;
-    }
-
-    // Todas las demás colecciones permanecen cerradas.
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
-) &&
+        id.matches('^[a-f0-9-]{36}$') &&
         repairAssetValid(id) &&
         request.resource.data.createdBy == request.auth.uid &&
         request.resource.data.createdAt == request.time &&
@@ -1484,18 +1400,9 @@ match /agora_finance_requests/{requestId} {
       allow delete: if false;
     }
     match /agora_repair_requests/{id} {
-      allow get: if canEdit() || (opsStaff() && resource.data.createdBy == request.auth.uid);
-      // Las consultas staff DEBEN filtrar createdBy == auth.uid.
-      allow list: if canEdit() || (opsStaff() && resource.data.createdBy == request.auth.uid);
+      allow get, list: if canEdit() || (opsStaff() && resource.data.createdBy == request.auth.uid);
       allow create: if repairUser() &&
-        id.matches('^[a-f0-9-]{36}
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
-) &&
+        id.matches('^[a-f0-9-]{36}$') &&
         repairDocumentValid(id) &&
         request.resource.data.createdBy == request.auth.uid &&
         request.resource.data.createdByEmail == request.auth.token.email &&
@@ -1526,14 +1433,7 @@ match /agora_finance_requests/{requestId} {
             request.resource.data.photos.size() == resource.data.photos.size() + 1 &&
             request.resource.data.photos.hasAll(resource.data.photos) &&
             request.resource.data.photos[request.resource.data.photos.size() - 1].path
-              .matches('^agora-repairs/' + id + '/' + request.auth.uid + '/[a-f0-9-]{36}\\.jpg
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
-))
+              .matches('^agora-repairs/' + id + '/' + request.auth.uid + '/[a-f0-9-]{36}\\.jpg$'))
         );
       allow delete: if false;
     }
