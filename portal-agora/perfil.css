@@ -515,3 +515,187 @@ body:not(.login-mode) footer{
   body:not(.login-mode) .header{background:#101113;backdrop-filter:none}
   body:not(.login-mode) main{background:#0b0c0e}
 }
+
+
+/* === Consolidación desde Identidad y RH, exclusiva del titular ===
+   Mis operaciones (solo proyección propia) y expediente privado por UID. */
+.profile-private-links{
+  margin-top:23px;padding:24px 27px;
+  border:1px solid #32363a;background:rgba(22,24,27,.95);
+  border-radius:15px;
+}
+.profile-private-links .profile-section-top h2{
+  font-size:20px;margin-bottom:4px;color:#f5f6f4;
+}
+.profile-private-grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;margin-top:18px;
+}
+.private-link{
+  display:flex;gap:15px;align-items:center;
+  min-width:0;min-height:80px;padding:15px 17px;
+  border:1px solid #3e4145;border-radius:12px;
+  color:#f4f4f1;text-decoration:none;
+  background:#242629;
+  transition:background .15s ease,border-color .15s ease;
+}
+.private-link:hover,.private-link:focus-visible{
+  background:#303338;border-color:#aea28d;
+}
+.private-link-symbol{
+  flex:0 0 45px;width:45px;height:45px;display:grid;place-items:center;
+  color:#dfcda8;border-radius:11px;border:1px solid #56514a;
+  background:#1b1c1d;font-size:21px;
+}
+.private-link>span:nth-child(2){flex:1;display:grid;gap:4px;min-width:0}
+.private-link strong{font-size:15px;font-weight:700}
+.private-link small{font-size:12px;color:#b9bdc1;line-height:1.45}
+.private-link-arrow{color:#d6bd8b;font-size:21px;font-weight:500}
+.secure-page{
+  max-width:970px;margin:0 auto;min-height:55vh;
+}
+.secure-back{
+  display:inline-flex;align-items:center;gap:5px;
+  color:#d5d7d8;text-decoration:none;font-size:13px;
+  padding:5px 0;margin-bottom:30px;
+}
+.secure-back:hover{text-decoration:underline;color:white}
+.secure-heading{
+  margin-bottom:22px;padding-bottom:22px;
+  border-bottom:1px solid #33363b;
+}
+.secure-heading h1{
+  margin:8px 0 10px;color:#f9f9f7;
+  line-height:1.15;font-size:clamp(29px,4.3vw,42px);
+  letter-spacing:-.04em;
+}
+.secure-heading p{
+  color:#c3c7ca;margin:0;font-size:14px;line-height:1.6;
+}
+.secure-privacy{
+  font-size:12px;line-height:1.55;color:#d1dbc9;
+  background:#202622;border-left:3px solid #759c7c;
+  border-radius:7px;padding:12px 16px;margin-bottom:19px;
+}
+.secure-accordion{display:grid;gap:12px}
+.secure-accordion details{
+  border:1px solid #383b40;border-radius:12px;
+  background:#1c1e21;overflow:hidden;
+}
+.secure-accordion summary{
+  cursor:pointer;list-style:none;display:flex;
+  justify-content:space-between;align-items:center;
+  gap:15px;padding:17px 20px;
+  color:#f1f2f0;font-size:15px;font-weight:700;
+}
+.secure-accordion summary::-webkit-details-marker{display:none}
+.secure-accordion summary span{
+  color:#cdb88b;font-size:19px;transition:transform .15s ease;
+}
+.secure-accordion details[open] summary span{transform:rotate(180deg)}
+.secure-accordion details[open] summary{
+  border-bottom:1px solid #36393e;
+}
+.secure-details{padding:19px 20px 21px}
+.secure-form{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:18px 16px;
+}
+.secure-field{display:grid;gap:7px;min-width:0}
+.secure-field>span{font-size:12px;font-weight:600;color:#d0d4d6}
+.secure-field input,.secure-field textarea{
+  box-sizing:border-box;width:100%;font:inherit;
+  color:#f8f8f5;background:#121416;
+  border:1px solid #5b5e63;border-radius:8px;
+  padding:11px 12px;min-height:44px;
+  font-size:14px;
+}
+.secure-field textarea{resize:vertical;min-height:84px}
+.secure-field input:disabled{
+  color:#b3b5b7;background:#1f2023;opacity:.82;
+}
+.secure-field input:focus-visible,.secure-field textarea:focus-visible{
+  outline:2px solid #dfc78e;outline-offset:2px;
+}
+.secure-wide,.secure-form-actions{grid-column:1/-1}
+.secure-form-actions{
+  border-top:1px solid #36383d;
+  padding-top:15px;margin-top:2px;
+}
+.secure-warning{
+  margin:0 0 17px;background:#372b20;
+  border:1px solid #6c5139;border-radius:7px;
+  padding:10px 12px;color:#f4dcbd;font-size:13px;
+}
+.secure-section-title{
+  display:flex;align-items:baseline;
+  justify-content:space-between;gap:16px;
+  flex-wrap:wrap;margin-bottom:17px;
+}
+.secure-section-title h2{
+  color:#f7f7f5;margin:0;
+  font-size:22px;letter-spacing:-.02em;
+}
+.secure-section-title span{
+  color:#bcbec2;font-size:13px;text-transform:capitalize;
+}
+.secure-assignments{display:block}
+.secure-assignment{
+  margin-bottom:15px;background:#1c1e22;
+  border:1px solid #363a40;border-radius:12px;
+  padding:20px 22px;
+}
+.secure-assignment-head{
+  display:flex;flex-wrap:wrap;align-items:center;gap:13px;
+  margin-bottom:14px;
+}
+.secure-time{
+  white-space:nowrap;display:inline-flex;
+  align-items:center;color:#e5d1a3;background:#292720;
+  border:1px solid #574c3a;border-radius:7px;
+  font-size:13px;font-weight:700;padding:8px 10px;
+}
+.secure-assignment h3{
+  color:#f8f8f5;font-size:18px;letter-spacing:-.02em;
+  margin:0;font-weight:700;
+}
+.secure-facts{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:13px 20px;margin:0;
+}
+.secure-facts div{min-width:0}
+.secure-facts dt{color:#afb4b8;font-size:12px;margin-bottom:4px}
+.secure-facts dd{color:#f1f2ef;font-size:14px;font-weight:600;margin:0;overflow-wrap:anywhere}
+.secure-instructions{
+  border-top:1px solid #393c41;padding-top:13px;
+  margin:15px 0 0;color:#d5d9db;font-size:13px;
+  line-height:1.65;
+}
+.secure-no-work{
+  margin:0;background:#1a1c1e;
+  border:1px dashed #42474b;border-radius:11px;
+  padding:32px 18px;text-align:center;
+  color:#c3c6c9;font-size:14px;
+}
+.secure-error{
+  padding:20px;border:1px solid #724f48;border-radius:11px;
+  background:#241f1e;color:#f2ded9;
+}
+.secure-error h1{font-size:22px;color:#fff}
+.secure-error p{font-size:14px;line-height:1.6}
+@media(max-width:680px){
+  .profile-private-links{padding:19px 16px;margin-top:15px}
+  .profile-private-grid{grid-template-columns:1fr;gap:9px}
+  .private-link{min-height:72px;padding:13px}
+  .secure-back{margin-bottom:22px}
+  .secure-accordion summary{padding:15px 13px;font-size:14px}
+  .secure-details{padding:15px 13px}
+  .secure-form{grid-template-columns:1fr;gap:15px}
+  .secure-facts{grid-template-columns:1fr}
+  .secure-assignment{padding:17px}
+  .secure-section-title{gap:6px}
+  .secure-section-title h2{font-size:20px}
+}
+@media(prefers-reduced-motion:reduce){
+  .private-link,.secure-accordion summary span{transition:none}
+}
