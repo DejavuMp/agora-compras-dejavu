@@ -41,7 +41,7 @@ exports.deliveryResponded=onDocumentCreated({document:'agora_file_responses/{id}
 
 
 // ÁGORA · aviso mínimo de solicitudes de ID, sin transmitir expedientes sensibles.
-const idPortalUrl=()=>new URL('inicio/',baseUrl.value().replace(/\\/?$/,'/')).toString();
+const idPortalUrl=()=>{const origin=baseUrl.value();return new URL('inicio/',origin.endsWith('/')?origin:origin+'/').toString();};
 exports.identityRegistrationRequested=onDocumentCreated({
   document:'agora_identity_registrations/{uid}',region:'us-central1',secrets:[apiKey]
 },async event=>{
