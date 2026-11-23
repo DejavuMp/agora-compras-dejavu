@@ -883,3 +883,107 @@ body.login-mode main{
   animation:none!important;transform:none!important
  }
 }
+
+
+/* Corrección visual · evitar el cuadro negro del wordmark PNG/WebP
+   El logotipo del press kit contiene fondo negro embebido. Screen
+   permite conservar únicamente sus trazos dorados y texto claro. */
+body.login-mode .cinema-brand{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:clamp(.72rem,1.5vh,1rem);
+  padding:0 0 .5rem;
+  margin:0 0 .7rem;
+  overflow:visible;
+}
+body.login-mode .cinema-brand img{
+  display:block;
+  width:min(375px,81vw);
+  max-width:min(375px,81vw);
+  height:auto;
+  max-height:unset;
+  object-fit:contain;
+  mix-blend-mode:screen;
+  image-rendering:auto;
+  filter:drop-shadow(0 0 12px rgba(232,177,75,.1));
+}
+body.login-mode .cinema-subtitle{
+  margin:0;
+  padding:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:.75rem;
+  font-size:clamp(.54rem,.7vw,.67rem);
+  line-height:1.5;
+  letter-spacing:.19em;
+  font-weight:700;
+  color:#f2d4a1;
+  white-space:normal;
+  text-align:center;
+  text-shadow:0 1px 8px #100c06;
+}
+body.login-mode .cinema-subtitle span{flex:0 0 clamp(15px,3vw,32px)}
+body.login-mode .cinema-content{gap:1.25rem}
+@media(max-width:700px){
+  body.login-mode .cinema-brand{gap:.5rem;margin-bottom:.3rem}
+  body.login-mode .cinema-brand img{
+    width:min(320px,76vw);
+    max-width:min(320px,76vw);
+    height:auto;
+    max-height:none;
+  }
+  body.login-mode .cinema-subtitle{
+    font-size:clamp(.5rem,2vw,.63rem);
+    letter-spacing:.1em;
+    line-height:1.4;
+  }
+  body.login-mode .cinema-content{gap:.8rem}
+}
+@media(max-width:400px){
+  body.login-mode .cinema-brand img{
+    width:min(275px,77vw);
+    max-width:min(275px,77vw);
+    height:auto;
+  }
+  body.login-mode .cinema-subtitle span{flex-basis:12px}
+}
+
+
+/* Marca auténtica con canal alfa del press kit; no usar 'screen' con WebP transparente. */
+body.login-mode .cinema-brand img[src$="agora-wordmark-transparent.webp"]{
+  mix-blend-mode:normal;
+  background:transparent;
+  width:min(408px,82vw);
+  max-width:min(408px,82vw);
+  height:auto;
+  border:0;
+  box-shadow:none;
+  filter:drop-shadow(0 0 9px rgba(237,189,109,.2));
+}
+body.login-mode .cinema-brand{
+  gap:.65rem;
+  margin-bottom:.5rem;
+}
+body.login-mode .cinema-subtitle{
+  position:relative;
+  isolation:isolate;
+  margin-top:0;
+  line-height:1.45;
+  max-width:min(590px,92vw);
+}
+@media(max-width:700px){
+  body.login-mode .cinema-brand img[src$="agora-wordmark-transparent.webp"]{
+    width:min(340px,81vw);
+    max-width:min(340px,81vw);
+  }
+  body.login-mode .cinema-brand{gap:.44rem}
+}
+@media(max-width:400px){
+  body.login-mode .cinema-brand img[src$="agora-wordmark-transparent.webp"]{
+    width:min(289px,82vw);
+    max-width:min(289px,82vw);
+  }
+}

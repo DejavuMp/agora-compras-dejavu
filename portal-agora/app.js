@@ -72,7 +72,7 @@ function login(){
     '<div class="cinema-stars" aria-hidden="true"></div>'+
     '<div class="cinema-content">'+
       '<div class="cinema-brand">'+
-        '<img src="./assets/pdf-agora-wordmark.webp" alt="ÁGORA por Dejavú Marketing" width="440" height="165">'+
+        '<img src="./assets/agora-wordmark-transparent.webp" alt="ÁGORA por Dejavú Marketing" width="886" height="330">'+
         '<div class="cinema-subtitle"><span aria-hidden="true"></span>IDENTIDAD ÚNICA · DEJAVÚ MARKETING<span aria-hidden="true"></span></div>'+
       '</div>'+
       '<section class="cinema-card" aria-label="Acceso ÁGORA">'+

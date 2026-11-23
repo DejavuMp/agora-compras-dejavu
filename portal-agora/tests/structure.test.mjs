@@ -76,6 +76,18 @@ test("original generated cinematic login background is bundled",async()=>{
  assert.ok(bytes.length>100000);
 });
 
+test("login logo uses the original transparent image and correct layout",async()=>{
+  const js=await read("app.js");
+  const css=await read("style.css");
+  assert.match(js,/assets\/agora-wordmark-transparent\.webp/);
+  assert.ok(css.includes('mix-blend-mode:normal'));
+  assert.ok(css.includes('.cinema-brand'));
+  const bytes=await readFile(new URL("../assets/agora-wordmark-transparent.webp",import.meta.url));
+  assert.equal(bytes.subarray(0,4).toString(),"RIFF");
+  assert.equal(bytes.subarray(8,12).toString(),"WEBP");
+  assert.ok(bytes.byteLength>50000);
+});
+
 test("firestore SMS rules are limited to identity and own UID",async()=>{
   const rules=await readFile(new URL("../../firestore.rules",import.meta.url),"utf8");
   assert.match(rules,/function identitySignedIn\(\)/);
