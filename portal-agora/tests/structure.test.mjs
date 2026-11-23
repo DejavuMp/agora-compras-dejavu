@@ -94,7 +94,9 @@ test("las tres páginas tienen ruta propia, etiqueta y regreso al perfil",async(
     assert.match(html,/href="\.\.\/"/);
     assert.match(app,new RegExp(''+path));
   }
-  assert.match(app,/Espacio en preparación/);
+  assert.match(app,/function staffOperationsSpace\(\)/);
+  assert.match(app,/function coordinationOperationsSpace\(admin=false\)/);
+  assert.match(app,/function emptySpace\(\)/);
   assert.match(app,/Volver a Mi perfil/);
   assert.match(app,/new URL\(path,ROOT\)/);
   assert.match(app,/routeDenied\(true\)/);
@@ -213,13 +215,24 @@ test("iconos originales y tipografía adaptable siguen en el portal",async()=>{
   assert.match(css,/\.credential-modal/);
 });
 
-test("no hay proveedores, actividades, pagos ni navegación a herramientas en los espacios nuevos",async()=>{
+test("Staff, Agencia y Administrador conectan al mismo Firestore sin escrituras operativas nuevas",async()=>{
   const app=await read("app.js");
-  const route=app.slice(app.indexOf("function emptySpace(){"),app.indexOf("function render(){"));
-  assert.match(route,/Espacio en preparación/);
-  assert.doesNotMatch(route,/https?:\/\/|herramientas|pago|proyecto|cotizaci|calendario|compras/i);
-  for(const path of ["staff","agencia","administrador"]){
-    const html=await read(path+"/index.html");
-    assert.doesNotMatch(html,/https?:\/\/|href="[^"]*compras|href="[^"]*operaciones|href="[^"]*recursos/i);
-  }
+  const css=await read("perfil.css");
+  assert.match(app,/getDoc\(doc\(db,"agora_ops_staff",uid\)\)/);
+  assert.match(app,/getDoc\(doc\(db,"agora_ops_control","schedule"\)\)/);
+  assert.match(app,/if\(space==="staff"\)/);
+  assert.match(app,/\["admin","coordinador"\]\.includes\(role\(\)\)/);
+  assert.match(app,/if\(routeSpace&&allowed\(routeSpace\)\)/);
+  assert.match(app,/role\(\)=="admin"|role\(\)===/i);
+  assert.match(app,/function staffOperationsSpace\(\)/);
+  assert.match(app,/function coordinationOperationsSpace\(admin=false\)/);
+  assert.match(app,/data-action="new-assignment"/);
+  assert.match(app,/data-action="add-assignment-activity"/);
+  assert.match(app,/data-draft-activity/);
+  assert.match(app,/validateAssignmentDraft/);
+  assert.match(app,/Borrador preparado\. No se ha guardado en Firebase/);
+  assert.match(app,/La carga privada de archivos se habilitará/);
+  assert.doesNotMatch(app,/setDoc\(doc\(db,"agora_ops_(?:control|staff|shift_access)"/);
+  assert.match(css,/\.role-jornada/);
+  assert.match(css,/\.role-assignment-form/);
 });
