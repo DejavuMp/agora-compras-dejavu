@@ -1270,6 +1270,157 @@ match /agora_finance_requests/{requestId} {
     }
 
 
+    // ÁGORA · Inventario, mantenimiento y reparaciones.
+    // Colecciones nuevas: no migran ni modifican los datos de otros módulos.
+    function repairUser() { return canEdit() || opsStaff(); }
+    function repairRequestPath(id) {
+      return /databases/$(database)/documents/agora_repair_requests/$(id);
+    }
+    function repairAllowedFields() {
+      return [
+        'id','project','asset','scope','area','cause','problem','solutionMode',
+        'instructions','materialLink','dueDate','priority','createdBy',
+        'createdByEmail','createdByName','createdAt','updatedAt','status',
+        'repairRoute','assignedTo','decisionBy','decisionNote','estimatedCost',
+        'quotes','selectedQuoteId','photos','revision'
+      ];
+    }
+    function repairDocumentValid(id) {
+      return request.resource.data.keys().hasOnly(repairAllowedFields()) &&
+        request.resource.data.keys().hasAll(repairAllowedFields()) &&
+        request.resource.data.id == id &&
+        request.resource.data.project is string &&
+        request.resource.data.project.size() > 0 &&
+        request.resource.data.project.size() <= 120 &&
+        request.resource.data.asset is string &&
+        request.resource.data.asset.size() > 0 &&
+        request.resource.data.asset.size() <= 120 &&
+        request.resource.data.area is string &&
+        request.resource.data.area.size() > 0 &&
+        request.resource.data.area.size() <= 120 &&
+        request.resource.data.problem is string &&
+        request.resource.data.problem.size() > 0 &&
+        request.resource.data.problem.size() <= 2000 &&
+        request.resource.data.scope in [
+          'Área del stand','Elemento específico','Stand completo','Mueble suelto'
+        ] &&
+        request.resource.data.cause is string &&
+        request.resource.data.cause.size() <= 250 &&
+        request.resource.data.instructions is string &&
+        request.resource.data.instructions.size() <= 2000 &&
+        request.resource.data.materialLink is string &&
+        request.resource.data.materialLink.size() <= 1000 &&
+        request.resource.data.dueDate is string &&
+        request.resource.data.dueDate.size() <= 10 &&
+        request.resource.data.priority in ['Normal','Alta','Urgente'] &&
+        request.resource.data.solutionMode in ['propuesta','instrucciones'] &&
+        request.resource.data.createdBy is string &&
+        request.resource.data.createdByEmail is string &&
+        request.resource.data.createdByEmail.size() <= 240 &&
+        request.resource.data.createdByName is string &&
+        request.resource.data.createdByName.size() <= 120 &&
+        request.resource.data.status in [
+          'pendiente','revision','cotizando','autorizado',
+          'reparacion','terminado','entregado'
+        ] &&
+        request.resource.data.repairRoute in [
+          'pendiente','staff','agencia','proveedor','nuevo','cotizar','comparar'
+        ] &&
+        request.resource.data.assignedTo is string &&
+        request.resource.data.assignedTo.size() <= 160 &&
+        request.resource.data.decisionBy is string &&
+        request.resource.data.decisionBy.size() <= 120 &&
+        request.resource.data.decisionNote is string &&
+        request.resource.data.decisionNote.size() <= 2000 &&
+        request.resource.data.estimatedCost is number &&
+        request.resource.data.estimatedCost >= 0 &&
+        request.resource.data.estimatedCost <= 99999999 &&
+        request.resource.data.quotes is list &&
+        request.resource.data.quotes.size() <= 8 &&
+        request.resource.data.selectedQuoteId is string &&
+        request.resource.data.selectedQuoteId.size() <= 36 &&
+        request.resource.data.photos is list &&
+        request.resource.data.photos.size() <= 12 &&
+        request.resource.data.revision is int &&
+        request.resource.data.revision >= 1;
+    }
+    match /agora_repair_requests/{id} {
+      allow get: if canEdit() || (opsStaff() && resource.data.createdBy == request.auth.uid);
+      // Las consultas staff DEBEN filtrar createdBy == auth.uid.
+      allow list: if canEdit() || (opsStaff() && resource.data.createdBy == request.auth.uid);
+      allow create: if repairUser() &&
+        id.matches('^[a-f0-9-]{36}
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+) &&
+        repairDocumentValid(id) &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.createdByEmail == request.auth.token.email &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.revision == 1 &&
+        request.resource.data.status == 'pendiente' &&
+        request.resource.data.repairRoute == 'pendiente' &&
+        request.resource.data.assignedTo == '' &&
+        request.resource.data.decisionBy == '' &&
+        request.resource.data.decisionNote == '' &&
+        request.resource.data.estimatedCost == 0 &&
+        request.resource.data.quotes.size() == 0 &&
+        request.resource.data.photos.size() == 0 &&
+        request.resource.data.selectedQuoteId == '';
+      allow update: if repairUser() &&
+        repairDocumentValid(id) &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.revision == resource.data.revision + 1 &&
+        (
+          canEdit() ||
+          (opsStaff() && resource.data.createdBy == request.auth.uid &&
+            request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['photos','revision','updatedAt']) &&
+            request.resource.data.photos.size() == resource.data.photos.size() + 1 &&
+            request.resource.data.photos.hasAll(resource.data.photos) &&
+            request.resource.data.photos[request.resource.data.photos.size() - 1].path
+              .matches('^agora-repairs/' + id + '/' + request.auth.uid + '/[a-f0-9-]{36}\\.jpg
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+))
+        );
+      allow delete: if false;
+    }
+    match /agora_repair_events/{eventId} {
+      allow get, list: if canEdit();
+      allow create: if repairUser() &&
+        request.resource.data.keys().hasOnly([
+          'requestId','actorUid','actorEmail','action','detail','createdAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'requestId','actorUid','actorEmail','action','detail','createdAt'
+        ]) &&
+        request.resource.data.actorUid == request.auth.uid &&
+        request.resource.data.actorEmail == request.auth.token.email &&
+        request.resource.data.requestId is string &&
+        request.resource.data.action in [
+          'creada','decisión','cotización','selección de cotización','evidencia'
+        ] &&
+        request.resource.data.detail is string &&
+        request.resource.data.detail.size() <= 500 &&
+        request.resource.data.createdAt == request.time &&
+        existsAfter(repairRequestPath(request.resource.data.requestId)) &&
+        (canEdit() || getAfter(repairRequestPath(request.resource.data.requestId)).data.createdBy == request.auth.uid);
+      allow update, delete: if false;
+    }
+
     // Todas las demás colecciones permanecen cerradas.
     match /{document=**} {
       allow read, write: if false;
