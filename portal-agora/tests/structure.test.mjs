@@ -27,7 +27,7 @@ test("site portable and independent from other systems",async()=>{
   assert.ok(css.includes("@media(max-width:580px)"));
   assert.match(css,/@keyframes orbit/);
   assert.match(css,/prefers-reduced-motion:reduce/);
-  assert.ok(html.includes('src="./assets/pdf-agora-wordmark.webp"'));
+  assert.ok(html.includes('src="./assets/logo-agora-hq.webp"'));
   assert.match(js,/class="cinema-login"/);
   assert.ok(css.includes("escena-login-agora.webp"));
   assert.match(css,/@keyframes cinema-drift/);
@@ -44,15 +44,15 @@ test("site portable and independent from other systems",async()=>{
   assert.match(initialLogin,/pendiente de habilitarse de forma segura/);
   assert.ok(css.includes(".id-prefix"));
   assert.match(js,/const phone=input\.startsWith\("\+"\)\?input:"\+52"\+input/);
-  assert.ok(js.includes('assets/pdf-agora-wordmark.webp'));
-  assert.ok(js.includes('pdf-staff-icon.webp'));
-  assert.ok(js.includes('pdf-agency-icon.webp'));
+  assert.ok(js.includes('assets/logo-agora-hq.webp'));
+  assert.ok(js.includes('icono-staff-hq.webp'));
+  assert.ok(js.includes('icono-agencia-hq.webp'));
   assert.ok(css.includes("pdf-hero.webp"));
   assert.ok(css.includes("pdf-zeus.webp"));
   assert.match(js,/class="credential-mark"/);
   assert.doesNotMatch(js,/\.\.\/identidad\/|\.\.\/operaciones\//);
   assert.doesNotMatch(js,/agora_ops_|agora_finance_|agora_records|agora_file_deliveries/);
-  assert.doesNotMatch(js,/compras|proveedores|inventario|nomina|nómina|solicitudes externas/i);
+  assert.doesNotMatch(initialLogin,/compras|proveedores|inventario|nomina|nómina|solicitudes externas/i);
 });
 test("official Dejavú assets are bundled for independent hosting",async()=>{
   for(const filename of ["dejavu-logo-oficial.png","dejavu-horizontal.png","dejavu-monograma.png"]){
@@ -91,6 +91,32 @@ test("login logo uses the original transparent image and correct layout",async()
   assert.equal(bytes.subarray(0,4).toString(),"RIFF");
   assert.equal(bytes.subarray(8,12).toString(),"WEBP");
   assert.ok(bytes.byteLength>50000);
+});
+
+test("digital credential, module links and safe admin role gating",async()=>{
+  const app=await read("app.js");
+  const style=await read("style.css");
+  for(const term of ["credentialVerificationLink","credential-qr","credential-qr-modal",
+    "agora_identity_registry","share-credential","open-credential","Ver credencial digital",
+    "icono-staff-hq.webp","icono-agencia-hq.webp","Mis jornadas / Visor","Operaciones Agencia",
+    "Compras y producción","Recursos y pagos","Archivos","Fichas de evento","Identidad y RH",
+    "adminRoleNotice","copy-uid","role: \\"admin\\""]){
+    assert.ok(app.includes(term),term);
+  }
+  assert.match(app,/userRole\(\)==="admin"&&mainAdmin\(state\.user\)/);
+  assert.match(app,/getDoc\(doc\(db,"agora_users",user\.uid\)\)/);
+  assert.ok(style.includes(".sites-grid"));
+  assert.ok(style.includes(".digital-dialog"));
+});
+test("original high resolution Dejavú images embedded",async()=>{
+  const names=["logo-agora-hq.webp","icono-staff-hq.webp",
+    "icono-agencia-hq.webp","icono-administrador-hq.webp"];
+  for(const name of names){
+    const b=await readFile(new URL("../assets/"+name,import.meta.url));
+    assert.equal(b.subarray(0,4).toString(),"RIFF");
+    assert.equal(b.subarray(8,12).toString(),"WEBP");
+    assert.ok(b.byteLength>80000,name+" must be original HQ asset");
+  }
 });
 
 test("firestore SMS rules are limited to identity and own UID",async()=>{
