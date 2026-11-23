@@ -1569,7 +1569,14 @@ match /agora_finance_requests/{requestId} {
         (canEdit() || (opsStaff() &&
            request.resource.data.action in ['creada','evidencia','avance'] &&
            (getAfter(repairRequestPath(request.resource.data.requestId)).data.createdBy == request.auth.uid ||
-            getAfter(repairRequestPath(request.resource.data.requestId)).data.assignedUid == request.auth.uid)));
+            getAfter(repairRequestPath(request.resource.data.requestId)).data.assignedUid == request.auth.uid) &&
+           (request.resource.data.action != 'creada' ||
+             (!exists(repairRequestPath(request.resource.data.requestId)) &&
+               getAfter(repairRequestPath(request.resource.data.requestId)).data.createdAt == request.time)) &&
+           (request.resource.data.action != 'evidencia' ||
+             (exists(repairRequestPath(request.resource.data.requestId)) &&
+               getAfter(repairRequestPath(request.resource.data.requestId)).data.photos.size() ==
+                 get(repairRequestPath(request.resource.data.requestId)).data.photos.size() + 1))));
       allow update, delete: if false;
     }
 
