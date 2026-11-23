@@ -6,6 +6,7 @@ import {doc,getDoc,setDoc,serverTimestamp}
   from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 import {saveProfile,saveFinancial} from "../identidad/firebase-identity.js";
 import {projectTodayAssignments} from "../identidad/domain.mjs";
+import {ownJornadas,coordinationJornadas,operationTotals,validateAssignmentDraft,assignmentDraftText,REQUEST_CHANNELS} from "./roles-operacion.mjs";
 
 // Una sola identidad Firebase para todas las vistas. Sin módulos operativos.
 const ROOT=new URL("./",import.meta.url);
@@ -26,7 +27,7 @@ const app=document.getElementById("app");
 const status=document.getElementById("system-status");
 const sessionLabel=document.getElementById("session-label");
 const logoutButton=document.getElementById("logout");
-const state={user:null,identity:null,privateData:null,privateError:null,page:"login",busy:false,epoch:0};
+const state={user:null,identity:null,privateData:null,privateError:null,roleData:null,roleError:null,page:"login",busy:false,epoch:0};
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
 })[c]);
@@ -156,6 +157,20 @@ async function readPrivateSection(uid,section){
   }
   return null;
 }
+async function readRoleOperations(uid,space){
+  // Nunca solicitar el cronograma general para Staff o cuentas de consulta.
+  if(space==="staff"){
+    const snapshot=await getDoc(doc(db,"agora_ops_staff",uid));
+    return {staff:snapshot.exists()?snapshot.data():null};
+  }
+  if(["admin","coordinador"].includes(role())&&
+     (space==="agencia"||space==="administrador")){
+    const snapshot=await getDoc(doc(db,"agora_ops_control","schedule"));
+    return {schedule:snapshot.exists()?snapshot.data():null};
+  }
+  return {readOnly:true};
+}
+
 async function refresh(){
   const user=state.user;
   const epoch=++state.epoch;
@@ -163,6 +178,8 @@ async function refresh(){
   logoutButton.hidden=!user;
   state.privateData=null;
   state.privateError=null;
+  state.roleData=null;
+  state.roleError=null;
   if(!user){
     state.identity=null;
     render();
@@ -184,6 +201,17 @@ async function refresh(){
         if(epoch!==state.epoch)return;
         state.privateError=error;
         console.warn("No se pudo leer la sección privada:",error?.code||"error");
+      }
+    }
+    if(routeSpace&&allowed(routeSpace)){
+      try{
+        const result=await readRoleOperations(user.uid,routeSpace);
+        if(epoch!==state.epoch||auth.currentUser?.uid!==user.uid)return;
+        state.roleData=result;
+      }catch(error){
+        if(epoch!==state.epoch)return;
+        state.roleError=error;
+        console.warn("Consulta de operación no disponible:",error?.code||"error");
       }
     }
     render();
@@ -475,15 +503,134 @@ function routeDenied(unauthenticated=false){
     '<a class="profile-button profile-button-primary" href="'+esc(ROOT.href)+'">'+
       (unauthenticated?"Ir al inicio de sesión":"Volver a Mi perfil")+'</a></section>';
 }
+const roleDate=ms=>new Intl.DateTimeFormat("es-MX",{
+  weekday:"short",day:"numeric",month:"short"
+}).format(new Date(ms));
+const roleTime=ms=>new Intl.DateTimeFormat("es-MX",{
+  hour:"2-digit",minute:"2-digit"
+}).format(new Date(ms));
+function roleNotice(){
+  if(!state.roleError)return "";
+  return '<div class="role-notice" role="status">'+
+    '<strong>Sin acceso a la operación todavía</strong>'+
+    '<p>El ID Dejavú está acreditado, pero falta verificar tu vinculación con Operaciones o los permisos del módulo. No se ha modificado ningún registro.</p>'+
+    '<button class="profile-button profile-button-outline" data-action="retry" type="button">Volver a consultar</button></div>';
+}
+function staffJornadaCard(item){
+  return '<article class="role-jornada">'+
+    '<div class="role-jornada-head"><div><small>'+esc(roleDate(item.start))+'</small>'+
+    '<h3>'+esc(item.title)+'</h3></div>'+
+    '<span class="role-time">'+roleTime(item.start)+' – '+roleTime(item.end)+'</span></div>'+
+    '<dl class="role-jornada-facts"><div><dt>Sede</dt><dd>'+esc(item.site)+'</dd></div>'+
+    '<div><dt>Asignado por</dt><dd>'+esc(item.responsible)+'</dd></div></dl>'+
+    '<div class="role-activities"><strong>Actividades de esta jornada</strong>'+
+      (item.activities.length?'<ul>'+item.activities.map(a=>'<li>'+esc(a.name)+'</li>').join("")+'</ul>':
+      '<p>Coordinación todavía no ha detallado las actividades.</p>')+
+      (item.instructions?'<p class="role-instructions">'+esc(item.instructions)+'</p>':"")+
+    '</div>'+
+    '<details class="role-add-activity"><summary>+ Proponer otra actividad en esta jornada</summary>'+
+      '<form data-draft-activity="'+esc(item.key)+'" class="role-proposal-form">'+
+        '<label>Actividad adicional<input name="activity" required maxlength="200" placeholder="¿Qué otra actividad realizarás?"></label>'+
+        '<label>Observación (opcional)<textarea name="note" rows="2" maxlength="400"></textarea></label>'+
+        '<button class="profile-button profile-button-outline" type="submit">Preparar mensaje</button>'+
+        '<p class="role-draft-warning">Este mensaje aún no queda guardado en Firebase. Puedes copiarlo para enviarlo a coordinación.</p>'+
+        '<textarea class="role-draft-preview" aria-label="Propuesta para coordinación" rows="5" readonly hidden></textarea>'+
+        '<button type="button" data-action="copy-activity-draft" class="profile-button profile-button-outline" hidden>Copiar propuesta</button>'+
+      '</form></details>'+
+    '</article>';
+}
+function staffOperationsSpace(){
+  const staff=state.roleData?.staff;
+  const assigned=ownJornadas(staff,new Date(),35);
+  return '<section class="role-module" aria-label="Mis jornadas y actividades">'+
+    '<header class="role-module-heading"><div><h2>Mis jornadas</h2>'+
+      '<p>Una jornada puede incluir varias actividades. Consulta tus asignaciones personales.</p></div>'+
+      '<a class="profile-button profile-button-primary" href="'+esc(href("mi-operacion/"))+'">Abrir Mi operación</a></header>'+
+    roleNotice()+
+    (staff?assigned.length?'<div class="role-jornada-list">'+assigned.map(staffJornadaCard).join("")+'</div>':
+      '<p class="role-empty">No hay jornadas vigentes o próximas en tu ficha personal.</p>':
+      '<p class="role-empty">Todavía no encontramos una ficha de Operaciones vinculada a tu cuenta. Coordinación debe vincular tu UID al personal asignado.</p>')+
+    '<p class="role-transition">Los marcajes oficiales de entrada y salida siguen en el módulo seguro de Jornadas mientras se termina su integración. No se alteran tus horas anteriores.</p>'+
+  '</section>';
+}
+function scheduleCard(item){
+  return '<article class="role-jornada role-schedule-item">'+
+    '<div class="role-jornada-head"><div><small>'+esc(roleDate(item.start))+'</small>'+
+      '<h3>'+esc(item.title)+'</h3></div>'+
+      '<span class="role-time">'+roleTime(item.start)+' – '+roleTime(item.end)+'</span></div>'+
+    '<dl class="role-jornada-facts"><div><dt>Sede</dt><dd>'+esc(item.site)+'</dd></div>'+
+      '<div><dt>Personal asignado</dt><dd>'+item.staffCount+'</dd></div>'+
+      '<div><dt>Actividades registradas</dt><dd>'+item.activitiesCount+'</dd></div>'+
+      '<div><dt>Estado</dt><dd>'+esc(item.status)+'</dd></div></dl></article>';
+}
+function assignmentDialog(){
+  const now=new Date();
+  const localDate=[now.getFullYear(),String(now.getMonth()+1).padStart(2,"0"),String(now.getDate()).padStart(2,"0")].join("-");
+  return '<dialog class="role-dialog" id="assignment-dialog" aria-label="Asignaciones de jornada">'+
+    '<div class="role-dialog-head"><div><strong>Asignaciones de jornada</strong>'+
+      '<p>Registra la solicitud como borrador previo a la autorización.</p></div>'+
+      '<button type="button" data-action="close-assignment" aria-label="Cerrar formulario">×</button></div>'+
+    '<div class="role-draft-warning" role="note">Todavía no se guardan solicitudes ni evidencias en Firebase. Este borrador puede copiarse, pero no publica jornadas ni asigna personal.</div>'+
+    '<form id="assignment-form" class="role-assignment-form">'+
+      '<label>Quién solicita<input name="requester" required maxlength="140" placeholder="Nombre de la persona o cliente"></label>'+
+      '<label>Medio de solicitud<select name="channel" required>'+
+        REQUEST_CHANNELS.map(ch=>'<option value="'+esc(ch)+'">'+esc(ch)+'</option>').join("")+'</select></label>'+
+      '<label>Contacto (opcional)<input name="contact" maxlength="120" placeholder="Correo o teléfono"></label>'+
+      '<label>Fecha de recepción<input name="requestedAt" type="datetime-local"></label>'+
+      '<label>Proyecto<input name="project" required maxlength="150" placeholder="Proyecto o motivo"></label>'+
+      '<label>Sede<input name="site" required maxlength="150" placeholder="Oficina, sucursal o lugar"></label>'+
+      '<label>Fecha de jornada<input name="date" type="date" required value="'+localDate+'"></label>'+
+      '<label>Inicio<input name="start" type="time" required></label>'+
+      '<label>Fin<input name="end" type="time" required></label>'+
+      '<label>Personas requeridas<input name="headcount" min="1" max="999" type="number" value="1"></label>'+
+      '<label class="role-wide">Descripción<textarea name="description" rows="3" maxlength="600"></textarea></label>'+
+      '<div class="role-wide"><div class="role-dialog-subhead"><strong>Actividades de la misma jornada</strong>'+
+        '<button type="button" data-action="add-assignment-activity" class="profile-button profile-button-outline">+ Añadir actividad</button></div>'+
+        '<div id="assignment-activities" class="role-activity-inputs"></div>'+
+        '<p class="role-help">Puedes agregar tantas actividades como necesites, incluso cuando el trabajo ya haya comenzado. Este formulario no registra todavía su ejecución.</p></div>'+
+      '<label class="role-wide">Descripción de evidencia recibida<textarea name="evidenceNote" rows="2" maxlength="400" placeholder="Ej.: solicitud por llamada el día… o captura de WhatsApp disponible"></textarea></label>'+
+      '<div class="role-wide"><label>Adjuntar captura, correo o audio <input type="file" disabled aria-disabled="true"></label>'+
+        '<small class="role-help">La carga privada de archivos se habilitará cuando existan permisos de Storage validados. No se publicarán archivos en enlaces abiertos.</small></div>'+
+      '<div class="role-wide role-dialog-actions"><button type="submit" class="profile-button profile-button-primary">Preparar borrador</button></div>'+
+    '</form>'+
+    '<div id="assignment-result" hidden><h3>Solicitud preparada · No guardada</h3>'+
+      '<textarea id="assignment-preview" rows="12" readonly aria-label="Texto del borrador"></textarea>'+
+      '<button type="button" data-action="copy-assignment" class="profile-button profile-button-outline">Copiar texto</button></div>'+
+  '</dialog>';
+}
+function coordinationOperationsSpace(admin=false){
+  const edit=["admin","coordinador"].includes(role());
+  const list=edit?coordinationJornadas(state.roleData?.schedule,new Date(),60):[];
+  const totals=operationTotals(list,new Date());
+  return '<section class="role-module" aria-label="Operaciones de '+(admin?"Administración":"Agencia")+'">'+
+    '<header class="role-module-heading"><div><h2>'+(admin?"Supervisión de jornadas":"Coordinación de jornadas")+'</h2>'+
+      '<p>'+(admin?"Vista administrativa de jornadas y asignaciones registradas.":
+        "Solicitudes, asignaciones y actividades de la operación.")+'</p></div>'+
+      (edit?'<button type="button" data-action="new-assignment" class="profile-button profile-button-primary">+ Asignaciones de jornada</button>':"")+
+    '</header>'+
+    roleNotice()+
+    (edit?'<div class="role-metrics"><div><small>Jornadas hoy</small><strong>'+totals.today+'</strong></div>'+
+      '<div><small>Próximas jornadas</small><strong>'+totals.upcoming+'</strong></div>'+
+      '<div><small>Personal asignado (turnos)</small><strong>'+totals.assignments+'</strong></div></div>'+
+      (list.length?'<div class="role-jornada-list">'+list.slice(0,20).map(scheduleCard).join("")+'</div>':
+       '<p class="role-empty">No hay jornadas próximas en el cronograma operativo.</p>')+
+      '<p class="role-transition">Estos datos se leen del cronograma original. Las solicitudes nuevas son borradores hasta contar con el flujo seguro de autorización y evidencias.</p>'+
+      assignmentDialog():
+      '<p class="role-empty">Esta cuenta tiene permisos de consulta, no de coordinación. No puede crear ni modificar asignaciones.</p>')+
+  '</section>';
+}
 function emptySpace(){
   const meta=PATH_SPACES[routeSpace];
-  app.innerHTML='<section class="empty-space-page">'+
-    '<a class="empty-back" href="'+esc(ROOT.href)+'">← Volver a Mi perfil</a>'+
-    '<img class="empty-space-icon" src="'+esc(iconSrc(meta.icon))+'" width="96" height="96" alt="">'+
-    '<div class="profile-kicker">ÁGORA · Espacio personal</div>'+
-    '<h1>'+meta.title+'</h1><p>Espacio en preparación</p>'+
-    '<a class="profile-button profile-button-outline" href="'+esc(ROOT.href)+'">Volver a Mi perfil</a></section>';
+  const body=routeSpace==="staff"?staffOperationsSpace():
+    coordinationOperationsSpace(routeSpace==="administrador");
+  app.innerHTML='<section class="role-space-page">'+
+    '<a class="secure-back" href="'+esc(ROOT.href)+'">← Volver a Mi perfil</a>'+
+    '<div class="role-space-heading">'+
+      '<img src="'+esc(iconSrc(meta.icon))+'" alt="" width="90" height="90">'+
+      '<div><div class="profile-kicker">ÁGORA · Operaciones</div><h1>'+esc(meta.title)+'</h1></div></div>'+
+    body+'</section>';
 }
+
 function render(){
   document.body.classList.toggle("login-mode",!state.user&&!routeSpace&&!routePrivate);
   if(!state.user){
@@ -538,6 +685,40 @@ app.addEventListener("click",event=>{
   const target=event.target.closest("[data-action]");
   if(!target)return;
   const task=target.dataset.action;
+  if(task==="new-assignment"){
+    if(!["admin","coordinador"].includes(role())||!allowed(routeSpace))return;
+    const dlg=document.getElementById("assignment-dialog");
+    if(dlg?.showModal)dlg.showModal();else dlg?.setAttribute("open","");
+    return;
+  }
+  if(task==="close-assignment"){
+    const dlg=document.getElementById("assignment-dialog");
+    if(dlg?.close)dlg.close();else dlg?.removeAttribute("open");
+    return;
+  }
+  if(task==="add-assignment-activity"){
+    const list=document.getElementById("assignment-activities");
+    if(!list)return;
+    const row=document.createElement("div");
+    row.className="role-activity-row";
+    row.innerHTML='<label>Actividad<input type="text" name="activity[]" maxlength="200" placeholder="Otra actividad dentro de esta jornada"></label>'+
+      '<button type="button" data-action="remove-assignment-activity" aria-label="Quitar actividad">×</button>';
+    list.append(row);row.querySelector("input")?.focus();
+    return;
+  }
+  if(task==="remove-assignment-activity"){
+    target.closest(".role-activity-row")?.remove();return;
+  }
+  if(task==="copy-assignment"){
+    const value=document.getElementById("assignment-preview")?.value;
+    if(value)return run(async()=>{await navigator.clipboard.writeText(value)},"Borrador copiado. Aún no está guardado en ÁGORA.");
+    return;
+  }
+  if(task==="copy-activity-draft"){
+    const value=target.closest(".role-proposal-form")?.querySelector(".role-draft-preview")?.value;
+    if(value)return run(async()=>{await navigator.clipboard.writeText(value)},"Propuesta copiada. Coordinación debe registrarla formalmente.");
+    return;
+  }
   if(task==="google")return run(google);
   if(task==="login"||task==="request"){
     state.page=task;render();return;
@@ -571,6 +752,46 @@ app.addEventListener("submit",event=>{
   if(!(form instanceof HTMLFormElement))return;
   event.preventDefault();
   if(form.id==="request-id")return run(()=>register(new FormData(form)));
+  if(form.id==="assignment-form"){
+    if(!["admin","coordinador"].includes(role())||!allowed(routeSpace))
+      return notice("No tienes permiso de coordinación.","error");
+    try{
+      const data=Object.fromEntries(new FormData(form));
+      data.activities=[...form.querySelectorAll('input[name="activity[]"]')].map(x=>x.value);
+      data.capturedBy=name()+" · "+state.user.uid;
+      const draft=validateAssignmentDraft(data);
+      const output=document.getElementById("assignment-preview");
+      if(!output)return;
+      output.value=assignmentDraftText(draft);
+      document.getElementById("assignment-result").hidden=false;
+      notice("Borrador preparado. No se ha guardado en Firebase.","ok");
+    }catch(error){notice(errorText(error),"error")}
+    return;
+  }
+  if(form.hasAttribute("data-draft-activity")){
+    const formData=new FormData(form);
+    const title=clean(formData.get("activity")).slice(0,200);
+    if(!title)return notice("Escribe la actividad adicional.","error");
+    const eventId=clean(form.dataset.draftActivity);
+    const items=ownJornadas(state.roleData?.staff,new Date(),100);
+    const own=items.find(x=>x.key===eventId);
+    if(!own)return notice("La jornada ya no está en tus asignaciones.","error");
+    const summary=[
+      "PROPUESTA DE ACTIVIDAD ADICIONAL · AÚN NO REGISTRADA",
+      "ID Dejavú: "+id(),"Colaborador: "+name(),
+      "Jornada: "+own.title,"Fecha: "+roleDate(own.start),
+      "Actividad: "+title,
+      "Observaciones: "+clean(formData.get("note")).slice(0,400),
+      "Solicito que coordinación incorpore esta actividad a mi jornada."
+    ].join("\n");
+    const output=form.querySelector(".role-draft-preview");
+    const copy=form.querySelector('[data-action="copy-activity-draft"]');
+    if(output){output.value=summary;output.hidden=false}
+    if(copy)copy.hidden=false;
+    notice("Propuesta lista para copiar. No está guardada en Firebase.","ok");
+    return;
+  }
+
   if(form.id==="private-profile-form"){
     const values=Object.fromEntries(new FormData(form));
     return run(async()=>{
