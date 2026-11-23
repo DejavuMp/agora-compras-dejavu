@@ -1,0 +1,33 @@
+name: "ÁGORA · Portal exclusivo de Identidad"
+on:
+  pull_request:
+    paths:
+      - "portal-agora/**"
+      - "firestore.rules"
+      - ".github/firebase-staff/test-identity-rules.mjs"
+      - ".github/workflows/portal-agora-identidad.yml"
+  push:
+    branches: [main]
+    paths:
+      - "portal-agora/**"
+      - "firestore.rules"
+      - ".github/firebase-staff/test-identity-rules.mjs"
+      - ".github/workflows/portal-agora-identidad.yml"
+permissions:
+  contents: read
+jobs:
+  portal:
+    name: "Tres espacios + ID Dejavú"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validar sintaxis de los módulos
+        run: |
+          node --check portal-agora/app.js
+          node --check portal-agora/firebase.js
+          node --check portal-agora/verify.js
+      - name: Comprobar autonomía y permisos mínimos
+        run: node --test portal-agora/tests/*.test.mjs
