@@ -1,6 +1,6 @@
 import {readFileSync} from "node:fs";
 import {initializeTestEnvironment,assertSucceeds,assertFails} from "@firebase/rules-unit-testing";
-import {doc,collection,query,where,getDoc,getDocs,setDoc,updateDoc,serverTimestamp,Timestamp} from "firebase/firestore";
+import {doc,collection,query,where,getDoc,getDocs,setDoc,updateDoc,writeBatch,serverTimestamp,Timestamp} from "firebase/firestore";
 const env=await initializeTestEnvironment({projectId:"demo-agora-repairs",firestore:{
  host:"127.0.0.1",port:Number(process.env.FIRESTORE_EMULATOR_PORT||8080),rules:readFileSync("firestore.rules","utf8")}});
 const id="d630d5ec-4e3a-4d51-92b2-0d917f43ebc9",aid="bc6305ec-4e3a-4d51-92b2-0d917f43ebc9",pic="b130d5ec-4e3a-4d51-92b2-0d917f43ebc9";
@@ -43,6 +43,18 @@ try{
  await yes("staff consulta inventario",getDocs(collection(staff,"agora_repair_assets")));
  await no("staff no altera inventario",updateDoc(asset(staff),{condition:"Disponible",revision:2,updatedAt:serverTimestamp()}));
  await yes("staff crea solicitud",setDoc(req(staff),payload(staffId)));
+ const secondId="aa30d5ec-4e3a-4d51-92b2-0d917f43ebc9";
+ const batch=writeBatch(staff);
+ batch.set(doc(staff,"agora_repair_requests",secondId),{...payload(staffId),id:secondId});
+ batch.set(doc(staff,"agora_repair_events","valid-created"),{
+  requestId:secondId,actorUid:staffId,actorEmail:email(staffId),
+  action:"creada",detail:"Reporte nuevo",createdAt:serverTimestamp()
+ });
+ await yes("reporte y bitácora se crean juntos",batch.commit());
+ await no("staff no inventa creación sobre folio existente",setDoc(doc(staff,"agora_repair_events","false-created"),{
+  requestId:id,actorUid:staffId,actorEmail:email(staffId),action:"creada",
+  detail:"Evento falso",createdAt:serverTimestamp()
+ }));
  await yes("staff ve solicitud propia",getDoc(req(staff)));
  await yes("staff lista las suyas",getDocs(query(collection(staff,"agora_repair_requests"),where("createdBy","==",staffId))));
  await no("staff no enumera todos los reportes",getDocs(collection(staff,"agora_repair_requests")));
@@ -51,6 +63,10 @@ try{
  await yes("staff adjunta evidencia",updateDoc(req(staff),{
   photos:[{path:"agora-repairs/"+id+"/"+staffId+"/"+pic+".jpg",label:"Panel.jpg"}],
   revision:2,updatedAt:serverTimestamp()}));
+ await no("staff no inventa evidencia sin subir foto",setDoc(doc(staff,"agora_repair_events","fake-evidence"),{
+  requestId:id,actorUid:staffId,actorEmail:email(staffId),
+  action:"evidencia",detail:"Foto falsa",createdAt:serverTimestamp()
+ }));
  await no("staff no elimina evidencia",updateDoc(req(staff),{photos:[],revision:3,updatedAt:serverTimestamp()}));
  await yes("coordinación decide la ruta",updateDoc(req(coord),{
   repairRoute:"agencia",assignedTo:"Taller",assignedUid:"asignado-2",status:"reparacion",decisionBy:"Coordinación",
