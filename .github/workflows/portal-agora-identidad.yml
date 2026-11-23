@@ -27,6 +27,7 @@ jobs:
       - name: Validar sintaxis de los módulos
         run: |
           node --check portal-agora/app.js
+          node --check portal-agora/roles-operacion.mjs
           node --check portal-agora/firebase.js
           node --check portal-agora/verify.js
       - name: Comprobar autonomía y permisos mínimos
