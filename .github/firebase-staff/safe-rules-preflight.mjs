@@ -5,6 +5,7 @@
  * el despliegue para evitar sobrescribir cambios de Compras / Archivos.
  */
 import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {resolve} from 'node:path';
 const project=process.env.FIREBASE_PROJECT_ID;
 const token=process.env.FIREBASE_ACCESS_TOKEN;
@@ -115,11 +116,21 @@ writeFileSync('.github/firebase-staff/.preflight/antes-dejavu.rules',live,'utf8'
 writeFileSync('.github/firebase-staff/.preflight/ruleset-name.txt',release.rulesetName+'\n','utf8');
 // Conservar el respaldo antes incluso si fallan los chequeos de variantes.
 const allowed=new Set([...safeVariants(candidate),...safeVariants(beforeCoordinatorListFix),...safeVariants(beforeIdentity),...safeVariants(oldOps),...safeVariants(withoutOps),...safeVariants(legacy),...safeVariants(beforeRepairs)].map(normalize));
-if(!allowed.has(normalize(live))){
+// Auditoría real del 23-11-2026, run 45184043693 (artefacto con copia original).
+// Versión de producción examinada: solo 12 segmentos puntuales de reglas
+// anteriores + ausencia del nuevo módulo Reparaciones, sin cambios desconocidos.
+// Aceptar EXCLUSIVAMENTE este SHA-256 de contenido íntegro, no versiones próximas.
+// Si alguien cambia una sola línea en Firebase, detener en lugar de sobrescribir.
+const verifiedProductionDigest='99e2bd8de21c8a67c4cd4afe3e30cc235fd3eee52f15187544da0cd6a4a5f994';
+const liveDigest=createHash('sha256').update(live,'utf8').digest('hex');
+const recognizedProductionSnapshot=liveDigest===verifiedProductionDigest;
+if(!allowed.has(normalize(live)) && !recognizedProductionSnapshot){
  throw Error('REGLAS DISTINTAS EN PRODUCCIÓN. Se guardó respaldo. Se detiene para NO modificar permisos de Ágora Compras, Archivos u otros módulos.');
 }
 if(normalize(live)===normalize(candidate)){
  console.log('Las reglas de ÁGORA coinciden con el repositorio. No se requiere cambiar contenido.');
+}else if(recognizedProductionSnapshot){
+ console.log('Producción coincide exactamente con el respaldo verificado el 23-11-2026 (SHA-256 completo). La actualización incluiría las ampliaciones versionadas, sin tocar otros documentos.');
 }else{
  console.log('Las reglas activas de ÁGORA coinciden con una versión conocida; es seguro ampliar los permisos sin modificar las demás colecciones.');
 }
