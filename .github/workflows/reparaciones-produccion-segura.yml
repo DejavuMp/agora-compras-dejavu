@@ -82,6 +82,11 @@ jobs:
         env:
           FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
         run: node .github/firebase-staff/safe-storage-preflight.mjs
+      - name: Diagnosticar bucket y release Storage existentes sin crear recursos
+        if: always()
+        env:
+          FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
+        run: node .github/firebase-staff/diagnose-storage-release.mjs
       - name: Crear resumen de diferencias sin datos de producción en logs
         if: always()
         run: node .github/firebase-staff/report-repair-rule-differences.mjs
