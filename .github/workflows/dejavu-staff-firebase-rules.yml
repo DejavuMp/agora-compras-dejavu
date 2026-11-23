@@ -58,6 +58,9 @@ jobs:
       - name: Probar Inventario y Reparaciones con roles ficticios
         run: npx firebase emulators:exec --only firestore --project demo-agora-repairs --non-interactive 'node .github/firebase-staff/test-repair-rules.mjs'
 
+      - name: Probar fotografías protegidas de Inventario y Reparaciones
+        run: npx firebase emulators:exec --only firestore,storage --project demo-agora-repairs-storage --non-interactive 'node .github/firebase-staff/test-repair-storage-rules.mjs'
+
       - name: Probar accesos de visitantes, personal y coordinadores
         run: npx firebase emulators:exec --only firestore --project demo-dejavu-fichas-staff --non-interactive 'node .github/firebase-staff/test-rules.mjs'
       - name: Probar Finanzas - crear solicitudes, roles, autorizar y pagar
