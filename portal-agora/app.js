@@ -4,6 +4,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
 import {doc,getDoc,setDoc,serverTimestamp}
   from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
+import {saveProfile,saveFinancial} from "../identidad/firebase-identity.js";
+import {projectTodayAssignments} from "../identidad/domain.mjs";
 
 // Una sola identidad Firebase para todas las vistas. Sin módulos operativos.
 const ROOT=new URL("./",import.meta.url);
@@ -17,13 +19,14 @@ const PATH_SPACES=Object.freeze({
   agencia:{title:"Agencia",icon:"icono-agencia-hq.webp"},
   administrador:{title:"Administrador",icon:"icono-administrador-hq.webp"}
 });
-const routeMatch=location.pathname.match(/\/(staff|agencia|administrador)\/(?:index\.html)?$/);
-const routeSpace=routeMatch?routeMatch[1]:"";
+const routeMatch=location.pathname.match(/\/(staff|agencia|administrador|expediente|mi-operacion)\/(?:index\.html)?$/);
+const routeSpace=routeMatch&&PATH_SPACES[routeMatch[1]]?routeMatch[1]:"";
+const routePrivate=routeMatch&&!PATH_SPACES[routeMatch[1]]?routeMatch[1]:"";
 const app=document.getElementById("app");
 const status=document.getElementById("system-status");
 const sessionLabel=document.getElementById("session-label");
 const logoutButton=document.getElementById("logout");
-const state={user:null,identity:null,page:"login",busy:false,epoch:0};
+const state={user:null,identity:null,privateData:null,privateError:null,page:"login",busy:false,epoch:0};
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
 })[c]);
@@ -136,11 +139,30 @@ async function readOwnIdentity(user){
     link:linked,registry
   };
 }
+async function readPrivateSection(uid,section){
+  if(section==="expediente"){
+    const [profileSnap,financialSnap]=await Promise.all([
+      getDoc(doc(db,"agora_identity_profiles",uid)),
+      getDoc(doc(db,"agora_identity_financial",uid))
+    ]);
+    return {
+      profile:profileSnap.exists()?profileSnap.data():null,
+      financial:financialSnap.exists()?financialSnap.data():null
+    };
+  }
+  if(section==="mi-operacion"){
+    const snap=await getDoc(doc(db,"agora_ops_staff",uid));
+    return {operations:snap.exists()?snap.data():null};
+  }
+  return null;
+}
 async function refresh(){
   const user=state.user;
   const epoch=++state.epoch;
   sessionLabel.textContent=user?.email||"Mi cuenta";
   logoutButton.hidden=!user;
+  state.privateData=null;
+  state.privateError=null;
   if(!user){
     state.identity=null;
     render();
@@ -151,12 +173,26 @@ async function refresh(){
     const identity=await readOwnIdentity(user);
     if(epoch!==state.epoch||auth.currentUser?.uid!==user.uid)return;
     state.identity=identity;
+    // Los datos médicos, bancarios y jornadas SOLO se consultan al abrir
+    // su propia página y únicamente para el UID de la sesión.
+    if(routePrivate&&verifiedId()){
+      try{
+        const result=await readPrivateSection(user.uid,routePrivate);
+        if(epoch!==state.epoch||auth.currentUser?.uid!==user.uid)return;
+        state.privateData=result;
+      }catch(error){
+        if(epoch!==state.epoch)return;
+        state.privateError=error;
+        console.warn("No se pudo leer la sección privada:",error?.code||"error");
+      }
+    }
     render();
     notice("","ok");
   }catch(e){
     if(epoch!==state.epoch)return;
     console.error(e);
     state.identity=null;
+    state.privateData=null;
     document.body.classList.remove("login-mode");
     app.innerHTML='<section class="profile-error"><h1>No se pudo cargar tu identidad</h1>'+
       '<p>'+esc(errorText(e))+'</p>'+
@@ -164,6 +200,7 @@ async function refresh(){
     notice(errorText(e),"error");
   }
 }
+
 function renderRegistration(){
   const existing=state.identity?.registration;
   const reg=state.identity?.registry;
@@ -312,9 +349,121 @@ function profile(){
         '<nav aria-label="Mis espacios autorizados" class="profile-space-list">'+cards+'</nav>'+
       '</section>'+
     '</div>'+
+    '<section class="profile-private-links" aria-labelledby="own-sections-heading">'+
+      '<div class="profile-section-top"><h2 id="own-sections-heading">Mi información</h2>'+
+        '<p>Consulta tus actividades y expediente sin salir de ÁGORA.</p></div>'+
+      '<div class="profile-private-grid">'+
+        '<a class="private-link" href="'+esc(href("mi-operacion/"))+'">'+
+          '<span class="private-link-symbol" aria-hidden="true">◷</span>'+
+          '<span><strong>Mi operación</strong><small>Mis actividades de hoy</small></span>'+
+          '<span class="private-link-arrow" aria-hidden="true">↗</span></a>'+
+        '<a class="private-link" href="'+esc(href("expediente/"))+'">'+
+          '<span class="private-link-symbol" aria-hidden="true">▤</span>'+
+          '<span><strong>Expediente privado</strong><small>Datos personales y fiscales</small></span>'+
+          '<span class="private-link-arrow" aria-hidden="true">↗</span></a>'+
+      '</div></section>'+
     credentialDialog()+
   '</section>';
   prepareProfilePhotos();
+}
+
+// Los campos se conservan con los mismos nombres que Identidad Única y RH.
+const dossierField=(key,label,value="",type="text",maxlength=140,disabled=false)=>
+  '<label class="secure-field" for="pr-'+key+'"><span>'+esc(label)+'</span>'+
+  '<input id="pr-'+key+'" name="'+esc(key)+'" type="'+esc(type)+
+    '" maxlength="'+maxlength+'" value="'+esc(value||"")+'"'+
+    (disabled?' disabled aria-disabled="true"':"")+'></label>';
+function personalBack(){
+  return '<a class="secure-back" href="'+esc(ROOT.href)+'">← Volver a Mi perfil</a>';
+}
+function sectionError(){
+  app.innerHTML='<section class="secure-page">'+personalBack()+
+    '<div class="secure-error" role="alert"><h1>No pudimos consultar tus datos</h1>'+
+    '<p>'+esc(errorText(state.privateError))+'</p>'+
+    '<p>Esta lectura no modificó ni duplicó tu expediente.</p>'+
+    '<button class="profile-button profile-button-outline" data-action="retry" type="button">Reintentar consulta</button>'+
+    '</div></section>';
+}
+function renderDossier(){
+  const p=state.privateData?.profile||{};
+  const f=state.privateData?.financial||{};
+  const locked=f.lockedByRH===true;
+  app.innerHTML='<section class="secure-page" aria-label="Mi expediente privado">'+
+    personalBack()+
+    '<header class="secure-heading"><div class="profile-kicker">ÁGORA · IDENTIDAD Y RH</div>'+
+      '<h1>Expediente privado</h1>'+
+      '<p>Tu información personal, de contacto y fiscal, protegida con tu cuenta.</p></header>'+
+    '<div class="secure-privacy">Acceso personal. Solo tu cuenta y RH con permisos pueden consultar estos registros.</div>'+
+    '<div class="secure-accordion">'+
+      '<details><summary>Datos personales, uniforme y emergencias <span aria-hidden="true">⌄</span></summary>'+
+        '<div class="secure-details">'+
+          '<form id="private-profile-form" class="secure-form" autocomplete="off">'+
+            dossierField("telephone","Teléfono",p.telephone,"tel",30)+
+            dossierField("address","Domicilio",p.address,"text",300)+
+            dossierField("shirtSize","Talla de playera",p.shirtSize,"text",12)+
+            dossierField("pantSize","Talla de pantalón",p.pantSize,"text",12)+
+            dossierField("shoeSize","Calzado",p.shoeSize,"text",12)+
+            dossierField("emergencyName","Contacto de emergencia",p.emergencyName,"text",140)+
+            dossierField("emergencyRelation","Relación con contacto",p.emergencyRelation,"text",80)+
+            dossierField("emergencyPhone","Teléfono de emergencia",p.emergencyPhone,"tel",30)+
+            '<label class="secure-field secure-wide" for="pr-medicalNotes">'+
+              '<span>Información médica estrictamente necesaria (solo titular y RH)</span>'+
+              '<textarea id="pr-medicalNotes" name="medicalNotes" maxlength="300" rows="3">'+
+                esc(p.medicalNotes||"")+'</textarea></label>'+
+            '<div class="secure-form-actions"><button type="submit" class="profile-button profile-button-primary">Guardar datos privados</button></div>'+
+          '</form></div></details>'+
+      '<details><summary>Datos fiscales y bancarios'+(locked?" · Bloqueados por RH":"")+
+        ' <span aria-hidden="true">⌄</span></summary>'+
+        '<div class="secure-details">'+
+          (locked?'<p class="secure-warning">RH bloqueó esta sección. Solicita la revisión correspondiente; no se sobrescribirán los datos.</p>':"")+
+          '<form id="private-financial-form" class="secure-form" autocomplete="off">'+
+            dossierField("rfc","RFC",f.rfc,"text",20,locked)+
+            dossierField("curp","CURP",f.curp,"text",24,locked)+
+            dossierField("nss","NSS",f.nss,"text",20,locked)+
+            dossierField("bank","Institución bancaria",f.bank,"text",100,locked)+
+            dossierField("clabe","CLABE",f.clabe,"text",24,locked)+
+            dossierField("taxRegime","Régimen fiscal",f.taxRegime,"text",140,locked)+
+            '<div class="secure-form-actions"><button type="submit" class="profile-button profile-button-primary"'+
+              (locked?' disabled aria-disabled="true"':"")+
+              '>Guardar datos fiscales</button></div>'+
+          '</form></div></details>'+
+      '<details><summary>Bóveda documental <span aria-hidden="true">⌄</span></summary>'+
+        '<div class="secure-details"><p class="profile-muted">La carga de documentos permanece deshabilitada hasta contar con almacenamiento privado, permisos de descarga y pruebas satisfactorias.</p></div>'+
+      '</details>'+
+    '</div></section>';
+}
+const operationTime=date=>new Intl.DateTimeFormat("es-MX",{
+  hour:"2-digit",minute:"2-digit"
+}).format(date);
+function renderMyOperation(){
+  // Se reutiliza exactamente la proyección limitada del sitio Identidad y RH.
+  // No incluye pagos, tarifas, GPS ni otras personas.
+  const today=projectTodayAssignments(state.privateData?.operations,new Date());
+  app.innerHTML='<section class="secure-page" aria-label="Mi operación">'+
+    personalBack()+
+    '<header class="secure-heading"><div class="profile-kicker">ÁGORA · OPERACIONES</div>'+
+      '<h1>Mi operación</h1><p>Consulta las actividades asignadas para hoy.</p></header>'+
+    '<section class="secure-assignments" aria-label="Mis actividades de hoy">'+
+      '<div class="secure-section-title"><h2>¿A qué voy hoy?</h2>'+
+        '<span>'+new Intl.DateTimeFormat("es-MX",{weekday:"long",day:"numeric",month:"long"}).format(new Date())+'</span></div>'+
+      (today.length?today.map(item=>
+        '<article class="secure-assignment"><div class="secure-assignment-head">'+
+          '<span class="secure-time">'+operationTime(item.start)+' – '+operationTime(item.end)+'</span>'+
+          '<h3>'+esc(item.project||"Actividad")+'</h3></div>'+
+        '<dl class="secure-facts">'+
+          '<div><dt>Sede</dt><dd>'+esc(item.site||"Por confirmar")+'</dd></div>'+
+          '<div><dt>Cargo</dt><dd>'+esc(item.jobTitle||"Asignado en operación")+'</dd></div>'+
+          '<div><dt>Actividad</dt><dd>'+esc(item.activity||"Por confirmar")+'</dd></div>'+
+          '<div><dt>Responsable</dt><dd>'+esc(item.responsible||"Coordinación")+'</dd></div>'+
+        '</dl>'+(item.instructions?'<p class="secure-instructions"><strong>Indicaciones: </strong>'+
+            esc(item.instructions)+'</p>':"")+'</article>'
+      ).join(""):'<p class="secure-no-work">No hay actividades programadas para hoy.</p>')+
+    '</section></section>';
+}
+function renderPrivateSection(){
+  if(state.privateError)return sectionError();
+  if(routePrivate==="expediente")renderDossier();
+  else if(routePrivate==="mi-operacion")renderMyOperation();
 }
 
 function routeDenied(unauthenticated=false){
@@ -336,15 +485,20 @@ function emptySpace(){
     '<a class="profile-button profile-button-outline" href="'+esc(ROOT.href)+'">Volver a Mi perfil</a></section>';
 }
 function render(){
-  document.body.classList.toggle("login-mode",!state.user&&!routeSpace);
+  document.body.classList.toggle("login-mode",!state.user&&!routeSpace&&!routePrivate);
   if(!state.user){
-    if(routeSpace)routeDenied(true);
+    if(routeSpace||routePrivate)routeDenied(true);
     else renderLogin();
     return;
   }
   if(!state.identity){renderLoading();return}
   if(routeSpace){
     if(allowed(routeSpace))emptySpace();
+    else routeDenied();
+    return;
+  }
+  if(routePrivate){
+    if(verifiedId())renderPrivateSection();
     else routeDenied();
     return;
   }
@@ -417,6 +571,24 @@ app.addEventListener("submit",event=>{
   if(!(form instanceof HTMLFormElement))return;
   event.preventDefault();
   if(form.id==="request-id")return run(()=>register(new FormData(form)));
+  if(form.id==="private-profile-form"){
+    const values=Object.fromEntries(new FormData(form));
+    return run(async()=>{
+      if(!verifiedId()||!state.user)throw Error("Se requiere una sesión acreditada.");
+      await saveProfile(state.user,values);
+      await refresh();
+    },"Datos privados guardados en tu expediente.");
+  }
+  if(form.id==="private-financial-form"){
+    if(state.privateData?.financial?.lockedByRH===true)
+      return notice("Los datos fiscales están bloqueados por RH.","error");
+    const values=Object.fromEntries(new FormData(form));
+    return run(async()=>{
+      if(!verifiedId()||!state.user)throw Error("Se requiere una sesión acreditada.");
+      await saveFinancial(state.user,values);
+      await refresh();
+    },"Datos fiscales guardados en tu expediente.");
+  }
 });
 logoutButton.addEventListener("click",()=>run(async()=>{
   state.identity=null;state.user=null;state.page="login";state.epoch++;

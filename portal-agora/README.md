@@ -75,3 +75,27 @@ La vista autenticada (`Mi perfil` y las tres páginas de espacios vacíos) ahora
 - La página de inicio de sesión **no se modifica**: las nuevas reglas actúan únicamente bajo `body:not(.login-mode)`.
 
 El cambio modifica solo `portal-agora/perfil.css`, tests y esta documentación. **No añade módulos ni accesos**, no altera la credencial digital, roles, usuarios, rutas, Firebase ni Firestore.
+
+
+## Consolidación de Identidad y RH — Mi operación y Expediente privado
+
+El portal ÁGORA reutiliza las **colecciones originales** del sitio `/identidad/`. No se migran ni copian registros:
+
+- `/portal-agora/mi-operacion/` consulta el documento individual `agora_ops_staff/{uid}` y **reutiliza** `projectTodayAssignments` de `identidad/domain.mjs`. Se muestran únicamente las actividades de hoy que corresponden a la cuenta, con proyecto, sede, horario, cargo, responsable e indicaciones. **No se muestran tarifas, nóminas, coordenadas ni información de terceras personas.**
+- `/portal-agora/expediente/` lee `agora_identity_profiles/{uid}` y `agora_identity_financial/{uid}` **solo al entrar en la página**. Los formularios mantienen los campos y validaciones del sitio Identidad Única y RH; al guardar usan las funciones `saveProfile` y `saveFinancial` de `identidad/firebase-identity.js`, y por tanto aplican el bloqueo `lockedByRH` y las reglas Firestore existentes.
+- Ambos accesos aparecen en **Mi perfil → Mi información**. El resto de los espacios Staff, Agencia y Administrador permanecen sin herramientas operativas.
+- Requieren sesión Firebase e ID Dejavú verificado y vigente; una URL escrita manualmente no omite estos controles. La seguridad real de lectura/escritura se aplica mediante reglas Firestore por UID.
+- La bóveda documental mantiene su carga **deshabilitada**: no se crean falsas subidas ni almacenamiento de documentos privado sin infraestructura y reglas verificadas.
+
+### Retirada del sitio anterior
+
+**No eliminar `/identidad/` todavía.** Además de estos dos módulos, mantiene flujos de solicitud/aprobación de IDs, directorio RH, asignación de coordinación y revocación de credenciales que no han sido trasladados a este portal. La eliminación o redirección anticipada rompería esas funciones. Solo retirar sus pantallas antiguas tras probar la equivalencia con usuarios de prueba, validar las operaciones de RH pendientes y confirmar respaldo. Esto no significa duplicar datos: ambos consultan los mismos documentos.
+
+### Validaciones antes de cerrar la migración
+
+- Un usuario con credencial activa puede ver y editar **únicamente su expediente**, con consentimiento/seguridad aplicable en Firebase.
+- La sección financiera respeta `lockedByRH`.
+- Un usuario sin ID activo no puede abrir por URL las dos páginas.
+- Si Firestore niega la lectura, aparece un error sin exponer información de terceras personas.
+- Los turnos provienen de `agora_ops_staff/{uid}` y se proyectan con la lógica existente.
+- La gestión centralizada de RH queda pendiente en la implementación original.

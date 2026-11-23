@@ -102,6 +102,72 @@ test("las tres páginas tienen ruta propia, etiqueta y regreso al perfil",async(
   assert.match(app,/else routeDenied\(\)/);
 });
 
+test("Mi perfil integra solo Mi operación y Expediente privado sin salir del portal",async()=>{
+  const app=await read("app.js");
+  const home=app.slice(app.indexOf("function profile(){"),app.indexOf("function routeDenied("));
+  assert.match(home,/Mi operación/);
+  assert.match(home,/Expediente privado/);
+  assert.match(home,/href\("mi-operacion\/"\)/);
+  assert.match(home,/href\("expediente\/"\)/);
+  assert.doesNotMatch(home,/href="https?:\/\/dejavump\.github\.io\/agora-/);
+  for(const [name,title] of [["expediente","Expediente privado"],["mi-operacion","Mi operación"]]){
+    const html=await read(name+"/index.html");
+    assert.ok(html.includes("<title>ÁGORA · "+title+"</title>"));
+    assert.match(html,/name="robots" content="noindex,nofollow"/);
+    assert.match(html,/src="\.\.\/app\.js"/);
+    assert.match(html,/href="\.\.\/perfil\.css"/);
+    assert.match(html,/href="\.\.\/"/);
+  }
+});
+
+test("expediente mantiene las colecciones y funciones seguras de RH por UID",async()=>{
+  const [app,old,css,rules]=await Promise.all([
+    read("app.js"),read("../identidad/firebase-identity.js"),
+    read("perfil.css"),read("../firestore.rules")
+  ]);
+  assert.match(app,/import \{saveProfile,saveFinancial\} from "\.\.\/identidad\/firebase-identity\.js"/);
+  assert.match(app,/getDoc\(doc\(db,"agora_identity_profiles",uid\)\)/);
+  assert.match(app,/getDoc\(doc\(db,"agora_identity_financial",uid\)\)/);
+  assert.match(app,/readPrivateSection\(user\.uid,routePrivate\)/);
+  assert.match(app,/if\(routePrivate&&verifiedId\(\)\)/);
+  assert.match(app,/if\(verifiedId\(\)\)renderPrivateSection\(\)/);
+  assert.match(app,/form id="private-profile-form"/);
+  assert.match(app,/form id="private-financial-form"/);
+  assert.match(app,/lockedByRH===true/);
+  assert.match(app,/await saveProfile\(state\.user,values\)/);
+  assert.match(app,/await saveFinancial\(state\.user,values\)/);
+  for(const field of ["telephone","address","shirtSize","pantSize","shoeSize",
+    "emergencyName","emergencyRelation","emergencyPhone","medicalNotes",
+    "rfc","curp","nss","bank","clabe","taxRegime"]){
+    assert.ok(app.includes('"'+field+'"'),"Falta "+field);
+  }
+  assert.match(app,/La carga de documentos permanece deshabilitada/);
+  assert.match(old,/lockedByRH===true/);
+  assert.match(rules,/match \/agora_identity_profiles\/\{uid\}/);
+  assert.match(rules,/match \/agora_identity_financial\/\{uid\}/);
+  assert.match(css,/\.secure-accordion/);
+  assert.match(css,/\.secure-form/);
+});
+
+test("Mi operación solo proyecta actividades propias y no información de pagos",async()=>{
+  const [app,projection,css]=await Promise.all([
+    read("app.js"),read("../identidad/domain.mjs"),read("perfil.css")
+  ]);
+  assert.match(app,/import \{projectTodayAssignments\} from "\.\.\/identidad\/domain\.mjs"/);
+  assert.match(app,/getDoc\(doc\(db,"agora_ops_staff",uid\)\)/);
+  assert.match(app,/projectTodayAssignments\(state\.privateData\?\.operations,new Date\(\)\)/);
+  assert.match(app,/No hay actividades programadas para hoy/);
+  const start=app.indexOf("function renderMyOperation(){");
+  const end=app.indexOf("function renderPrivateSection(){",start);
+  const op=app.slice(start,end);
+  for(const field of ["project","site","jobTitle","activity","responsible","instructions","start","end"]){
+    assert.ok(op.includes("item."+field),"Falta dato seguro "+field);
+  }
+  assert.doesNotMatch(op,/item\.(?:salary|rate|bank|clabe|rfc|payment|gps|latitude|longitude)/i);
+  assert.match(projection,/export function projectTodayAssignments/);
+  assert.match(css,/\.secure-assignment/);
+});
+
 test("los tres espacios se autorizan con UID, acreditación y rol",async()=>{
   const app=await read("app.js");
   assert.match(app,/state\.identity\?\.link\?\.active===true/);
