@@ -933,3 +933,16 @@ body:not(.login-mode) footer{
  .role-legacy-links{display:grid}
  .role-legacy-links a{width:100%}
 }
+
+.role-more-jornadas{
+ margin:0;border:1px solid #393d42;
+ border-radius:11px;overflow:hidden;
+ background:#1c1e22;
+}
+.role-more-jornadas>summary{
+ cursor:pointer;list-style:none;padding:15px 18px;
+ color:#e7dfd0;font-weight:700;font-size:13px;
+}
+.role-more-jornadas>summary::-webkit-details-marker{display:none}
+.role-more-jornadas[open]>summary{border-bottom:1px solid #393d42}
+.role-more-jornadas .role-jornada-list{padding:14px;gap:10px}
