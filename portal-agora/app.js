@@ -27,6 +27,16 @@ const verifiedId=()=>state.identity?.link?.active===true&&
 const canAdmin=()=>verifiedId()&&userRole()==="admin"&&mainAdmin(state.user);
 const canAgency=()=>verifiedId()&&["admin","coordinador","consulta"].includes(userRole());
 const canStaff=()=>verifiedId();
+const SITE_URLS={
+ operaciones:"https://dejavump.github.io/agora-operaciones-dejavu/operaciones/",
+ visor:"https://dejavump.github.io/agora-operaciones-dejavu/operaciones/visor.html",
+ compras:"https://dejavump.github.io/agora-compras-dejavu/",
+ archivos:"https://dejavump.github.io/agora-compras-dejavu/archivos/",
+ recursos:"https://dejavump.github.io/agora-compras-dejavu/recursos/",
+ fichas:"https://dejavump.github.io/agora-compras-dejavu/fichas/",
+ identidad:"https://dejavump.github.io/agora-compras-dejavu/identidad/"
+};
+
 const message=(m,t="")=>{status.textContent=m;if(t)status.dataset.tone=t;else delete status.dataset.tone};
 const err=e=>{
   const code=String(e?.code||"");
@@ -164,31 +174,56 @@ function selectSpace(){
   const available=spaces().map(v=>v[0]);
   if(!available.includes(state.space))state.space=canAdmin()?"admin":canAgency()?"agency":"staff";
 }
+function credentialVerificationLink(){
+  const token=state.identity?.registry?.credentialId||"";
+  if(!/^[0-9a-f]{32}$/i.test(token))return "";
+  const url=new URL("./verificar.html",location.href);
+  url.searchParams.set("id",token);
+  return url.href;
+}
 function credential(){
-  const reg=state.identity.registry;
-  const href=new URL("./verificar.html",location.href);
-  href.searchParams.set("id",reg.credentialId);
-  return '<section class="credential" aria-label="Credencial digital de Dejavú">'+
-    '<div class="credential-art" aria-hidden="true"></div>'+
-    '<div class="credential-top"><img class="credential-mark" src="./assets/pdf-agora-wordmark.webp" alt="ÁGORA" width="176" height="66">'+
-    '<span class="credential-status">IDENTIDAD VIGENTE</span></div>'+
-    '<div class="eyebrow">CREDENCIAL DIGITAL · DEJAVÚ MARKETING</div>'+
-    '<h2>'+esc(reg.displayName||state.user?.displayName||"Colaborador")+'</h2>'+
+  const reg=state.identity.registry,link=credentialVerificationLink();
+  return '<section class="credential live-credential" aria-label="Credencial digital verificable">'+
+    '<div class="credential-top"><img class="credential-mark" src="./assets/logo-agora-hq.webp" alt="ÁGORA Dejavú Marketing">'+
+    '<span class="credential-status">ID VIGENTE</span></div>'+
+    '<div class="eyebrow">IDENTIDAD DIGITAL · REGISTRO FIREBASE</div>'+
+    '<h2>'+esc(reg.displayName||"Colaborador")+'</h2>'+
     '<p class="job">'+esc(reg.jobTitle||"Colaborador")+'</p>'+
     '<div class="credential-bottom"><div><div class="id">'+esc(reg.agoraId)+'</div>'+
-    '<small>'+ (reg.credentialActive?"ACTIVA · VERIFICABLE":"NO VIGENTE")+'</small>'+
-    '<p><a class="credential-verify" href="'+esc(href.href)+'" target="_blank" rel="noopener">Verificar credencial <span aria-hidden="true">↗</span></a></p></div>'+
-    '<div id="credential-qr" class="qr"><a href="'+esc(href.href)+'">Verificar</a></div></div></section>';
+    '<small>QR INDIVIDUAL · CONSULTA DE VIGENCIA</small></div>'+
+    (link?'<div id="credential-qr" class="qr"><a href="'+esc(link)+'" target="_blank" rel="noopener">Verificar QR</a></div>':
+    '<p class="note error">Credencial sin token de verificación válido</p>')+
+    '</div><div class="credential-actions"><button class="btn gold" type="button" data-action="open-credential">Abrir credencial digital</button>'+
+    (link?'<a class="btn outline" href="'+esc(link)+'" target="_blank" rel="noopener">Comprobar vigencia</a>':"")+
+    '</div></section>';
+}
+function credentialDialog(){
+  const reg=state.identity?.registry,link=credentialVerificationLink();
+  if(!reg)return "";
+  return '<dialog id="credential-dialog" class="digital-dialog" aria-label="Mi credencial digital">'+
+    '<div class="digital-dialog-top"><b>ÁGORA · Credencial digital</b>'+
+    '<button type="button" data-action="close-credential" aria-label="Cerrar credencial">×</button></div>'+
+    '<div class="digital-face"><img src="./assets/logo-agora-hq.webp" alt="ÁGORA" class="digital-logo">'+
+    '<h2>'+esc(reg.displayName||"Colaborador")+'</h2><p>'+esc(reg.jobTitle||"Colaborador")+'</p>'+
+    '<b class="digital-id">'+esc(reg.agoraId)+'</b>'+
+    (link?'<div class="digital-qr" id="credential-qr-modal"><a href="'+esc(link)+'" target="_blank" rel="noopener">Abrir verificación</a></div>':"")+
+    '<span class="digital-state">VIGENTE · CONSULTA EN LÍNEA</span></div>'+
+    '<p class="digital-hint">El QR muestra únicamente los datos públicos de acreditación y su vigencia.</p>'+
+    '<div class="actions">'+(link?'<button class="btn gold" type="button" data-action="share-credential">Compartir verificación</button>':"")+
+    '<button class="btn outline" type="button" data-action="close-credential">Cerrar</button></div></dialog>';
 }
 function drawQr(){
-  const qr=document.getElementById("credential-qr");
-  const reg=state.identity?.registry;
-  if(!qr||!reg?.credentialId||!window.QRCode)return;
-  const href=new URL("./verificar.html",location.href);
-  href.searchParams.set("id",reg.credentialId);
-  qr.replaceChildren();
-  new window.QRCode(qr,{text:href.href,width:78,height:78,colorDark:"#171512",colorLight:"#ffffff",correctLevel:window.QRCode.CorrectLevel.M});
+  const link=credentialVerificationLink();
+  if(!link||!window.QRCode)return;
+  for(const id of ["credential-qr","credential-qr-modal"]){
+    const qr=document.getElementById(id);
+    if(!qr)continue;
+    qr.replaceChildren();
+    const size=id==="credential-qr"?84:154;
+    new window.QRCode(qr,{text:link,width:size,height:size,colorDark:"#16120e",colorLight:"#ffffff",correctLevel:window.QRCode.CorrectLevel.M});
+  }
 }
+
 function spaceContent(){
   const name=state.space==="admin"?"Administrador":state.space==="agency"?"Agencia":"Staff";
   const asset=state.space==="agency"?"pdf-agency-icon.webp":
