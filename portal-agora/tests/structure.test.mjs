@@ -27,7 +27,7 @@ test("inicio autenticado es Mi perfil, sin herramientas, accesos rápidos ni QR 
   assert.match(home,/profile-identity|pageShell/);
   assert.match(home,/profile-fields/);
   assert.match(home,/profile-space-link/);
-  assert.match(home,/Ver credencial digital/);
+  assert.match(home,/Ver mi credencial/);
   assert.match(home,/credentialDialog\(\)/);
   assert.doesNotMatch(home,/<div id="credential-qr"|<div class="credential-qr"/);
   assert.doesNotMatch(app,/SITE_URLS|quickAccess\(|siteTile\(|sites\(\)|https:\/\/dejavump\.github\.io\/agora-(?:compras|operaciones)/);
