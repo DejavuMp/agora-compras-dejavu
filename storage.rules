@@ -20,6 +20,41 @@ service firebase.storage {
       // No permitir lectura por listado ni acceso directo sin el token de descarga.
       allow read: if canEdit();
     }
+    // Evidencias del módulo de reparaciones. Sin lectura pública ni sobreescritura.
+    function opsMember(uid) {
+      return /databases/(default)/documents/agora_ops_members/$(uid);
+    }
+    function repairDoc(id) {
+      return /databases/(default)/documents/agora_repair_requests/$(id);
+    }
+    function canReadRepair(id) {
+      return signedIn() &&
+        firestore.exists(repairDoc(id)) &&
+        (canEdit() ||
+          firestore.get(repairDoc(id)).data.createdBy == request.auth.uid);
+    }
+    match /agora-repairs/{requestId}/{uploaderUid}/{fileName} {
+      allow get: if fileName.matches('^[a-f0-9-]{36}\\.jpg
+  }
+}
+) &&
+        canReadRepair(requestId);
+      allow list: if false;
+      allow create: if signedIn() &&
+        fileName.matches('^[a-f0-9-]{36}\\.jpg
+  }
+}
+) &&
+        (request.auth.uid == uploaderUid) &&
+        firestore.exists(repairDoc(requestId)) &&
+        (canEdit() ||
+          firestore.get(repairDoc(requestId)).data.createdBy == request.auth.uid) &&
+        request.resource.size > 0 &&
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType == 'image/jpeg';
+      allow update: if false;
+      allow delete: if canEdit();
+    }
     match /{allPaths=**} { allow read, write: if false; }
   }
 }
