@@ -54,5 +54,37 @@ try{
   revision:3,updatedAt:serverTimestamp()}));
  await no("coordinación no altera autoría",updateDoc(req(coord),{
   createdBy:"otro",revision:4,updatedAt:serverTimestamp()}));
+ const token="A".repeat(43);
+ const invite=db=>doc(db,"agora_repair_invites",token);
+ const snapshotPublic={project:"Hot Cruji Bravo",asset:"Stand",area:"Panel frontal",
+  problem:"Pieza desprendida",scope:"Elemento específico",priority:"Alta",
+  dueDate:"2026-12-01",materialLink:"https://example.invalid/planos"};
+ const inviteData=()=>({
+  requestId:id,snapshot:snapshotPublic,supplierHint:"Proveedor ficticio",
+  createdBy:coordId,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),
+  expiresAt:Timestamp.fromMillis(Date.now()+7*86400000),
+  status:"pending",response:null,submittedAt:null
+ });
+ await no("proveedor no crea invitación sin coordinación",setDoc(invite(anon),inviteData()));
+ await yes("coordinación crea enlace de cotización",setDoc(invite(coord),inviteData()));
+ await yes("proveedor sin login consulta solo invitación conocida",getDoc(invite(anon)));
+ await no("proveedor no lista invitaciones",getDocs(collection(anon,"agora_repair_invites")));
+ await no("proveedor no modifica el problema o alcance",updateDoc(invite(anon),{
+  snapshot:{...snapshotPublic,problem:"Problema adulterado"}
+ }));
+ await yes("proveedor envía primera propuesta",updateDoc(invite(anon),{
+  status:"submitted",response:{
+   provider:"Taller ficticio",email:"hola@example.invalid",amount:1800,
+   scope:"Reparar panel",note:"Entrega en dos días",link:""
+  },submittedAt:serverTimestamp(),updatedAt:serverTimestamp()
+ }));
+ await no("proveedor no modifica importe después de enviar",updateDoc(invite(anon),{
+  response:{provider:"Taller ficticio",email:"",amount:1,scope:"Otro",note:"",link:""}
+ }));
+ await yes("coordinación puede consultar respuesta",getDoc(invite(coord)));
+ await yes("coordinación revoca invitación",updateDoc(invite(coord),{
+  status:"revoked",updatedAt:serverTimestamp()
+ }));
+ await no("invitación revocada deja de abrirse externamente",getDoc(invite(anon)));
  console.log("Comprobaciones de roles terminadas: "+checks);
 }finally{await env.cleanup()}
