@@ -61,3 +61,17 @@ Se aplica el diseño guiado por la captura compartida por Dejavú Marketing:
 **La foto no se sube todavía a un almacén propio de ÁGORA.** El archivo `storage.rules` actual no concede escritura de fotografías de perfil; modificarlo o publicar reglas nuevas sin un flujo probado de subida y permisos no sería seguro. El usuario podrá configurar su fotografía en la cuenta Google asociada y actualizar su sesión para verla en ÁGORA. No se crean ni se modifican documentos de Firestore.
 
 El resto permanece sin cambios: tres espacios iniciales vacíos, sin herramientas ni módulos añadidos.
+
+
+## Mi perfil con entorno ambiental Dejavú — 23 NOV 2026
+
+La vista autenticada (`Mi perfil` y las tres páginas de espacios vacíos) ahora utiliza:
+
+- **Imagen ambiental original del proyecto** `assets/escena-login-agora.webp`, usada anteriormente en la portada aprobada, como fondo exterior. No se genera ni incorpora otra imagen.
+- **Oscurecimiento y desenfoque con CSS** para mantener la legibilidad y evitar competir con el contenido.
+- **Panel principal negro/carbón** centrado, con borde sutil, ligera profundidad y una única línea de acento discreta.
+- **Tarjetas interiores menos contrastadas**, sin botones o cajas adicionales.
+- **Versión móvil adaptada**: panel de casi todo el ancho, manteniendo una franja exterior de fondo ambiental.
+- La página de inicio de sesión **no se modifica**: las nuevas reglas actúan únicamente bajo `body:not(.login-mode)`.
+
+El cambio modifica solo `portal-agora/perfil.css`, tests y esta documentación. **No añade módulos ni accesos**, no altera la credencial digital, roles, usuarios, rutas, Firebase ni Firestore.

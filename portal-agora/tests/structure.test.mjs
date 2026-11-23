@@ -63,6 +63,27 @@ test("fotografía real, respaldo por iniciales y navegación basada en iconos",a
   }
 });
 
+test("panel de perfil negro delimitado, fondo ambiental Dejavú y legibilidad adaptable",async()=>{
+  const [css,global,html]=await Promise.all([
+    read("perfil.css"),read("style.css"),read("index.html")
+  ]);
+  const image=await readFile(new URL("../assets/escena-login-agora.webp",import.meta.url));
+  assert.equal(image.subarray(0,4).toString(),"RIFF");
+  assert.equal(image.subarray(8,12).toString(),"WEBP");
+  assert.ok(image.byteLength>100000);
+  assert.match(css,/body:not\(\.login-mode\)::before/);
+  assert.match(css,/url\("\.\/assets\/escena-login-agora\.webp"\)/);
+  assert.match(css,/filter:blur\(10px\) brightness\(\.49\)/);
+  assert.match(css,/body:not\(\.login-mode\) main\{/);
+  assert.match(css,/background:rgba\(11,12,14,\.965\)/);
+  assert.match(css,/border-radius:23px/);
+  assert.match(css,/@media\(max-width:600px\)/);
+  assert.match(css,/prefers-reduced-transparency:reduce/);
+  assert.match(css,/prefers-reduced-motion:reduce/);
+  assert.match(global,/cinema-login/);
+  assert.match(html,/body class="login-mode"/);
+});
+
 test("las tres páginas tienen ruta propia, etiqueta y regreso al perfil",async()=>{
   const app=await read("app.js");
   for(const path of ["staff","agencia","administrador"]){
