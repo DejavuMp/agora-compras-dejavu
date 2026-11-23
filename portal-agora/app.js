@@ -54,19 +54,6 @@ function login(){
   document.body.classList.add("login-mode");
   resetCaptcha();
   const request=state.page==="request";
-  const inputs=state.method==="google"?
-    '<button class="btn gold full" data-action="google" type="button">Continuar con Google <span aria-hidden="true">→</span></button>':
-    state.method==="email"?
-      '<form id="email-send"><div class="field"><label for="email">Correo electrónico</label>'+
-        '<input type="email" id="email" name="email" autocomplete="email" required placeholder="tu@correo.com"></div>'+
-        '<button class="btn gold full" type="submit">Enviarme un enlace <span aria-hidden="true">→</span></button></form>':
-      '<form id="phone-send"><div class="field"><label for="phone">Número de celular</label>'+
-        '<div class="phone-entry"><span class="phone-country" aria-label="Clave de México">+52</span>'+
-        '<input type="tel" id="phone" name="phone" autocomplete="tel-national" required inputmode="tel" placeholder="Número de celular"></div></div>'+
-        '<div id="recaptcha"></div><button class="btn gold full" type="submit">Ingresar <span aria-hidden="true">→</span></button></form>'+
-      '<form id="phone-confirm" hidden><div class="field"><label for="sms">Código de verificación SMS</label>'+
-        '<input type="text" id="sms" name="sms" required inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="Los 6 dígitos"></div>'+
-        '<button class="btn gold full" type="submit">Verificar e ingresar <span aria-hidden="true">→</span></button></form>';
   app.innerHTML='<div class="cinema-login">'+
     '<div class="cinema-backdrop" aria-hidden="true"></div>'+
     '<div class="cinema-stars" aria-hidden="true"></div>'+
@@ -78,12 +65,18 @@ function login(){
       '<section class="cinema-card" aria-label="Acceso ÁGORA">'+
         '<div class="cinema-inner">'+
           '<h1 class="sr-only">'+(request?"Solicitar ID Dejavú":"Iniciar sesión en ÁGORA")+'</h1>'+
-          '<div class="methods" role="tablist" aria-label="Método de acceso">'+
-          [["phone","Celular","▯"],["email","Correo","✉"],["google","Google","G"]].map(([m,label,ico])=>
-            '<button type="button" role="tab" data-method="'+m+'" aria-selected="'+String(state.method===m)+'"><span aria-hidden="true" class="method-icon">'+ico+'</span>'+label+'</button>').join("")+
-          '</div>'+
-          (request?'<p class="cinema-info">Verifica tu contacto para solicitar un ID Dejavú.</p>':'')+
-          inputs+
+          (request?'<p class="cinema-info">Para solicitar tu ID, ingresa primero con Google. Tu solicitud quedará asociada a esa misma cuenta.</p>':
+            '<form id="id-login" aria-describedby="id-login-note">'+
+              '<div class="field"><label for="staff-id">Usuario · ID Dejavú</label>'+
+                '<div class="id-entry"><span class="id-prefix" aria-hidden="true">DJV-</span>'+
+                  '<input id="staff-id" name="id" type="text" inputmode="text" autocapitalize="characters" autocomplete="username" spellcheck="false" placeholder="2026-001" pattern="[0-9]{4}-[0-9]{3,6}" aria-label="ID Dejavú, después de DJV-" required></div></div>'+
+              '<div class="field"><label for="staff-password">Contraseña</label>'+
+                '<input id="staff-password" name="password" type="password" autocomplete="current-password" placeholder="Tu contraseña de ÁGORA" required></div>'+
+              '<button class="btn gold full" type="submit" disabled aria-disabled="true" title="Pendiente de activación segura en el servidor">Ingresar con ID <span aria-hidden="true">→</span></button>'+
+            '</form>'+
+            '<p id="id-login-note" class="login-pending" role="status">El ingreso con ID y contraseña está pendiente de habilitarse de forma segura. Por ahora, entra con Google para conservar tu cuenta actual.</p>')+
+          '<div class="login-separator"><span>o continúa con</span></div>'+
+          '<button type="button" class="btn google-login full" data-action="google"><span aria-hidden="true" class="google-g">G</span> Continuar con Google <span aria-hidden="true">→</span></button>'+
           '<div class="cinema-secondary"><button class="text-btn" type="button" data-action="'+(request?"login":"request")+'">'+
             (request?"Volver al acceso":"<span aria-hidden='true'>▤</span> Solicitar mi ID Dejavú")+
           '</button></div>'+
