@@ -75,7 +75,7 @@ try{
  const invite=db=>doc(db,"agora_repair_invites",token);
  const snapshotPublic={project:"Hot Cruji Bravo",asset:"Stand",area:"Panel frontal",
   problem:"Pieza desprendida",scope:"Elemento específico",priority:"Alta",
-  dueDate:"2026-12-01",materialLink:"https://example.invalid/planos"};
+  dueDate:"2026-12-01",materialLink:"https://example.invalid/planos",photoPreview:""};
  const inviteData=()=>({
   requestId:id,snapshot:snapshotPublic,supplierHint:"Proveedor ficticio",
   createdBy:coordId,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),
@@ -84,6 +84,11 @@ try{
  });
  await no("proveedor no crea invitación sin coordinación",setDoc(invite(anon),inviteData()));
  await yes("coordinación crea enlace de cotización",setDoc(invite(coord),inviteData()));
+ await no("invitación rechaza imágenes incrustadas que no sean JPEG",setDoc(
+  doc(coord,"agora_repair_invites","B".repeat(43)),{
+   ...inviteData(),snapshot:{...snapshotPublic,photoPreview:"data:text/html;base64,PHNjcmlwdD4="}
+  }
+ ));
  await yes("proveedor sin login consulta solo invitación conocida",getDoc(invite(anon)));
  await no("proveedor no lista invitaciones",getDocs(collection(anon,"agora_repair_invites")));
  await no("proveedor no modifica el problema o alcance",updateDoc(invite(anon),{
