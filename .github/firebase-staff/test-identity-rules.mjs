@@ -38,6 +38,24 @@ try{
   const coord=env.authenticatedContext(coordId,{email:mail(coordId),email_verified:true}).firestore();
   const staff=env.authenticatedContext(staffId,{email:mail(staffId),email_verified:true}).firestore();
   const other=env.authenticatedContext(otherId,{email:mail(otherId),email_verified:true}).firestore();
+  // Emula un teléfono confirmado por Firebase Auth, sin correo electrónico.
+  const phoneId='identity-phone';
+  const phone=env.authenticatedContext(phoneId,{
+    phone_number:'+525500000001',
+    firebase:{sign_in_provider:'phone'}
+  }).firestore();
+  await yes('celular verificado puede solicitar su propio ID',setDoc(doc(phone,'agora_identity_registrations',phoneId),{
+    uid:phoneId,email:'',displayName:'Staff Telefonico',
+    telephone:'+525500000001',requestedJobTitle:'Staff',status:'pending',
+    privacyAccepted:true,privacyVersion:'provisional-2026-11-18',
+    createdAt:serverTimestamp(),updatedAt:serverTimestamp()
+  }));
+  await yes('celular lee su propia solicitud',getDoc(doc(phone,'agora_identity_registrations',phoneId)));
+  await yes('celular consulta solo su perfil de usuario',getDoc(doc(phone,'agora_users',phoneId)));
+  await no('celular no accede a otro usuario',getDoc(doc(phone,'agora_users',adminId)));
+  await no('celular no enumera usuarios',getDocs(collection(phone,'agora_users')));
+  await no('celular no accede al directorio completo',getDocs(collection(phone,'agora_identity_registry')));
+  await no('celular no puede crear registros financieros',setDoc(doc(phone,'agora_finance_requests','test-phone'),{foo:'bar'}));
 
   await yes('persona solicita su propia identidad',setDoc(doc(staff,'agora_identity_registrations',staffId),{
     uid:staffId,email:mail(staffId),displayName:'Persona de Prueba',telephone:'5500000000',
