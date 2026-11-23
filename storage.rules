@@ -49,6 +49,7 @@ service firebase.storage {
         (canEdit() || isOpsStaff());
       allow list: if false;
       allow create: if canEdit() &&
+        resource == null &&
         request.auth.uid == uploaderUid &&
         fileName.matches('^[a-f0-9-]{36}\\.jpg$') &&
         firestore.exists(repairAssetDoc(assetId)) &&
@@ -63,6 +64,7 @@ service firebase.storage {
         canReadRepair(requestId);
       allow list: if false;
       allow create: if signedIn() &&
+        resource == null &&
         request.auth.uid == uploaderUid &&
         fileName.matches('^[a-f0-9-]{36}\\.jpg$') &&
         firestore.exists(repairDoc(requestId)) &&
