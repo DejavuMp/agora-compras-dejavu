@@ -24,12 +24,12 @@ test("site portable and independent from other systems",async()=>{
   assert.match(js,/new URL\("\.\/verificar\.html",location\.href\)/);
   assert.match(verify,/agora_identity_credentials/);
   assert.match(fire,/agora-dejavu-38b8c/);
-  assert.match(css,/@media\\(max-width:580px\\)/);
+  assert.ok(css.includes("@media(max-width:580px)"));
   assert.match(css,/@keyframes orbit/);
   assert.match(css,/prefers-reduced-motion:reduce/);
-  assert.match(html,/src="\\.\\/assets\\/dejavu-logo-oficial\\.png"/);
+  assert.ok(html.includes('src="./assets/dejavu-logo-oficial.png"'));
   assert.match(js,/class="brand-stage"/);
-  assert.match(js,/assets\\/dejavu-logo-oficial\\.png/);
+  assert.ok(js.includes('assets/dejavu-logo-oficial.png'));
   assert.match(js,/class="credential-mark"/);
   assert.doesNotMatch(js,/\.\.\/identidad\/|\.\.\/operaciones\//);
   assert.doesNotMatch(js,/agora_ops_|agora_finance_|agora_records|agora_file_deliveries/);
