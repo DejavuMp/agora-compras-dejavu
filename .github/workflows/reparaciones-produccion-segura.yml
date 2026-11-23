@@ -7,8 +7,16 @@ on:
       - ".github/workflows/reparaciones-produccion-segura.yml"
   workflow_dispatch:
     inputs:
+      operation:
+        description: "Auditar reglas vigentes o publicar después de conciliarlas"
+        required: true
+        type: choice
+        default: audit
+        options:
+          - audit
+          - publish
       project_confirmation:
-        description: "Escribe agora-dejavu-38b8c para reintentar la publicación"
+        description: "Confirma el proyecto agora-dejavu-38b8c"
         required: true
         type: string
 concurrency:
@@ -42,6 +50,50 @@ jobs:
               print(f"{key}: {payload.get(key,'(sin valor)')}")
           print("Diagnóstico finalizado: JWT no mostrado ni guardado; ningún recurso Firebase fue consultado.")
           PY
+  audit-live-rules:
+    name: "Auditoría de reglas reales, sin ninguna publicación"
+    if: github.event_name == 'workflow_dispatch' && inputs.operation == 'audit' && inputs.project_confirmation == 'agora-dejavu-38b8c' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      FIREBASE_PROJECT_ID: agora-dejavu-38b8c
+    steps:
+      - uses: actions/checkout@v4
+      - id: google_auth
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: agora-dejavu-38b8c
+          workload_identity_provider: ${{ vars.DEJAVU_FIREBASE_WIF_PROVIDER }}
+          service_account: ${{ vars.DEJAVU_FIREBASE_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_lifetime: "600s"
+      - name: Leer y respaldar reglas activas de Firestore (comparación segura)
+        id: firestore_audit
+        continue-on-error: true
+        env:
+          FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
+        run: node .github/firebase-staff/safe-rules-preflight.mjs
+      - name: Leer y respaldar reglas activas de Storage (comparación segura)
+        id: storage_audit
+        continue-on-error: true
+        env:
+          FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
+        run: node .github/firebase-staff/safe-storage-preflight.mjs
+      - name: Crear resumen de diferencias sin datos de producción en logs
+        if: always()
+        run: node .github/firebase-staff/report-repair-rule-differences.mjs
+      - name: Guardar respaldo original y diagnóstico (solo para conciliación)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auditoria-reglas-reales-agora-reparaciones
+          path: .github/firebase-staff/.preflight/
+          include-hidden-files: true
+          retention-days: 1
+          if-no-files-found: warn
   predeploy-tests:
     name: "Probar respaldos y permisos sin producción"
     runs-on: ubuntu-latest
@@ -67,7 +119,7 @@ jobs:
   activate:
     name: "Respaldo real, comprobación y activación"
     needs: predeploy-tests
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.project_confirmation == 'agora-dejavu-38b8c'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.project_confirmation == 'agora-dejavu-38b8c' && inputs.operation == 'publish'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -106,6 +158,15 @@ jobs:
         env:
           FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
         run: node .github/firebase-staff/safe-bucket-cors.mjs
+      - name: Guardar respaldo aunque la comparación haya fallado
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: respaldo-firestore-ante-deriva-activacion
+          path: .github/firebase-staff/.preflight/
+          include-hidden-files: true
+          retention-days: 1
+          if-no-files-found: warn
       - name: Almacenar respaldo previo OBLIGATORIO de ambos servicios
         uses: actions/upload-artifact@v4
         with:
