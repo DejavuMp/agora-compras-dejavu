@@ -1,0 +1,39 @@
+name: "ÁGORA · Portal unificado (sintaxis y estructura)"
+on:
+  pull_request:
+    paths:
+      - "inicio/**"
+      - "identidad/**"
+      - "functions/index.js"
+      - "firestore.rules"
+      - ".github/workflows/agora-portal-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "inicio/**"
+      - "identidad/**"
+      - "functions/index.js"
+      - "firestore.rules"
+      - ".github/workflows/agora-portal-tests.yml"
+permissions:
+  contents: read
+jobs:
+  portal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validar sintaxis de aplicaciones y notificaciones
+        run: |
+          node --check inicio/app.js
+          node --check identidad/app.js
+          node --check identidad/firebase-identity.js
+          node --check functions/index.js
+      - name: Verificar estructura, ID y accesos
+        run: |
+          node --test inicio/tests/*.test.mjs
+          node identidad/tests/domain.test.mjs
+          node identidad/tests/app-structure.test.mjs
+          node identidad/tests/rules-structure.test.mjs
