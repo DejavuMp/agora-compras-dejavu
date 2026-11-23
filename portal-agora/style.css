@@ -1033,3 +1033,107 @@ body.login-mode .cinema-subtitle{
  .cinema-card .id-prefix{flex-basis:70px;font-size:.85rem}
  .cinema-card .google-login.full{font-size:.88rem}
 }
+
+
+/* Identidad digital operativa y accesos a herramientas, sin carteles rasterizados */
+.workspace-header h1{font-size:clamp(2.05rem,4vw,3.45rem);line-height:1.08;max-width:22ch}
+.workspace-header p{font-size:.96rem;max-width:50rem}
+.brand-mark{width:128px;height:auto;max-height:60px;object-fit:contain}
+.credential.live-credential{
+  background:
+    radial-gradient(ellipse 75% 90% at 100% 0%,rgba(187,133,46,.20),transparent 64%),
+    linear-gradient(145deg,#241e15,#0a0a09 72%);
+  display:flex;flex-direction:column;justify-content:flex-end;
+  min-height:390px;padding:1.6rem;
+  border-color:rgba(242,194,112,.56);
+}
+.credential.live-credential::after{display:none}
+.credential.live-credential .credential-art{display:none}
+.credential.live-credential .credential-top{top:1.2rem;left:1.55rem;right:1.55rem}
+.credential.live-credential .credential-mark{
+  width:172px;max-width:42%;height:auto;max-height:78px;
+  object-fit:contain;filter:drop-shadow(0 0 10px rgba(255,193,96,.10));
+}
+.credential.live-credential h2{
+  font-size:clamp(1.6rem,2.9vw,2.15rem);max-width:85%;
+  margin:1.6rem 0 .4rem;line-height:1.16;overflow-wrap:anywhere;
+}
+.credential.live-credential .job{font-size:.85rem;color:#dbcbaa}
+.credential.live-credential .credential-bottom{align-items:center}
+.credential.live-credential .id{font-size:1.2rem}
+.credential-actions{
+  position:relative;z-index:2;display:flex;gap:.65rem;flex-wrap:wrap;
+  padding-top:1.2rem;margin-top:1.15rem;border-top:1px solid rgba(237,197,126,.17);
+}
+.credential-actions .btn{font-size:.78rem;padding:.69rem .84rem;flex:1}
+.space-card-icon{width:108px;height:108px;object-fit:contain;image-rendering:auto;flex:0 0 auto}
+.space-card-head{align-items:center}
+.sites-panel{
+  margin:1.6rem 0 0;padding:1.6rem;
+  background:linear-gradient(145deg,rgba(43,34,22,.8),rgba(13,12,10,.95));
+  border:1px solid rgba(227,186,115,.28);border-radius:1.1rem;
+}
+.sites-panel h2{font-size:clamp(1.4rem,3vw,1.8rem);margin:.35rem 0 .1rem}
+.sites-panel>p{font-size:.82rem;color:#a99e8c;line-height:1.6}
+.sites-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.8rem;margin-top:1rem}
+.site-tile{
+  display:flex;gap:.75rem;align-items:center;min-height:104px;
+  padding:.95rem;background:rgba(3,3,3,.34);color:#f7edda;text-decoration:none;
+  border:1px solid rgba(232,188,116,.19);border-radius:.85rem;
+  transition:transform .18s,border-color .18s,background .18s;
+}
+.site-tile:hover{transform:translateY(-2px);background:rgba(77,51,21,.35);border-color:rgba(244,196,113,.55)}
+.site-symbol{font-weight:800;font-size:1.25rem;flex:0 0 42px;display:grid;place-items:center;
+  width:42px;height:42px;color:#f3d296;background:rgba(242,192,103,.09);
+  border:1px solid rgba(225,179,102,.25);border-radius:.6rem}
+.site-copy{display:grid;gap:.12rem;min-width:0;flex:1}
+.site-copy b{font-size:.9rem;line-height:1.25}
+.site-copy small{font-size:.71rem;line-height:1.45;color:#a99e8b}
+.site-arrow{font-size:1.3rem;align-self:flex-start;color:#d6a857}
+.admin-pending{
+  margin:1rem 0 1.4rem;padding:1.2rem 1.4rem;
+  border:1px solid rgba(247,195,104,.57);border-radius:.85rem;
+  background:linear-gradient(120deg,rgba(95,59,16,.26),rgba(17,15,11,.97));
+}
+.admin-pending h2{font-size:1.25rem;line-height:1.35;margin:.4rem 0}
+.admin-pending p{color:#dfd0b8;font-size:.85rem;line-height:1.65}
+.admin-pending code{color:#f0d8aa;overflow-wrap:anywhere}
+.admin-pending .btn{margin-top:.25rem}
+.digital-dialog{
+  color:#f7ebd8;background:#12100c;width:min(510px,calc(100% - 1.5rem));
+  max-height:min(92vh,850px);border:1px solid #d1a968;border-radius:1.1rem;
+  padding:1.25rem;box-shadow:0 28px 95px rgba(0,0,0,.7);overflow-y:auto;
+}
+.digital-dialog::backdrop{background:rgba(0,0,0,.78);backdrop-filter:blur(6px)}
+.digital-dialog .digital-dialog-top{display:flex;justify-content:space-between;align-items:center;gap:.7rem;
+  color:#d6b777;font-size:.82rem;padding-bottom:.8rem}
+.digital-dialog .digital-dialog-top button{border:1px solid #8a7148;border-radius:50%;
+  width:35px;height:35px;color:#f7d8a1;background:#30271a;font-size:1.35rem;line-height:1}
+.digital-face{
+  border-radius:.85rem;padding:1.35rem 1.2rem;text-align:center;
+  border:1px solid rgba(252,211,142,.45);
+  background:radial-gradient(ellipse at 48% 0%,rgba(166,107,29,.32),transparent 60%),linear-gradient(135deg,#282014,#0d0c0a);
+}
+.digital-logo{display:block;width:min(200px,75%);height:auto;margin:.2rem auto 1rem}
+.digital-face h2{font-size:1.5rem;line-height:1.18;margin:.5rem auto .35rem}
+.digital-face p{color:#d5c3aa;margin:0 auto 1rem;font-size:.85rem}
+.digital-id{display:block;color:#f6d48e;letter-spacing:.14em;font-size:1.15rem}
+.digital-qr{display:grid;place-items:center;width:177px;height:177px;padding:.5rem;
+  background:white;border-radius:.55rem;margin:1.1rem auto .55rem}
+.digital-qr img{width:154px;height:154px;max-width:100%}
+.digital-state{display:block;font-weight:700;letter-spacing:.12em;font-size:.7rem;color:#b9d69c}
+.digital-hint{font-size:.77rem;color:#bcae99;text-align:center;line-height:1.6;margin:1rem auto}
+.digital-dialog .actions{justify-content:center}
+@media(max-width:960px){.sites-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:580px){
+  .workspace-header h1{font-size:clamp(1.9rem,9vw,2.55rem)}
+  .sites-panel{padding:1rem}
+  .sites-grid{grid-template-columns:1fr}
+  .site-tile{min-height:85px}
+  .credential-actions .btn{flex:1 1 100%}
+  .space-card-icon{width:83px;height:83px}
+  .credential.live-credential{padding:1.2rem}
+  .credential.live-credential .credential-top{left:1.2rem;right:1.2rem}
+  .credential.live-credential h2{max-width:100%}
+}
+@media(prefers-reduced-motion:reduce){.site-tile{transition:none}.site-tile:hover{transform:none}}

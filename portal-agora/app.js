@@ -27,6 +27,16 @@ const verifiedId=()=>state.identity?.link?.active===true&&
 const canAdmin=()=>verifiedId()&&userRole()==="admin"&&mainAdmin(state.user);
 const canAgency=()=>verifiedId()&&["admin","coordinador","consulta"].includes(userRole());
 const canStaff=()=>verifiedId();
+const SITE_URLS={
+ operaciones:"https://dejavump.github.io/agora-operaciones-dejavu/operaciones/",
+ visor:"https://dejavump.github.io/agora-operaciones-dejavu/operaciones/visor.html",
+ compras:"https://dejavump.github.io/agora-compras-dejavu/",
+ archivos:"https://dejavump.github.io/agora-compras-dejavu/archivos/",
+ recursos:"https://dejavump.github.io/agora-compras-dejavu/recursos/",
+ fichas:"https://dejavump.github.io/agora-compras-dejavu/fichas/",
+ identidad:"https://dejavump.github.io/agora-compras-dejavu/identidad/"
+};
+
 const message=(m,t="")=>{status.textContent=m;if(t)status.dataset.tone=t;else delete status.dataset.tone};
 const err=e=>{
   const code=String(e?.code||"");
@@ -164,66 +174,129 @@ function selectSpace(){
   const available=spaces().map(v=>v[0]);
   if(!available.includes(state.space))state.space=canAdmin()?"admin":canAgency()?"agency":"staff";
 }
+function credentialVerificationLink(){
+  const token=state.identity?.registry?.credentialId||"";
+  if(!/^[0-9a-f]{32}$/i.test(token))return "";
+  const url=new URL("./verificar.html",location.href);
+  url.searchParams.set("id",token);
+  return url.href;
+}
 function credential(){
-  const reg=state.identity.registry;
-  const href=new URL("./verificar.html",location.href);
-  href.searchParams.set("id",reg.credentialId);
-  return '<section class="credential" aria-label="Credencial digital de Dejavú">'+
-    '<div class="credential-art" aria-hidden="true"></div>'+
-    '<div class="credential-top"><img class="credential-mark" src="./assets/pdf-agora-wordmark.webp" alt="ÁGORA" width="176" height="66">'+
-    '<span class="credential-status">IDENTIDAD VIGENTE</span></div>'+
-    '<div class="eyebrow">CREDENCIAL DIGITAL · DEJAVÚ MARKETING</div>'+
-    '<h2>'+esc(reg.displayName||state.user?.displayName||"Colaborador")+'</h2>'+
+  const reg=state.identity.registry,link=credentialVerificationLink();
+  return '<section class="credential live-credential" aria-label="Credencial digital verificable">'+
+    '<div class="credential-top"><img class="credential-mark" src="./assets/logo-agora-hq.webp" alt="ÁGORA Dejavú Marketing">'+
+    '<span class="credential-status">ID VIGENTE</span></div>'+
+    '<div class="eyebrow">IDENTIDAD DIGITAL · REGISTRO FIREBASE</div>'+
+    '<h2>'+esc(reg.displayName||"Colaborador")+'</h2>'+
     '<p class="job">'+esc(reg.jobTitle||"Colaborador")+'</p>'+
     '<div class="credential-bottom"><div><div class="id">'+esc(reg.agoraId)+'</div>'+
-    '<small>'+ (reg.credentialActive?"ACTIVA · VERIFICABLE":"NO VIGENTE")+'</small>'+
-    '<p><a class="credential-verify" href="'+esc(href.href)+'" target="_blank" rel="noopener">Verificar credencial <span aria-hidden="true">↗</span></a></p></div>'+
-    '<div id="credential-qr" class="qr"><a href="'+esc(href.href)+'">Verificar</a></div></div></section>';
+    '<small>QR INDIVIDUAL · CONSULTA DE VIGENCIA</small></div>'+
+    (link?'<div id="credential-qr" class="qr"><a href="'+esc(link)+'" target="_blank" rel="noopener">Verificar QR</a></div>':
+    '<p class="note error">Credencial sin token de verificación válido</p>')+
+    '</div><div class="credential-actions"><button class="btn gold" type="button" data-action="open-credential">Abrir credencial digital</button>'+
+    (link?'<a class="btn outline" href="'+esc(link)+'" target="_blank" rel="noopener">Comprobar vigencia</a>':"")+
+    '</div></section>';
+}
+function credentialDialog(){
+  const reg=state.identity?.registry,link=credentialVerificationLink();
+  if(!reg)return "";
+  return '<dialog id="credential-dialog" class="digital-dialog" aria-label="Mi credencial digital">'+
+    '<div class="digital-dialog-top"><b>ÁGORA · Credencial digital</b>'+
+    '<button type="button" data-action="close-credential" aria-label="Cerrar credencial">×</button></div>'+
+    '<div class="digital-face"><img src="./assets/logo-agora-hq.webp" alt="ÁGORA" class="digital-logo">'+
+    '<h2>'+esc(reg.displayName||"Colaborador")+'</h2><p>'+esc(reg.jobTitle||"Colaborador")+'</p>'+
+    '<b class="digital-id">'+esc(reg.agoraId)+'</b>'+
+    (link?'<div class="digital-qr" id="credential-qr-modal"><a href="'+esc(link)+'" target="_blank" rel="noopener">Abrir verificación</a></div>':"")+
+    '<span class="digital-state">VIGENTE · CONSULTA EN LÍNEA</span></div>'+
+    '<p class="digital-hint">El QR muestra únicamente los datos públicos de acreditación y su vigencia.</p>'+
+    '<div class="actions">'+(link?'<button class="btn gold" type="button" data-action="share-credential">Compartir verificación</button>':"")+
+    '<button class="btn outline" type="button" data-action="close-credential">Cerrar</button></div></dialog>';
 }
 function drawQr(){
-  const qr=document.getElementById("credential-qr");
-  const reg=state.identity?.registry;
-  if(!qr||!reg?.credentialId||!window.QRCode)return;
-  const href=new URL("./verificar.html",location.href);
-  href.searchParams.set("id",reg.credentialId);
-  qr.replaceChildren();
-  new window.QRCode(qr,{text:href.href,width:78,height:78,colorDark:"#171512",colorLight:"#ffffff",correctLevel:window.QRCode.CorrectLevel.M});
+  const link=credentialVerificationLink();
+  if(!link||!window.QRCode)return;
+  for(const id of ["credential-qr","credential-qr-modal"]){
+    const qr=document.getElementById(id);
+    if(!qr)continue;
+    qr.replaceChildren();
+    const size=id==="credential-qr"?84:154;
+    new window.QRCode(qr,{text:link,width:size,height:size,colorDark:"#16120e",colorLight:"#ffffff",correctLevel:window.QRCode.CorrectLevel.M});
+  }
+}
+
+function siteTile(title,summary,href,symbol){
+  return '<a class="site-tile" href="'+esc(href)+'" target="_blank" rel="noopener noreferrer">'+
+    '<span class="site-symbol" aria-hidden="true">'+esc(symbol)+'</span>'+
+    '<span class="site-copy"><b>'+esc(title)+'</b><small>'+esc(summary)+'</small></span>'+
+    '<span class="site-arrow" aria-hidden="true">↗</span></a>';
+}
+function sites(){
+  if(!verifiedId())return "";
+  let entries=[];
+  if(state.space==="staff"){
+    entries=[
+      ["Mis jornadas / Visor","Actividades y seguimiento personal",SITE_URLS.visor,"◷"],
+      ["Mi expediente","Identidad y credencial Dejavú",SITE_URLS.identidad,"ID"]
+    ];
+  }else{
+    entries=[
+      ["Operaciones Agencia","Eventos, coordinación y personal",SITE_URLS.operaciones,"◷"],
+      ["Compras y producción","Pedidos y órdenes",SITE_URLS.compras,"▤"],
+      ["Archivos","Evidencias, entregas y revisión",SITE_URLS.archivos,"▣"],
+      ["Fichas de evento","Formatos y datos del evento",SITE_URLS.fichas,"◈"],
+      ["Identidad y RH","Acreditaciones y credenciales",SITE_URLS.identidad,"ID"]
+    ];
+    if(state.space==="admin"||userRole()==="coordinador"){
+      entries.splice(3,0,["Recursos y pagos","Solicitudes y autorizaciones",SITE_URLS.recursos,"$"]);
+    }
+  }
+  return '<section class="sites-panel"><div class="eyebrow">ACCESOS EXISTENTES · ÁGORA</div>'+
+    '<h2>Mis herramientas</h2>'+
+    '<p>Abre cada sitio con tu cuenta acreditada. Sus permisos se verifican en la aplicación de destino.</p>'+
+    '<div class="sites-grid">'+entries.map(x=>siteTile(...x)).join("")+'</div></section>';
+}
+function adminRoleNotice(){
+  if(!mainAdmin(state.user)||canAdmin())return "";
+  const uid=state.user?.uid||"";
+  return '<section class="admin-pending" role="status">'+
+    '<div class="eyebrow">ACCESO DE ADMINISTRACIÓN PENDIENTE</div>'+
+    '<h2>Tu correo está reconocido, pero aún no está acreditado el rol Administrador.</h2>'+
+    '<p>ÁGORA no concede privilegios únicamente por la dirección de correo. En Firebase, verifica el documento '+
+    '<code>agora_users/'+esc(uid)+'</code> con <code>active: true</code> y <code>role: "admin"</code>. '+
+    'El rol actual es <b>'+esc(userRole()||"sin rol activo")+'</b>. No cambies tu UID ni tu ID Dejavú.</p>'+
+    '<button type="button" class="btn outline" data-action="copy-uid">Copiar UID para revisión</button></section>';
 }
 function spaceContent(){
   const name=state.space==="admin"?"Administrador":state.space==="agency"?"Agencia":"Staff";
-  const asset=state.space==="agency"?"pdf-agency-icon.webp":
-    state.space==="staff"?"pdf-staff-icon.webp":"pdf-agora-icon.webp";
-  const copy=state.space==="admin"?
-    "Tu identidad de Administrador está reconocida. Por ahora, aquí se muestra únicamente tu ID Dejavú y tu credencial digital.":
-    state.space==="agency"?
-    "Tu identidad Dejavú está acreditada. Este espacio inicial presenta únicamente tu ID personal y tu credencial.":
-    "Bienvenido a tu espacio de Staff. Aquí puedes consultar únicamente tu ID Dejavú y la vigencia de tu credencial.";
-  const otherOptions=[];
-  if(state.user?.email)otherOptions.push("Correo: "+state.user.email);
-  if(state.user?.phoneNumber)otherOptions.push("Celular: "+state.user.phoneNumber);
-  return '<section class="space-card"><div class="space-card-head">'+
-    '<img src="./assets/'+asset+'" alt="" class="space-card-icon" loading="lazy">'+
-    '<div><div class="eyebrow">ESPACIO / IDENTIDAD</div>'+
-    '<h2>'+esc(name)+'</h2></div></div>'+
-    '<p>'+esc(copy)+'</p>'+
+  const asset=state.space==="agency"?"icono-agencia-hq.webp":
+    state.space==="staff"?"icono-staff-hq.webp":"icono-administrador-hq.webp";
+  const msg=state.space==="admin"?"Identidad administrativa acreditada. Las herramientas estarán disponibles según tus permisos.":
+    state.space==="agency"?"Tu identidad de Agencia está acreditada. Consulta las herramientas existentes.":
+    "Tu credencial es personal y única. Desde aquí puedes ver tu ID y acceder a tus herramientas.";
+  return '<section class="space-card">'+
+    '<div class="space-card-head"><img src="./assets/'+asset+'" alt="" class="space-card-icon" width="106" height="106">'+
+    '<div><div class="eyebrow">ESPACIO / IDENTIDAD</div><h2>'+esc(name)+'</h2></div></div>'+
+    '<p>'+esc(msg)+'</p>'+
     '<div class="meta"><div><small>ID DEJAVÚ</small><b>'+esc(state.identity.registry.agoraId)+'</b></div>'+
     '<div><small>ESTADO</small><b>Vigente</b></div></div>'+
-    '<div class="note success">La información de este espacio está asociada a tu credencial. Todavía no incluye actividades, pagos ni otros módulos.</div>'+
-    '<hr><p class="help">'+esc(otherOptions.join(" · "))+'</p>'+
+    '<div class="note success">Credencial vinculada con Firebase. No es una imagen de demostración.</div>'+
     '</section>';
 }
 function dashboard(){
   resetCaptcha();selectSpace();
-  const name=state.identity?.registry?.displayName||state.user?.displayName||"tu espacio";
-  app.innerHTML='<div class="workspace-header"><div><div class="eyebrow">TU IDENTIDAD · DEJAVÚ MARKETING</div>'+
-    '<h1>Hola, '+esc(name)+'.</h1>'+
-    '<p>Tu credencial está activa. Este es tu espacio personal dentro de ÁGORA.</p></div>'+
+  const name=state.identity?.registry?.displayName||state.user?.displayName||"Colaborador";
+  app.innerHTML='<div class="workspace-header"><div><div class="eyebrow">IDENTIDAD ÚNICA · DEJAVÚ MARKETING</div>'+
+    '<h1>Bienvenido a ÁGORA</h1>'+
+    '<p>'+esc(name)+' · Credencial digital activa</p></div>'+
     '<span class="id-pill">'+esc(state.identity.registry.agoraId)+'</span></div>'+
     '<nav class="space-nav" aria-label="Cambiar espacio">'+spaces().map(([id,label])=>
       '<button type="button" data-space="'+id+'" aria-pressed="'+String(state.space===id)+'">'+label+'</button>').join("")+'</nav>'+
-    '<div class="workspace">'+credential()+spaceContent()+'</div>';
+    adminRoleNotice()+
+    '<div class="workspace">'+credential()+spaceContent()+'</div>'+
+    sites()+credentialDialog();
   drawQr();
 }
+
 function contactLink(){
   resetCaptcha();
   const phone=state.page==="link-phone";
@@ -362,6 +435,32 @@ app.addEventListener("click",event=>{
   }
   const btn=event.target.closest("[data-action]");if(!btn)return;
   const task=btn.dataset.action;
+  if(task==="open-credential"){
+    const dialog=document.getElementById("credential-dialog");
+    if(!dialog)return;
+    if(typeof dialog.showModal==="function")dialog.showModal();
+    else dialog.setAttribute("open","");
+    drawQr();return;
+  }
+  if(task==="close-credential"){
+    const dialog=document.getElementById("credential-dialog");
+    if(dialog?.close)dialog.close();else dialog?.removeAttribute("open");
+    return;
+  }
+  if(task==="copy-uid"){
+    if(!state.user?.uid)return;
+    return action(async()=>{await navigator.clipboard.writeText(state.user.uid)},
+      "UID copiado. Puedes consultarlo en Firebase.");
+  }
+  if(task==="share-credential"){
+    const url=credentialVerificationLink();
+    if(!url)return message("La credencial no dispone de un token válido.","error");
+    return action(async()=>{
+      const data={title:"ÁGORA · Verificación de credencial",url};
+      if(navigator.share){try{await navigator.share(data);return}catch(e){if(e.name==="AbortError")return}}
+      await navigator.clipboard.writeText(url);
+    },"Enlace individual de verificación listo para compartir.");
+  }
   if(task==="google")return action(google,"Autenticación de Google solicitada.");
   if(task==="retry")return action(refresh);
   if(task==="request"||task==="login"){state.page=task;render();return}
