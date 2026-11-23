@@ -2,7 +2,16 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {
-      return request.auth != null && request.auth.token.email_verified == true;
+      return request.auth != null && request.auth.token.get('email_verified', false) == true;
+    }
+    // Correo verificado o SMS confirmado mediante Firebase Auth.
+    // Solamente para identidad y recursos privados del propio Staff.
+    // Los permisos elevados conservan signedIn() y agora_users.
+    function identitySignedIn() {
+      return signedIn() ||
+        (request.auth != null &&
+         request.auth.token.firebase.sign_in_provider == 'phone' &&
+         request.auth.token.phone_number is string);
     }
     function userPath() {
       return /databases/$(database)/documents/agora_users/$(request.auth.uid);
@@ -23,7 +32,7 @@ service cloud.firestore {
         request.resource.data.active is bool;
     }
     match /agora_users/{uid} {
-      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow get: if (identitySignedIn() && request.auth.uid == uid) || isAdmin();
       allow list: if isAdmin();
       // El primer administrador se configura manualmente desde la consola Firebase.
       allow create, update: if isAdmin() && validStaff();
@@ -537,7 +546,7 @@ match /agora_finance_requests/{requestId} {
       return /databases/$(database)/documents/agora_ops_members/$(uid);
     }
     function opsStaff() {
-      return signedIn() && exists(opsMemberPath(request.auth.uid)) &&
+      return identitySignedIn() && exists(opsMemberPath(request.auth.uid)) &&
         get(opsMemberPath(request.auth.uid)).data.active == true &&
         get(opsMemberPath(request.auth.uid)).data.role == 'staff';
     }
@@ -605,7 +614,7 @@ match /agora_finance_requests/{requestId} {
       allow delete: if false;
     }
     match /agora_ops_members/{uid} {
-      allow get: if canEdit() || (signedIn() && request.auth.uid == uid);
+      allow get: if canEdit() || (identitySignedIn() && request.auth.uid == uid);
       allow list: if canEdit();
       allow create, update: if canEdit() &&
         request.resource.data.keys().hasOnly([
@@ -983,7 +992,7 @@ match /agora_finance_requests/{requestId} {
       return /databases/$(database)/documents/agora_identity_audit/$(auditId);
     }
     function identityOwnerOf(agoraId) {
-      return signedIn() && exists(identityLinkPath(request.auth.uid)) &&
+      return identitySignedIn() && exists(identityLinkPath(request.auth.uid)) &&
         get(identityLinkPath(request.auth.uid)).data.agoraId == agoraId;
     }
     function identityAssigned(record) {
@@ -1064,9 +1073,9 @@ match /agora_finance_requests/{requestId} {
     }
 
     match /agora_identity_registrations/{uid} {
-      allow get: if (signedIn() && request.auth.uid == uid) || identityRh();
+      allow get: if (identitySignedIn() && request.auth.uid == uid) || identityRh();
       allow list: if identityRh();
-      allow create: if signedIn() && request.auth.uid == uid &&
+      allow create: if identitySignedIn() && request.auth.uid == uid &&
         request.resource.data.keys().hasOnly([
           'uid','email','displayName','telephone','requestedJobTitle','status',
           'privacyAccepted','privacyVersion','createdAt','updatedAt'
@@ -1076,7 +1085,7 @@ match /agora_finance_requests/{requestId} {
           'privacyAccepted','privacyVersion','createdAt','updatedAt'
         ]) &&
         request.resource.data.uid == uid &&
-        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.email == request.auth.token.get('email', '') &&
         request.resource.data.displayName is string && request.resource.data.displayName.size() >= 3 &&
         request.resource.data.displayName.size() <= 140 &&
         request.resource.data.telephone is string && request.resource.data.telephone.size() <= 30 &&
@@ -1120,7 +1129,7 @@ match /agora_finance_requests/{requestId} {
     }
 
     match /agora_identity_links/{uid} {
-      allow get: if (signedIn() && request.auth.uid == uid) || identityRh();
+      allow get: if (identitySignedIn() && request.auth.uid == uid) || identityRh();
       allow list: if identityRh();
       allow create: if identityRh() &&
         request.resource.data.keys().hasOnly([
@@ -1170,9 +1179,9 @@ match /agora_finance_requests/{requestId} {
     }
 
     match /agora_identity_profiles/{uid} {
-      allow get: if identityRh() || (signedIn() && request.auth.uid == uid);
+      allow get: if identityRh() || (identitySignedIn() && request.auth.uid == uid);
       allow list: if identityRh();
-      allow create, update: if (identityRh() || (signedIn() && request.auth.uid == uid)) &&
+      allow create, update: if (identityRh() || (identitySignedIn() && request.auth.uid == uid)) &&
         request.resource.data.keys().hasOnly([
           'uid','telephone','address','shirtSize','pantSize','shoeSize',
           'emergencyName','emergencyRelation','emergencyPhone','medicalNotes','updatedAt'
@@ -1186,9 +1195,9 @@ match /agora_finance_requests/{requestId} {
     }
 
     match /agora_identity_financial/{uid} {
-      allow get: if identityRh() || (signedIn() && request.auth.uid == uid);
+      allow get: if identityRh() || (identitySignedIn() && request.auth.uid == uid);
       allow list: if identityRh();
-      allow create: if (identityRh() || (signedIn() && request.auth.uid == uid)) &&
+      allow create: if (identityRh() || (identitySignedIn() && request.auth.uid == uid)) &&
         request.resource.data.keys().hasOnly([
           'uid','rfc','curp','nss','bank','clabe','taxRegime','lockedByRH','updatedAt'
         ]) &&
@@ -1201,7 +1210,7 @@ match /agora_finance_requests/{requestId} {
         ]) &&
         request.resource.data.updatedAt == request.time && (
           identityRh() ||
-          (signedIn() && request.auth.uid == uid &&
+          (identitySignedIn() && request.auth.uid == uid &&
             resource.data.lockedByRH == false &&
             request.resource.data.lockedByRH == false)
         );
