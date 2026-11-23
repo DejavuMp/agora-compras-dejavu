@@ -224,41 +224,79 @@ function drawQr(){
   }
 }
 
+function siteTile(title,summary,href,symbol){
+  return '<a class="site-tile" href="'+esc(href)+'" target="_blank" rel="noopener noreferrer">'+
+    '<span class="site-symbol" aria-hidden="true">'+esc(symbol)+'</span>'+
+    '<span class="site-copy"><b>'+esc(title)+'</b><small>'+esc(summary)+'</small></span>'+
+    '<span class="site-arrow" aria-hidden="true">↗</span></a>';
+}
+function sites(){
+  if(!verifiedId())return "";
+  let entries=[];
+  if(state.space==="staff"){
+    entries=[
+      ["Mis jornadas / Visor","Actividades y seguimiento personal",SITE_URLS.visor,"◷"],
+      ["Mi expediente","Identidad y credencial Dejavú",SITE_URLS.identidad,"ID"]
+    ];
+  }else{
+    entries=[
+      ["Operaciones Agencia","Eventos, coordinación y personal",SITE_URLS.operaciones,"◷"],
+      ["Compras y producción","Pedidos y órdenes",SITE_URLS.compras,"▤"],
+      ["Archivos","Evidencias, entregas y revisión",SITE_URLS.archivos,"▣"],
+      ["Fichas de evento","Formatos y datos del evento",SITE_URLS.fichas,"◈"],
+      ["Identidad y RH","Acreditaciones y credenciales",SITE_URLS.identidad,"ID"]
+    ];
+    if(state.space==="admin"||userRole()==="coordinador"){
+      entries.splice(3,0,["Recursos y pagos","Solicitudes y autorizaciones",SITE_URLS.recursos,"$"]);
+    }
+  }
+  return '<section class="sites-panel"><div class="eyebrow">ACCESOS EXISTENTES · ÁGORA</div>'+
+    '<h2>Mis herramientas</h2>'+
+    '<p>Abre cada sitio con tu cuenta acreditada. Sus permisos se verifican en la aplicación de destino.</p>'+
+    '<div class="sites-grid">'+entries.map(x=>siteTile(...x)).join("")+'</div></section>';
+}
+function adminRoleNotice(){
+  if(!mainAdmin(state.user)||canAdmin())return "";
+  const uid=state.user?.uid||"";
+  return '<section class="admin-pending" role="status">'+
+    '<div class="eyebrow">ACCESO DE ADMINISTRACIÓN PENDIENTE</div>'+
+    '<h2>Tu correo está reconocido, pero aún no está acreditado el rol Administrador.</h2>'+
+    '<p>ÁGORA no concede privilegios únicamente por la dirección de correo. En Firebase, verifica el documento '+
+    '<code>agora_users/'+esc(uid)+'</code> con <code>active: true</code> y <code>role: "admin"</code>. '+
+    'El rol actual es <b>'+esc(userRole()||"sin rol activo")+'</b>. No cambies tu UID ni tu ID Dejavú.</p>'+
+    '<button type="button" class="btn outline" data-action="copy-uid">Copiar UID para revisión</button></section>';
+}
 function spaceContent(){
   const name=state.space==="admin"?"Administrador":state.space==="agency"?"Agencia":"Staff";
-  const asset=state.space==="agency"?"pdf-agency-icon.webp":
-    state.space==="staff"?"pdf-staff-icon.webp":"pdf-agora-icon.webp";
-  const copy=state.space==="admin"?
-    "Tu identidad de Administrador está reconocida. Por ahora, aquí se muestra únicamente tu ID Dejavú y tu credencial digital.":
-    state.space==="agency"?
-    "Tu identidad Dejavú está acreditada. Este espacio inicial presenta únicamente tu ID personal y tu credencial.":
-    "Bienvenido a tu espacio de Staff. Aquí puedes consultar únicamente tu ID Dejavú y la vigencia de tu credencial.";
-  const otherOptions=[];
-  if(state.user?.email)otherOptions.push("Correo: "+state.user.email);
-  if(state.user?.phoneNumber)otherOptions.push("Celular: "+state.user.phoneNumber);
-  return '<section class="space-card"><div class="space-card-head">'+
-    '<img src="./assets/'+asset+'" alt="" class="space-card-icon" loading="lazy">'+
-    '<div><div class="eyebrow">ESPACIO / IDENTIDAD</div>'+
-    '<h2>'+esc(name)+'</h2></div></div>'+
-    '<p>'+esc(copy)+'</p>'+
+  const asset=state.space==="agency"?"icono-agencia-hq.webp":
+    state.space==="staff"?"icono-staff-hq.webp":"icono-administrador-hq.webp";
+  const msg=state.space==="admin"?"Identidad administrativa acreditada. Las herramientas estarán disponibles según tus permisos.":
+    state.space==="agency"?"Tu identidad de Agencia está acreditada. Consulta las herramientas existentes.":
+    "Tu credencial es personal y única. Desde aquí puedes ver tu ID y acceder a tus herramientas.";
+  return '<section class="space-card">'+
+    '<div class="space-card-head"><img src="./assets/'+asset+'" alt="" class="space-card-icon" width="106" height="106">'+
+    '<div><div class="eyebrow">ESPACIO / IDENTIDAD</div><h2>'+esc(name)+'</h2></div></div>'+
+    '<p>'+esc(msg)+'</p>'+
     '<div class="meta"><div><small>ID DEJAVÚ</small><b>'+esc(state.identity.registry.agoraId)+'</b></div>'+
     '<div><small>ESTADO</small><b>Vigente</b></div></div>'+
-    '<div class="note success">La información de este espacio está asociada a tu credencial. Todavía no incluye actividades, pagos ni otros módulos.</div>'+
-    '<hr><p class="help">'+esc(otherOptions.join(" · "))+'</p>'+
+    '<div class="note success">Credencial vinculada con Firebase. No es una imagen de demostración.</div>'+
     '</section>';
 }
 function dashboard(){
   resetCaptcha();selectSpace();
-  const name=state.identity?.registry?.displayName||state.user?.displayName||"tu espacio";
-  app.innerHTML='<div class="workspace-header"><div><div class="eyebrow">TU IDENTIDAD · DEJAVÚ MARKETING</div>'+
-    '<h1>Hola, '+esc(name)+'.</h1>'+
-    '<p>Tu credencial está activa. Este es tu espacio personal dentro de ÁGORA.</p></div>'+
+  const name=state.identity?.registry?.displayName||state.user?.displayName||"Colaborador";
+  app.innerHTML='<div class="workspace-header"><div><div class="eyebrow">IDENTIDAD ÚNICA · DEJAVÚ MARKETING</div>'+
+    '<h1>Bienvenido a ÁGORA</h1>'+
+    '<p>'+esc(name)+' · Credencial digital activa</p></div>'+
     '<span class="id-pill">'+esc(state.identity.registry.agoraId)+'</span></div>'+
     '<nav class="space-nav" aria-label="Cambiar espacio">'+spaces().map(([id,label])=>
       '<button type="button" data-space="'+id+'" aria-pressed="'+String(state.space===id)+'">'+label+'</button>').join("")+'</nav>'+
-    '<div class="workspace">'+credential()+spaceContent()+'</div>';
+    adminRoleNotice()+
+    '<div class="workspace">'+credential()+spaceContent()+'</div>'+
+    sites()+credentialDialog();
   drawQr();
 }
+
 function contactLink(){
   resetCaptcha();
   const phone=state.page==="link-phone";
