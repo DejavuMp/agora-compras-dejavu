@@ -3,10 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#171512">
+  <meta name="theme-color" content="#100f0d">
   <meta name="robots" content="noindex,nofollow">
-  <meta name="description" content="ÁGORA Dejavú · Portal único de identidad.">
-  <title>ÁGORA · Dejavú Marketing</title>
+  <meta name="description" content="ÁGORA Dejavú. Una identidad, tres espacios, tu credencial digital.">
+  <title>ÁGORA · Tu identidad Dejavú</title>
+  <link rel="icon" type="image/png" href="./assets/dejavu-monograma.png">
+  <link rel="preload" href="./assets/dejavu-logo-oficial.png" as="image">
   <link rel="stylesheet" href="./style.css">
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script type="module" src="./app.js"></script>
@@ -14,17 +16,21 @@
 <body>
 <a class="skip" href="#app">Ir al contenido</a>
 <header class="header">
-  <a class="brand" href="./" aria-label="ÁGORA Dejavú Marketing">
-    <span class="brand-symbol">Á</span>
-    <span><strong>ÁGORA</strong><small>DEJAVÚ MARKETING</small></span>
+  <a class="brand" href="./" aria-label="Inicio ÁGORA · Dejavú Marketing">
+    <img class="brand-mark" src="./assets/dejavu-logo-oficial.png" alt="Dejavú Marketing" width="46" height="64">
+    <span class="brand-text"><strong>ÁGORA</strong><small>UNA IDENTIDAD. TRES ESPACIOS.</small></span>
   </a>
-  <div class="session"><span id="session-label">Acceso protegido</span>
-    <button type="button" id="logout" hidden>Cerrar sesión</button>
+  <div class="header-right">
+    <span class="header-led" aria-hidden="true"></span>
+    <span class="header-label">IDENTIDAD ÚNICA</span>
+    <div class="session"><span id="session-label">Acceso protegido</span>
+      <button type="button" id="logout" hidden>Cerrar sesión</button>
+    </div>
   </div>
 </header>
-<div id="system-status" class="status" role="status" aria-live="polite">Conectando con Identidad Dejavú…</div>
-<main id="app"><p class="loading">Abriendo ÁGORA…</p></main>
-<footer>ÁGORA · Identidad única y credencial digital · Dejavú Marketing</footer>
-<noscript>Debes activar JavaScript para entrar a ÁGORA.</noscript>
+<div id="system-status" class="status" role="status" aria-live="polite">Conectando de forma segura con Identidad Dejavú…</div>
+<main id="app"><p class="loading">Preparando tu experiencia ÁGORA…</p></main>
+<footer><span>© DEJAVÚ MARKETING · ÁGORA</span><span>ID único · Credencial digital · Acceso personal</span></footer>
+<noscript>Debes activar JavaScript para acceder a tu credencial digital ÁGORA.</noscript>
 </body>
 </html>

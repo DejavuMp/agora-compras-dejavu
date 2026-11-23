@@ -24,11 +24,25 @@ test("site portable and independent from other systems",async()=>{
   assert.match(js,/new URL\("\.\/verificar\.html",location\.href\)/);
   assert.match(verify,/agora_identity_credentials/);
   assert.match(fire,/agora-dejavu-38b8c/);
-  assert.match(css,/@media\(max-width:540px\)/);
+  assert.ok(css.includes("@media(max-width:580px)"));
+  assert.match(css,/@keyframes orbit/);
+  assert.match(css,/prefers-reduced-motion:reduce/);
+  assert.ok(html.includes('src="./assets/dejavu-logo-oficial.png"'));
+  assert.match(js,/class="brand-stage"/);
+  assert.ok(js.includes('assets/dejavu-logo-oficial.png'));
+  assert.match(js,/class="credential-mark"/);
   assert.doesNotMatch(js,/\.\.\/identidad\/|\.\.\/operaciones\//);
   assert.doesNotMatch(js,/agora_ops_|agora_finance_|agora_records|agora_file_deliveries/);
   assert.doesNotMatch(js,/compras|proveedores|inventario|nomina|nómina|solicitudes externas/i);
 });
+test("official Dejavú assets are bundled for independent hosting",async()=>{
+  for(const filename of ["dejavu-logo-oficial.png","dejavu-horizontal.png","dejavu-monograma.png"]){
+    const bytes=await readFile(new URL("../assets/"+filename,import.meta.url));
+    assert.equal(bytes.subarray(1,4).toString(),"PNG",filename+" must be a real PNG");
+    assert.ok(bytes.byteLength>1000,"Expected the original asset "+filename);
+  }
+});
+
 test("firestore SMS rules are limited to identity and own UID",async()=>{
   const rules=await readFile(new URL("../../firestore.rules",import.meta.url),"utf8");
   assert.match(rules,/function identitySignedIn\(\)/);
