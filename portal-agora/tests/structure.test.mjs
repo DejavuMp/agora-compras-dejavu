@@ -37,6 +37,32 @@ test("inicio autenticado es Mi perfil, sin herramientas, accesos rápidos ni QR 
   assert.match(css,/--profile-bg:#101113/);
 });
 
+test("fotografía real, respaldo por iniciales y navegación basada en iconos",async()=>{
+  const [app,css,html]=await Promise.all([
+    read("app.js"),read("perfil.css"),read("index.html")
+  ]);
+  assert.match(app,/user\?\.photoURL/);
+  assert.match(app,/user\?\.providerData/);
+  assert.match(app,/url\.protocol==="https:"/);
+  assert.match(app,/person-photo--/);
+  assert.match(app,/person-photo-fallback/);
+  assert.match(app,/person-photo-image/);
+  assert.match(app,/Foto de perfil de /);
+  assert.match(app,/Sin foto en Google; se muestran tus iniciales/);
+  assert.match(app,/img\.addEventListener\("error"/);
+  assert.match(app,/profile-space-visual/);
+  assert.match(app,/aria-label="Abrir espacio /);
+  assert.match(app,/profile-space-role/);
+  assert.match(css,/\.person-photo--profile/);
+  assert.match(css,/\.profile-space-link:focus-visible/);
+  assert.match(css,/\.profile-photo-hint/);
+  assert.doesNotMatch(html,/<strong>PORTAL ÁGORA<\/strong>/);
+  for(const route of ["staff","agencia","administrador"]){
+    const routeHTML=await read(route+"/index.html");
+    assert.doesNotMatch(routeHTML,/<strong>ÁGORA<\/strong>/);
+  }
+});
+
 test("las tres páginas tienen ruta propia, etiqueta y regreso al perfil",async()=>{
   const app=await read("app.js");
   for(const path of ["staff","agencia","administrador"]){
