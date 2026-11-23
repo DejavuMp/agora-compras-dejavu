@@ -99,3 +99,31 @@ El portal ÁGORA reutiliza las **colecciones originales** del sitio `/identidad/
 - Si Firestore niega la lectura, aparece un error sin exponer información de terceras personas.
 - Los turnos provienen de `agora_ops_staff/{uid}` y se proyectan con la lógica existente.
 - La gestión centralizada de RH queda pendiente en la implementación original.
+
+
+## Primer enlace funcional por roles: Staff / Coordinación / Administración (23 nov 2026)
+
+Esta etapa conecta las rutas existentes a las **colecciones reales**, con un solo UID e ID Dejavú. No sustituye todavía los marcajes oficiales ni habilita nuevas escrituras fuera de las reglas actuales.
+
+### Staff — `/portal-agora/staff/`
+- Consulta `agora_ops_staff/{uid}` solamente para el titular acreditado. Si no existe su vínculo `agora_ops_members/{uid}` o no hay permiso, muestra diagnóstico sin revelar datos ajenos.
+- Muestra jornadas propias y **varias actividades dentro de una misma jornada** si esas actividades ya están presentes en la ficha. No calcula tiempos de traslado ni muestra datos de nómina, GPS o pagos ajenos.
+- Permite **preparar una propuesta de actividad adicional**, sin límite predeterminado y sin bloquear por hora de inicio. El botón **no guarda en Firebase** hasta habilitar una colección de actividades propia con reglas verificadas; genera un texto que puede copiarse para solicitar su incorporación.
+- Mientras no se porte el sistema de marcajes, mantiene un enlace directo y explícito al **Jornadas / Visor original** para registrar entrada/salida con la autenticación vigente. No crea relojes o marcajes falsos.
+
+### Coordinación — `/portal-agora/agencia/`
+- Solo roles `coordinador` y `admin` activos pueden leer `agora_ops_control/schedule` y ver la agenda administrativa. Cuentas `consulta` conservan un acceso de solo consulta sin solicitar documentos para los que carecen de permisos.
+- Muestra resúmenes y fechas, sin copiar tarifas, nóminas, cuentas bancarias, datos médicos ni GPS.
+- **Asignaciones de jornada:** formulario con solicitante, medio, contacto, fecha de solicitud, proyecto, sede, fecha y horario laboral, personal requerido, descripción, nota de evidencia y **múltiples actividades abiertas** (agregar/eliminar filas sin límite arbitrario).
+- Botón **Preparar borrador** valida y crea un texto exportable para compartir con coordinación. Indica explícitamente **NO GUARDADO / NO AUTORIZADO**. No carga archivos por ahora porque `storage.rules` no incluye ruta privada de evidencia de solicitudes. La carga aparece deshabilitada y explicada.
+- Conserva accesos transitorios al editor original y al control oficial de asistencia; estos continúan protegidos por Firestore.
+
+### Administrador — `/portal-agora/administrador/`
+- Solo cuenta principal con correo verificado e ID activo **y** `agora_users/{uid}.role === "admin"`.
+- Lee el cronograma como administrador y muestra supervisión de jornadas, turnos asignados y solicitudes en borrador, sin sustituir los permisos del editor.
+- No concede roles, aprueba solicitudes, realiza pagos ni modifica la agenda automáticamente.
+
+### Próxima etapa segura: persistencia y evidencias
+Las reglas actuales **no** disponen de una colección para actividades dinámicas por jornada ni de un almacenamiento privado para evidencias (capturas, audio, correos). Implementar ambas con validación de UID, rol, autoría, folio y bloqueo de escalamiento de privilegios; pruebas en emulador Firebase; después verificar el estado de las reglas efectivas en producción y **no sobrescribirlas si difieren de la línea base**. Hasta esa publicación comprobada, mantener los borradores solo para copiar. No eliminar las herramientas antiguas mientras se sigan usando para marcar horarios o publicar asignaciones.
+
+Todo lo anterior es un primer paso real de integración **de lectura** y de navegación por rol; no debe describirse como publicación completa del sistema de solicitudes ni de tareas persistentes.
