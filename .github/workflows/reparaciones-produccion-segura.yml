@@ -152,6 +152,10 @@ jobs:
           service_account: ${{ vars.DEJAVU_FIREBASE_SERVICE_ACCOUNT }}
           token_format: access_token
           access_token_lifetime: "600s"
+      - name: Construir reglas de Firestore preservando todos los permisos reales
+        env:
+          FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
+        run: node .github/firebase-staff/prepare-additive-repair-rules.mjs
       - name: Respaldar y validar reglas activas de Firestore
         env:
           FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
@@ -186,6 +190,10 @@ jobs:
           node-version: "22"
       - name: Instalar Firebase CLI
         run: npm install --global firebase-tools
+      - name: Probar con emulador las reglas fusionadas sin tocar producción
+        run: |
+          npm install --no-save 'firebase@^12.0.0' '@firebase/rules-unit-testing@^5.0.0'
+          firebase emulators:exec --only firestore --project demo-agora-repairs-merge --non-interactive 'node .github/firebase-staff/test-repair-rules.mjs'
       - name: Añadir origen de ÁGORA a CORS conservando todos los existentes
         env:
           FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
