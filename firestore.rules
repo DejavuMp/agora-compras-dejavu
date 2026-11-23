@@ -1437,41 +1437,11 @@ match /agora_finance_requests/{requestId} {
         );
       allow delete: if false;
     }
-    // Invitaciones individuales a proveedores. El token aleatorio de 256 bits
-    // es la única llave pública: sin listados, sin acceso al expediente interno.
-    function validRepairInviteRequest(token) {
-      return canEdit() && token.matches('^[A-Za-z0-9_-]{43}
-      allow get, list: if canEdit();
-      allow create: if repairUser() &&
-        request.resource.data.keys().hasOnly([
-          'requestId','actorUid','actorEmail','action','detail','createdAt'
-        ]) &&
-        request.resource.data.keys().hasAll([
-          'requestId','actorUid','actorEmail','action','detail','createdAt'
-        ]) &&
-        request.resource.data.actorUid == request.auth.uid &&
-        request.resource.data.actorEmail == request.auth.token.email &&
-        request.resource.data.requestId is string &&
-        request.resource.data.action in [
-          'creada','decisión','cotización','selección de cotización','evidencia',
-          'invitación','cotización externa'
-        ] &&
-        request.resource.data.detail is string &&
-        request.resource.data.detail.size() <= 500 &&
-        request.resource.data.createdAt == request.time &&
-        existsAfter(repairRequestPath(request.resource.data.requestId)) &&
-        (canEdit() || getAfter(repairRequestPath(request.resource.data.requestId)).data.createdBy == request.auth.uid);
-      allow update, delete: if false;
-    }
 
-    // Todas las demás colecciones permanecen cerradas.
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
-) &&
+    // Invitación externa por token de 256 bits: única, con caducidad y sin listados.
+    function repairInviteCreate(token) {
+      return canEdit() && token.size() == 43 &&
+        token.matches('[A-Za-z0-9_-]+') &&
         request.resource.data.keys().hasOnly([
           'requestId','snapshot','supplierHint','createdBy','createdAt',
           'updatedAt','expiresAt','status','response','submittedAt'
@@ -1481,37 +1451,7 @@ match /agora_finance_requests/{requestId} {
           'updatedAt','expiresAt','status','response','submittedAt'
         ]) &&
         request.resource.data.requestId is string &&
-        request.resource.data.requestId.matches('^[a-f0-9-]{36}
-      allow get, list: if canEdit();
-      allow create: if repairUser() &&
-        request.resource.data.keys().hasOnly([
-          'requestId','actorUid','actorEmail','action','detail','createdAt'
-        ]) &&
-        request.resource.data.keys().hasAll([
-          'requestId','actorUid','actorEmail','action','detail','createdAt'
-        ]) &&
-        request.resource.data.actorUid == request.auth.uid &&
-        request.resource.data.actorEmail == request.auth.token.email &&
-        request.resource.data.requestId is string &&
-        request.resource.data.action in [
-          'creada','decisión','cotización','selección de cotización','evidencia'
-        ] &&
-        request.resource.data.detail is string &&
-        request.resource.data.detail.size() <= 500 &&
-        request.resource.data.createdAt == request.time &&
-        existsAfter(repairRequestPath(request.resource.data.requestId)) &&
-        (canEdit() || getAfter(repairRequestPath(request.resource.data.requestId)).data.createdBy == request.auth.uid);
-      allow update, delete: if false;
-    }
-
-    // Todas las demás colecciones permanecen cerradas.
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
-) &&
+        request.resource.data.requestId.size() == 36 &&
         exists(repairRequestPath(request.resource.data.requestId)) &&
         request.resource.data.snapshot is map &&
         request.resource.data.snapshot.keys().hasOnly([
@@ -1548,38 +1488,9 @@ match /agora_finance_requests/{requestId} {
         request.resource.data.response == null &&
         request.resource.data.submittedAt == null;
     }
-    function validRepairExternalQuote(token) {
-      return token.matches('^[A-Za-z0-9_-]{43}
-      allow get, list: if canEdit();
-      allow create: if repairUser() &&
-        request.resource.data.keys().hasOnly([
-          'requestId','actorUid','actorEmail','action','detail','createdAt'
-        ]) &&
-        request.resource.data.keys().hasAll([
-          'requestId','actorUid','actorEmail','action','detail','createdAt'
-        ]) &&
-        request.resource.data.actorUid == request.auth.uid &&
-        request.resource.data.actorEmail == request.auth.token.email &&
-        request.resource.data.requestId is string &&
-        request.resource.data.action in [
-          'creada','decisión','cotización','selección de cotización','evidencia'
-        ] &&
-        request.resource.data.detail is string &&
-        request.resource.data.detail.size() <= 500 &&
-        request.resource.data.createdAt == request.time &&
-        existsAfter(repairRequestPath(request.resource.data.requestId)) &&
-        (canEdit() || getAfter(repairRequestPath(request.resource.data.requestId)).data.createdBy == request.auth.uid);
-      allow update, delete: if false;
-    }
-
-    // Todas las demás colecciones permanecen cerradas.
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
-) &&
+    function repairInviteSubmit(token) {
+      return token.size() == 43 &&
+        token.matches('[A-Za-z0-9_-]+') &&
         resource.data.status == 'pending' &&
         resource.data.expiresAt > request.time &&
         request.resource.data.diff(resource.data).affectedKeys()
@@ -1612,50 +1523,19 @@ match /agora_finance_requests/{requestId} {
     }
     match /agora_repair_invites/{token} {
       allow get: if canEdit() ||
-        (token.matches('^[A-Za-z0-9_-]{43}
-      allow get, list: if canEdit();
-      allow create: if repairUser() &&
-        request.resource.data.keys().hasOnly([
-          'requestId','actorUid','actorEmail','action','detail','createdAt'
-        ]) &&
-        request.resource.data.keys().hasAll([
-          'requestId','actorUid','actorEmail','action','detail','createdAt'
-        ]) &&
-        request.resource.data.actorUid == request.auth.uid &&
-        request.resource.data.actorEmail == request.auth.token.email &&
-        request.resource.data.requestId is string &&
-        request.resource.data.action in [
-          'creada','decisión','cotización','selección de cotización','evidencia'
-        ] &&
-        request.resource.data.detail is string &&
-        request.resource.data.detail.size() <= 500 &&
-        request.resource.data.createdAt == request.time &&
-        existsAfter(repairRequestPath(request.resource.data.requestId)) &&
-        (canEdit() || getAfter(repairRequestPath(request.resource.data.requestId)).data.createdBy == request.auth.uid);
-      allow update, delete: if false;
-    }
-
-    // Todas las demás colecciones permanecen cerradas.
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
-) &&
-          resource.data.expiresAt > request.time &&
-          resource.data.status in ['pending','submitted']);
+        (token.size() == 43 && token.matches('[A-Za-z0-9_-]+') &&
+         resource.data.expiresAt > request.time &&
+         resource.data.status in ['pending','submitted']);
       allow list: if canEdit();
-      allow create: if validRepairInviteRequest(token);
-      allow update: if validRepairExternalQuote(token) ||
+      allow create: if repairInviteCreate(token);
+      allow update: if repairInviteSubmit(token) ||
         (canEdit() && resource.data.status in ['pending','submitted'] &&
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status','updatedAt']) &&
-          request.resource.data.status == 'revoked' &&
-          request.resource.data.updatedAt == request.time);
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['status','updatedAt']) &&
+         request.resource.data.status == 'revoked' &&
+         request.resource.data.updatedAt == request.time);
       allow delete: if false;
     }
-
     match /agora_repair_events/{eventId} {
       allow get, list: if canEdit();
       allow create: if repairUser() &&
@@ -1669,7 +1549,8 @@ match /agora_finance_requests/{requestId} {
         request.resource.data.actorEmail == request.auth.token.email &&
         request.resource.data.requestId is string &&
         request.resource.data.action in [
-          'creada','decisión','cotización','selección de cotización','evidencia'
+          'creada','decisión','cotización','selección de cotización','evidencia',
+          'invitación','cotización externa'
         ] &&
         request.resource.data.detail is string &&
         request.resource.data.detail.size() <= 500 &&
