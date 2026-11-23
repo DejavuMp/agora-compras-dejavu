@@ -27,7 +27,7 @@ const withoutOps=candidate.slice(0,opsAt-1)+candidate.slice(endAt);
 const legacy=candidate.slice(0,financeAt)+candidate.slice(endAt);
 const repairMarker="    // ÁGORA · Inventario, mantenimiento y reparaciones.";
 const repairAt=candidate.indexOf(repairMarker);
-assert.ok(repairAt>identityAt&&repairAt<endAt,"El módulo se añade después de Identidad, sin alterar sistemas previos");
+assert.ok(repairAt>clockAt&&repairAt<endAt,"El módulo está aislado antes del cierre, sin modificar módulos previos");
 const beforeRepairs=candidate.slice(0,repairAt)+candidate.slice(endAt);
 const identityMarker="    // AGORA - Identidad Unica y RH. Fragmento para insertar dentro de";
 const identityAt=candidate.indexOf(identityMarker);
