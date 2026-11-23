@@ -33,6 +33,78 @@ service firebase.storage {
         (canEdit() ||
           firestore.get(repairDoc(id)).data.createdBy == request.auth.uid);
     }
+    // Fotografías originales de las piezas: sólo personal autenticado y autorizado.
+    match /agora-repair-assets/{assetId}/{uploaderUid}/{fileName} {
+      allow get: if signedIn() &&
+        fileName.matches('^[a-f0-9-]{36}\\.jpg
+      allow get: if fileName.matches('^[a-f0-9-]{36}\\.jpg
+  }
+}
+) &&
+        canReadRepair(requestId);
+      allow list: if false;
+      allow create: if signedIn() &&
+        fileName.matches('^[a-f0-9-]{36}\\.jpg
+  }
+}
+) &&
+        (request.auth.uid == uploaderUid) &&
+        firestore.exists(repairDoc(requestId)) &&
+        (canEdit() ||
+          firestore.get(repairDoc(requestId)).data.createdBy == request.auth.uid) &&
+        request.resource.size > 0 &&
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType == 'image/jpeg';
+      allow update: if false;
+      allow delete: if canEdit();
+    }
+    match /{allPaths=**} { allow read, write: if false; }
+  }
+}
+) &&
+        firestore.exists(/databases/(default)/documents/agora_repair_assets/$(assetId)) &&
+        (
+          canEdit() ||
+          (firestore.exists(opsMember(request.auth.uid)) &&
+            firestore.get(opsMember(request.auth.uid)).data.active == true &&
+            firestore.get(opsMember(request.auth.uid)).data.role == 'staff')
+        );
+      allow list: if false;
+      allow create: if canEdit() &&
+        request.auth.uid == uploaderUid &&
+        fileName.matches('^[a-f0-9-]{36}\\.jpg
+      allow get: if fileName.matches('^[a-f0-9-]{36}\\.jpg
+  }
+}
+) &&
+        canReadRepair(requestId);
+      allow list: if false;
+      allow create: if signedIn() &&
+        fileName.matches('^[a-f0-9-]{36}\\.jpg
+  }
+}
+) &&
+        (request.auth.uid == uploaderUid) &&
+        firestore.exists(repairDoc(requestId)) &&
+        (canEdit() ||
+          firestore.get(repairDoc(requestId)).data.createdBy == request.auth.uid) &&
+        request.resource.size > 0 &&
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType == 'image/jpeg';
+      allow update: if false;
+      allow delete: if canEdit();
+    }
+    match /{allPaths=**} { allow read, write: if false; }
+  }
+}
+) &&
+        firestore.exists(/databases/(default)/documents/agora_repair_assets/$(assetId)) &&
+        request.resource.size > 0 &&
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType == 'image/jpeg';
+      allow update: if false;
+      allow delete: if canEdit();
+    }
     match /agora-repairs/{requestId}/{uploaderUid}/{fileName} {
       allow get: if fileName.matches('^[a-f0-9-]{36}\\.jpg
   }
