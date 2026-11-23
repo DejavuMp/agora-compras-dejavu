@@ -14,7 +14,7 @@ on:
         default: audit
         options:
           - audit
-          - publish
+          - publish_spark
       project_confirmation:
         description: "Confirma el proyecto agora-dejavu-38b8c"
         required: true
@@ -101,7 +101,7 @@ jobs:
           if-no-files-found: warn
   predeploy-tests:
     name: "Probar respaldos y permisos sin producción"
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.operation == 'publish')
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.operation == 'publish_spark')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -122,10 +122,10 @@ jobs:
           npx firebase emulators:exec --only firestore --project demo-agora-repairs --non-interactive 'node .github/firebase-staff/test-repair-rules.mjs'
       - name: Probar fotografías con Storage de prueba
         run: npx firebase emulators:exec --only firestore,storage --project demo-agora-repairs-storage --non-interactive 'node .github/firebase-staff/test-repair-storage-rules.mjs'
-  activate:
-    name: "Respaldo real, comprobación y activación"
+  activate-spark:
+    name: "Activar SOLO Firestore Spark (sin facturación ni Cloud Storage)"
     needs: predeploy-tests
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.project_confirmation == 'agora-dejavu-38b8c' && inputs.operation == 'publish'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.operation == 'publish_spark' && inputs.project_confirmation == 'agora-dejavu-38b8c'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -135,15 +135,6 @@ jobs:
       FIREBASE_PROJECT_ID: agora-dejavu-38b8c
     steps:
       - uses: actions/checkout@v4
-      - name: Exigir identidad confiable del repositorio
-        env:
-          WIF_PROVIDER: ${{ vars.DEJAVU_FIREBASE_WIF_PROVIDER }}
-          WIF_SERVICE_ACCOUNT: ${{ vars.DEJAVU_FIREBASE_SERVICE_ACCOUNT }}
-        run: |
-          if [ -z "$WIF_PROVIDER" ] || [ -z "$WIF_SERVICE_ACCOUNT" ]; then
-            echo "::error::No hay identidad federada configurada; no se modifica Firebase."
-            exit 1
-          fi
       - id: google_auth
         uses: google-github-actions/auth@v3
         with:
@@ -152,57 +143,32 @@ jobs:
           service_account: ${{ vars.DEJAVU_FIREBASE_SERVICE_ACCOUNT }}
           token_format: access_token
           access_token_lifetime: "600s"
-      - name: Construir reglas de Firestore preservando todos los permisos reales
+      - name: Respaldar Firestore real y preparar reglas aditivas Spark
         env:
           FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
-        run: node .github/firebase-staff/prepare-additive-repair-rules.mjs
-      - name: Respaldar y validar reglas activas de Firestore
-        env:
-          FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
-        run: node .github/firebase-staff/safe-rules-preflight.mjs
-      - name: Respaldar y validar reglas activas de Storage
-        env:
-          FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
-        run: node .github/firebase-staff/safe-storage-preflight.mjs
-      - name: Respaldar CORS vigente, sin modificar bucket
-        env:
-          FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
-        run: node .github/firebase-staff/safe-bucket-cors.mjs
-      - name: Guardar respaldo aunque la comparación haya fallado
-        if: failure()
+        run: node .github/firebase-staff/prepare-spark-firestore-release.mjs
+      - name: Guardar respaldo obligatorio ANTES del despliegue
         uses: actions/upload-artifact@v4
         with:
-          name: respaldo-firestore-ante-deriva-activacion
+          name: respaldo-firestore-spark-antes-de-reparaciones
           path: .github/firebase-staff/.preflight/
           include-hidden-files: true
           retention-days: 1
-          if-no-files-found: warn
-      - name: Almacenar respaldo previo OBLIGATORIO de ambos servicios
-        uses: actions/upload-artifact@v4
-        with:
-          name: respaldo-firebase-reparaciones-preproduccion
-          path: .github/firebase-staff/.preflight/
-          include-hidden-files: true
-          retention-days: 30
           if-no-files-found: error
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Instalar Firebase CLI
-        run: npm install --global firebase-tools
-      - name: Probar con emulador las reglas fusionadas sin tocar producción
-        run: |
-          npm install --no-save 'firebase@^12.0.0' '@firebase/rules-unit-testing@^5.0.0'
-          firebase emulators:exec --only firestore --project demo-agora-repairs-merge --non-interactive 'node .github/firebase-staff/test-repair-rules.mjs'
-      - name: Añadir origen de ÁGORA a CORS conservando todos los existentes
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Instalar herramientas de emulación y publicación
+        run: npm install --no-save 'firebase@^12.0.0' '@firebase/rules-unit-testing@^5.0.0' firebase-tools
+      - name: Probar reglas fusionadas que realmente se van a publicar
+        run: npx firebase emulators:exec --only firestore --project demo-agora-repairs-spark-live --non-interactive 'node .github/firebase-staff/test-repair-rules.mjs'
+      - name: Publicar exclusivamente reglas Firestore, sin Cloud Storage
+        run: npx firebase deploy --only firestore:rules --project agora-dejavu-38b8c --non-interactive
+      - name: Confirmar que las reglas publicadas coinciden con las aprobadas
         env:
           FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
-        run: node .github/firebase-staff/safe-bucket-cors.mjs --apply
-      - name: Publicar SOLO reglas de Storage (no archivos ni datos)
-        run: firebase deploy --only storage --project agora-dejavu-38b8c --non-interactive
-      - name: Publicar SOLO reglas de Firestore (sin migración de datos)
-        run: firebase deploy --only firestore:rules --project agora-dejavu-38b8c --non-interactive
-      - name: Comprobar ambas versiones activas tras desplegar
-        env:
-          FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
-        run: node .github/firebase-staff/verify-repair-release.mjs
+        run: node .github/firebase-staff/prepare-spark-firestore-release.mjs --verify
