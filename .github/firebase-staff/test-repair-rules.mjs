@@ -41,6 +41,21 @@ try{
  await no("staff no inventaría",setDoc(asset(staff),assetData()));
  await yes("coordinación registra pieza",setDoc(asset(coord),assetData()));
  await yes("staff consulta inventario",getDocs(collection(staff,"agora_repair_assets")));
+ const picAsset="a230d5ec-4e3a-4d51-92b2-0d917f43ebc9";
+ const assetImage=doc(coord,"agora_repair_photos",picAsset);
+ const assetBatch=writeBatch(coord);
+ assetBatch.set(assetImage,{
+  id:picAsset,kind:"asset",ownerId:aid,uploadedBy:coordId,
+  dataUrl:"data:image/jpeg;base64,/9j/2Q==",label:"Vista principal",
+  stage:"inventario",createdAt:serverTimestamp()
+ });
+ assetBatch.update(asset(coord),{
+  photoPaths:["firestore:"+picAsset],revision:2,updatedAt:serverTimestamp()
+ });
+ await yes("coordinación guarda foto de inventario sin Storage",assetBatch.commit());
+ await yes("staff consulta foto de pieza autorizada",getDoc(doc(staff,"agora_repair_photos",picAsset)));
+ await no("anónimo no ve foto inventario",getDoc(doc(anon,"agora_repair_photos",picAsset)));
+ await no("no se pueden enumerar fotos de todo ÁGORA",getDocs(collection(staff,"agora_repair_photos")));
  await no("staff no altera inventario",updateDoc(asset(staff),{condition:"Disponible",revision:2,updatedAt:serverTimestamp()}));
  await yes("staff crea solicitud",setDoc(req(staff),payload(staffId)));
  const secondId="aa30d5ec-4e3a-4d51-92b2-0d917f43ebc9";
@@ -60,9 +75,31 @@ try{
  await no("staff no enumera todos los reportes",getDocs(collection(staff,"agora_repair_requests")));
  await no("tercero no ve reporte",getDoc(req(outsider)));
  await no("staff no se autoautoriza",updateDoc(req(staff),{repairRoute:"proveedor",status:"autorizado",revision:2,updatedAt:serverTimestamp()}));
- await yes("staff adjunta evidencia",updateDoc(req(staff),{
-  photos:[{path:"agora-repairs/"+id+"/"+staffId+"/"+pic+".jpg",label:"Panel.jpg"}],
-  revision:2,updatedAt:serverTimestamp()}));
+ const photo=db=>doc(db,"agora_repair_photos",pic);
+ const jpeg="data:image/jpeg;base64,/9j/2Q==";
+ const imageData=(kind,ownerId,uploadedBy,stage="avance")=>({
+  id:pic,kind,ownerId,uploadedBy,dataUrl:jpeg,label:"Panel.jpg",stage,createdAt:serverTimestamp()
+ });
+ await no("foto sin vínculo en folio se rechaza",setDoc(photo(staff),imageData("request",id,staffId)));
+ const evidenceBatch=writeBatch(staff);
+ evidenceBatch.set(photo(staff),imageData("request",id,staffId));
+ evidenceBatch.update(req(staff),{
+  photos:[{path:"firestore:"+pic,label:"Panel.jpg",stage:"avance"}],
+  revision:2,updatedAt:serverTimestamp()
+ });
+ evidenceBatch.set(doc(staff,"agora_repair_events","real-evidence-01"),{
+  requestId:id,actorUid:staffId,actorEmail:email(staffId),
+  action:"evidencia",detail:"Panel.jpg",createdAt:serverTimestamp()
+ });
+ await yes("staff guarda foto Firestore y vincula folio con bitácora atómica",evidenceBatch.commit());
+ await yes("staff consulta su evidencia privada",getDoc(photo(staff)));
+ await no("anónimo no consulta fotos del expediente",getDoc(photo(anon)));
+ await no("otro empleado no consulta fotos ajenas",getDoc(photo(outsider)));
+ await no("nadie puede reemplazar JPEG privado",updateDoc(photo(staff),{dataUrl:"data:image/jpeg;base64,AAAA"}));
+ await no("no es posible crear foto con HTML o archivo sin JPEG",setDoc(
+   doc(staff,"agora_repair_photos","aa1d0d5e-4e3a-4d51-92b2-0d917f43ebc9"),
+   {...imageData("request",id,staffId),id:"aa1d0d5e-4e3a-4d51-92b2-0d917f43ebc9",dataUrl:"data:text/html;base64,AAAA"}
+ ));
  await no("staff no inventa evidencia sin subir foto",setDoc(doc(staff,"agora_repair_events","fake-evidence"),{
   requestId:id,actorUid:staffId,actorEmail:email(staffId),
   action:"evidencia",detail:"Foto falsa",createdAt:serverTimestamp()
