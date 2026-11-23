@@ -36,3 +36,7 @@ const path=folder+"/diagnostico-reglas.json";
 writeFileSync(path,JSON.stringify(result,null,2)+"\n");
 console.log("Informe sin reglas confidenciales en logs: "+path);
 console.log("Esta auditoría NO modifica Firebase ni concede permisos.");
+if(result.collections.some(item=>item.availability!=="respaldo obtenido")){
+ console.error("Auditoría incompleta: no fue posible leer todas las reglas vigentes. Verifica permisos antes de continuar.");
+ process.exitCode=1;
+}
