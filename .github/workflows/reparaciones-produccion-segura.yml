@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - "security/storage-before-reparaciones.rules"
+      - ".github/workflows/reparaciones-produccion-segura.yml"
   workflow_dispatch:
     inputs:
       project_confirmation:
@@ -16,6 +17,31 @@ concurrency:
 permissions:
   contents: read
 jobs:
+  diagnose-oidc:
+    name: "Diagnóstico OIDC de GitHub sin acceder a Google Cloud"
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Mostrar únicamente claims públicos para revisar IAM (nunca el token)
+        run: |
+          python3 - <<'PY'
+          import os,json,base64,urllib.request,urllib.parse
+          url=os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"]
+          audience="//iam.googleapis.com/projects/775680965171/locations/global/workloadIdentityPools/agora-github-actions/providers/github-actions"
+          sep="&" if "?" in url else "?"
+          url+=sep+"audience="+urllib.parse.quote(audience,safe="")
+          req=urllib.request.Request(url,headers={"Authorization":"Bearer "+os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]})
+          with urllib.request.urlopen(req,timeout=15) as res:
+              jwt=json.load(res)["value"]
+          data=jwt.split(".")[1]
+          payload=json.loads(base64.urlsafe_b64decode(data+"="*(-len(data)%4)))
+          for key in ["repository","repository_id","repository_owner","ref","event_name","workflow","workflow_ref","sub","job_workflow_ref","runner_environment"]:
+              print(f"{key}: {payload.get(key,'(sin valor)')}")
+          print("Diagnóstico finalizado: JWT no mostrado ni guardado; ningún recurso Firebase fue consultado.")
+          PY
   predeploy-tests:
     name: "Probar respaldos y permisos sin producción"
     runs-on: ubuntu-latest
@@ -41,7 +67,7 @@ jobs:
   activate:
     name: "Respaldo real, comprobación y activación"
     needs: predeploy-tests
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.project_confirmation == 'agora-dejavu-38b8c')
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.project_confirmation == 'agora-dejavu-38b8c'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
