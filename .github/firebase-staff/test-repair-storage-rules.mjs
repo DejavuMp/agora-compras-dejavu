@@ -12,7 +12,7 @@ const env=await initializeTestEnvironment({
  firestore:{host:"127.0.0.1",port:8080,rules:readFileSync("firestore.rules","utf8")},
  storage:{host:"127.0.0.1",port:9199,rules:readFileSync("storage.rules","utf8")}
 });
-const coordId="coord",staffId="staff",otherId="other";
+const coordId="coord",staffId="staff",otherId="other",assigneeId="assignee";
 const assetId="b130d5ec-4e3a-4d51-92b2-0d917f43ebc9",requestId="d630d5ec-4e3a-4d51-92b2-0d917f43ebc9";
 const filename="fb30d5ec-4e3a-4d51-92b2-0d917f43ebc9.jpg";
 const email=x=>x+"@example.invalid";
@@ -26,12 +26,14 @@ try{
   await setDoc(doc(db,"agora_users",coordId),{name:"Coord",email:email(coordId),role:"coordinador",active:true,createdAt:Timestamp.now(),updatedAt:Timestamp.now()});
   await setDoc(doc(db,"agora_ops_members",staffId),{uid:staffId,email:email(staffId),role:"staff",personId:"staff-1",active:true,updatedAt:Timestamp.now()});
   await setDoc(doc(db,"agora_ops_members",otherId),{uid:otherId,email:email(otherId),role:"staff",personId:"staff-2",active:true,updatedAt:Timestamp.now()});
+  await setDoc(doc(db,"agora_ops_members",assigneeId),{uid:assigneeId,email:email(assigneeId),role:"staff",personId:"staff-3",active:true,updatedAt:Timestamp.now()});
   await setDoc(doc(db,"agora_repair_assets",assetId),{createdBy:coordId});
-  await setDoc(doc(db,"agora_repair_requests",requestId),{createdBy:staffId});
+  await setDoc(doc(db,"agora_repair_requests",requestId),{createdBy:staffId,assignedUid:assigneeId});
  });
  const coordinator=env.authenticatedContext(coordId,{email:email(coordId),email_verified:true}).storage(bucket);
  const staff=env.authenticatedContext(staffId,{email:email(staffId),email_verified:true}).storage(bucket);
  const other=env.authenticatedContext(otherId,{email:email(otherId),email_verified:true}).storage(bucket);
+ const assignee=env.authenticatedContext(assigneeId,{email:email(assigneeId),email_verified:true}).storage(bucket);
  const anon=env.unauthenticatedContext().storage(bucket);
  const assetPath="agora-repair-assets/"+assetId+"/"+coordId+"/"+filename;
  const reportPath="agora-repairs/"+requestId+"/"+staffId+"/"+filename;
@@ -44,6 +46,7 @@ try{
  await yes("coordinación consulta evidencia",getMetadata(ref(coordinator,reportPath)));
  await yes("propietario consulta evidencia",getMetadata(ref(staff,reportPath)));
  await no("otro empleado no ve evidencia",getMetadata(ref(other,reportPath)));
+ await yes("staff asignado consulta evidencia",getMetadata(ref(assignee,reportPath)));
  await no("no se permite sobrescribir evidencia",uploadBytes(ref(staff,reportPath),photo,{contentType:"image/jpeg"}));
  await no("no se permiten fotos sin tipo JPEG",uploadBytes(ref(staff,"agora-repairs/"+requestId+"/"+staffId+"/fb30d5ec-4e3a-4d51-92b2-0d917f43ebca.jpg"),photo,{contentType:"image/png"}));
  await no("staff no borra evidencia",deleteObject(ref(staff,reportPath)));
