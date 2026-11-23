@@ -12,7 +12,7 @@ const payload=creator=>({
  materialLink:"https://example.invalid/planos",dueDate:"2026-12-01",priority:"Alta",
  createdBy:creator,createdByEmail:email(creator),createdByName:"Staff ficticio",
  createdAt:serverTimestamp(),updatedAt:serverTimestamp(),status:"pendiente",
- repairRoute:"pendiente",assignedTo:"",decisionBy:"",decisionNote:"",
+ repairRoute:"pendiente",assignedTo:"",assignedUid:"",decisionBy:"",decisionNote:"",
  estimatedCost:0,quotes:[],selectedQuoteId:"",photos:[],revision:1
 });
 const assetData=()=>({id:aid,project:"Hot Cruji Bravo",stand:"Stand",piece:"Panel frontal",
@@ -28,11 +28,14 @@ try{
     createdAt:Timestamp.now(),updatedAt:Timestamp.now()});
   await setDoc(doc(db,"agora_ops_members",staffId),{uid:staffId,email:email(staffId),role:"staff",
     personId:"persona-uno",active:true,updatedAt:Timestamp.now()});
+  await setDoc(doc(db,"agora_ops_members","asignado-2"),{uid:"asignado-2",email:email("asignado-2"),
+    role:"staff",personId:"persona-dos",active:true,updatedAt:Timestamp.now()});
  });
  const anon=env.unauthenticatedContext().firestore();
  const coord=env.authenticatedContext(coordId,{email:email(coordId),email_verified:true}).firestore();
  const staff=env.authenticatedContext(staffId,{email:email(staffId),email_verified:true}).firestore();
  const outsider=env.authenticatedContext("extra",{email:email("extra"),email_verified:true}).firestore();
+ const assignee=env.authenticatedContext("asignado-2",{email:email("asignado-2"),email_verified:true}).firestore();
  await no("anónimo no lee inventario",getDocs(collection(anon,"agora_repair_assets")));
  await no("externo no inventaría",setDoc(asset(outsider),assetData()));
  await no("staff no inventaría",setDoc(asset(staff),assetData()));
@@ -50,8 +53,22 @@ try{
   revision:2,updatedAt:serverTimestamp()}));
  await no("staff no elimina evidencia",updateDoc(req(staff),{photos:[],revision:3,updatedAt:serverTimestamp()}));
  await yes("coordinación decide la ruta",updateDoc(req(coord),{
-  repairRoute:"agencia",assignedTo:"Taller",status:"reparacion",decisionBy:"Coordinación",
+  repairRoute:"agencia",assignedTo:"Taller",assignedUid:"asignado-2",status:"reparacion",decisionBy:"Coordinación",
   revision:3,updatedAt:serverTimestamp()}));
+ await yes("responsable ve el trabajo asignado",getDoc(req(assignee)));
+ await yes("responsable consulta solo sus asignaciones",getDocs(query(collection(assignee,"agora_repair_requests"),where("assignedUid","==","asignado-2"))));
+ await no("responsable no cambia autorización de coordinación",updateDoc(req(assignee),{
+  status:"entregado",revision:4,updatedAt:serverTimestamp()
+ }));
+ await yes("responsable puede reportar avance",setDoc(doc(assignee,"agora_repair_events","avance-01"),{
+  requestId:id,actorUid:"asignado-2",actorEmail:email("asignado-2"),
+  action:"avance",detail:"Se reparó la base",createdAt:serverTimestamp()
+ }));
+ await yes("responsable consulta su propio movimiento",getDocs(query(collection(assignee,"agora_repair_events"),where("actorUid","==","asignado-2"))));
+ await no("responsable no puede inventar decisiones",setDoc(doc(assignee,"agora_repair_events","fraude-01"),{
+  requestId:id,actorUid:"asignado-2",actorEmail:email("asignado-2"),
+  action:"decisión",detail:"Autorizado falsamente",createdAt:serverTimestamp()
+ }));
  await no("coordinación no altera autoría",updateDoc(req(coord),{
   createdBy:"otro",revision:4,updatedAt:serverTimestamp()}));
  const token="A".repeat(43);
