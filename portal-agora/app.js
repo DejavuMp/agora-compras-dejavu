@@ -15,7 +15,7 @@ const app=document.getElementById("app");
 const status=document.getElementById("system-status");
 const sessionLabel=document.getElementById("session-label");
 const logoutButton=document.getElementById("logout");
-const state={user:null,identity:null,method:"phone",page:"login",space:"",sms:null,captcha:null,loading:false,finishingEmail:false};
+const state={user:null,identity:null,method:"id",page:"login",space:"",sms:null,captcha:null,loading:false,finishingEmail:false};
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const value=v=>String(v??"").trim();
 const safePhone=v=>value(v).replace(/[\s\-().]/g,"");
@@ -210,8 +210,7 @@ function spaceContent(){
     '<div><small>ESTADO</small><b>Vigente</b></div></div>'+
     '<div class="note success">La información de este espacio está asociada a tu credencial. Todavía no incluye actividades, pagos ni otros módulos.</div>'+
     '<hr><p class="help">'+esc(otherOptions.join(" · "))+'</p>'+
-    '<div class="actions">'+(state.user?.phoneNumber?"":'<button type="button" class="btn outline small" data-action="link-phone">Vincular celular</button>')+
-    (state.user?.email?"":'<button type="button" class="btn outline small" data-action="link-email">Vincular correo</button>')+'</div></section>';
+    '</section>';
 }
 function dashboard(){
   resetCaptcha();selectSpace();
