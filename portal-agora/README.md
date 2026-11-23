@@ -68,3 +68,12 @@ Los siguientes recursos visuales se extrajeron del documento de referencia aport
 La página **17** sirvió como referencia del sistema visual y la separación de pantallas. Por decisión de alcance, los espacios siguen mostrando **únicamente ID, credencial, QR y datos básicos de la propia sesión**, sin añadir módulos de trabajo, actividades, pagos ni cotizaciones.
 
 Los archivos WebP son recursos locales de la carpeta, no direcciones de terceros. También se conserva el logotipo original Dejavú de la versión anterior. No se han modificado los usuarios ni las reglas de Firebase como parte de este rediseño visual.
+
+
+## Portada cinematográfica de acceso (aprobada 23 nov 2026)
+
+La portada utiliza `assets/escena-login-agora.webp`, derivada de la imagen original de acceso elegida por Dejavú Marketing. Para que **no se duplique la interfaz que estaba dentro de la imagen**, las zonas centrales con textos y botones se cubrieron al preparar el fondo optimizado. El formulario es HTML real y sigue usando los mismos métodos Firebase (SMS, correo con enlace y Google), la solicitud de ID y la credencial existente.
+
+Se ocultan en portada los cuadros de Agencia, Staff y Administrador; los espacios se muestran solamente después de verificar el ID. La animación CSS es lenta, discreta y respeta `prefers-reduced-motion`. En celulares la composición se adapta a una tarjeta vertical. No se añadió información sobre actividades, pagos ni proveedores.
+
+**Importante:** desplegar HTML/CSS no activa automáticamente los proveedores de Firebase Auth; Phone Auth y Email Link requieren su configuración en la consola y pruebas con cuentas reales.
