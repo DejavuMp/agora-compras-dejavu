@@ -31,6 +31,7 @@ jobs:
       - run: |
           node .github/firebase-staff/test-preflight.mjs
           node .github/firebase-staff/test-storage-preflight.mjs
+          node .github/firebase-staff/test-bucket-cors.mjs
       - name: Probar roles de reparaciones con Firestore de prueba
         run: |
           npm install --no-save 'firebase@^12.0.0' '@firebase/rules-unit-testing@^5.0.0' firebase-tools
@@ -75,6 +76,10 @@ jobs:
         env:
           FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
         run: node .github/firebase-staff/safe-storage-preflight.mjs
+      - name: Respaldar CORS vigente, sin modificar bucket
+        env:
+          FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
+        run: node .github/firebase-staff/safe-bucket-cors.mjs
       - name: Almacenar respaldo previo OBLIGATORIO de ambos servicios
         uses: actions/upload-artifact@v4
         with:
@@ -88,6 +93,10 @@ jobs:
           node-version: "22"
       - name: Instalar Firebase CLI
         run: npm install --global firebase-tools
+      - name: Añadir origen de ÁGORA a CORS conservando todos los existentes
+        env:
+          FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
+        run: node .github/firebase-staff/safe-bucket-cors.mjs --apply
       - name: Publicar SOLO reglas de Storage (no archivos ni datos)
         run: firebase deploy --only storage --project agora-dejavu-38b8c --non-interactive
       - name: Publicar SOLO reglas de Firestore (sin migración de datos)
