@@ -77,3 +77,28 @@ La portada utiliza `assets/escena-login-agora.webp`, derivada de la imagen origi
 Se ocultan en portada los cuadros de Agencia, Staff y Administrador; los espacios se muestran solamente después de verificar el ID. La animación CSS es lenta, discreta y respeta `prefers-reduced-motion`. En celulares la composición se adapta a una tarjeta vertical. No se añadió información sobre actividades, pagos ni proveedores.
 
 **Importante:** desplegar HTML/CSS no activa automáticamente los proveedores de Firebase Auth; Phone Auth y Email Link requieren su configuración en la consola y pruebas con cuentas reales.
+
+
+## Simplificación de acceso: ID Dejavú y Google (23 NOV 2026)
+
+La portada ya no ofrece inicio de sesión por SMS ni enlace de correo.
+Se ven únicamente **Usuario (prefijo visible y fijo `DJV-`) + contraseña** y **Continuar con Google**.
+
+**Por qué se muestra `DJV-` en lugar de `DVM_`:** los IDs permanentes emitidos por Identidad Única están definidos en `identidad/domain.mjs` con formato `DJV-AAAA-NNN`. Cambiar el prefijo crearía cuentas inconsistentes o impediría localizar credenciales anteriores; no se modificaron IDs, UIDs, roles ni datos personales.
+
+### Estado técnico real
+
+- **Google:** sigue conectado al mismo proyecto Firebase Auth `agora-dejavu-38b8c`. Es la única opción de acceso activo de esta portada.
+- **ID + contraseña:** campo visible como diseño definitivo, pero botón de ingreso deshabilitado y mensaje claro hasta que exista un servicio de autenticación real. **No se recoge, envía ni almacena ninguna contraseña** desde esta pantalla.
+- **Solicitar ID:** quien todavía no tiene identidad debe verificar su cuenta con Google antes de enviar la solicitud existente.
+- **No** se habilitarán sign-in mediante credenciales simuladas, contraseñas guardadas en Firestore, lecturas públicas del directorio para transformar ID en correo ni creación silenciosa de un UID nuevo.
+
+### Qué falta para activar ID + contraseña de forma segura
+
+1. Implantar un flujo de **establecimiento de contraseña** vinculado al UID existente tras autenticación acreditada (sin crear otra cuenta).
+2. Crear un **endpoint de autenticación en backend** que resuelva `DJV-AAAA-NNN` de manera privada, valide la contraseña usando Firebase Authentication y emita acceso únicamente al mismo UID; usar App Check, límites de intentos y errores sin enumeración de cuentas.
+3. Probar estados de ID suspendido, sin contraseña, incorrecto y bloqueado, además de los roles Agencia/Staff/Administrador.
+4. Revisar el plan de facturación y configuración de Firebase para el backend; mientras no esté habilitado, mantener el botón desactivado.
+5. Solo tras pruebas reales y despliegue controlado, activar el botón. Google debe seguir funcionando como alternativa.
+
+Esta etapa es **un cambio de interfaz sin migración de credenciales**.
