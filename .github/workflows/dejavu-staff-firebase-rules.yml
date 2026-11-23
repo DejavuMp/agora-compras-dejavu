@@ -55,15 +55,15 @@ jobs:
         run: node .github/firebase-staff/test-preflight.mjs
       - name: Instalar dependencias temporales de test
         run: npm install --no-save 'firebase@^12.0.0' '@firebase/rules-unit-testing@^5.0.0' firebase-tools
+      - name: Probar Inventario y Reparaciones con roles ficticios
+        run: npx firebase emulators:exec --only firestore --project demo-agora-repairs --non-interactive 'node .github/firebase-staff/test-repair-rules.mjs'
+
       - name: Probar accesos de visitantes, personal y coordinadores
         run: npx firebase emulators:exec --only firestore --project demo-dejavu-fichas-staff --non-interactive 'node .github/firebase-staff/test-rules.mjs'
       - name: Probar Finanzas - crear solicitudes, roles, autorizar y pagar
         run: npx firebase emulators:exec --only firestore --project demo-agora-finanzas --non-interactive 'node .github/firebase-staff/test-finance-rules.mjs'
       - name: Probar Operaciones - roles, cronograma, horas y sueldos
         run: npx firebase emulators:exec --only firestore --project demo-agora-ops --non-interactive 'node .github/firebase-staff/test-ops-rules.mjs'
-
-      - name: Probar Inventario y Reparaciones con roles ficticios
-        run: npx firebase emulators:exec --only firestore --project demo-agora-repairs --non-interactive 'node .github/firebase-staff/test-repair-rules.mjs'
 
       - name: Probar Identidad Unica - alta, privacidad, credencial y auditoria
         run: npx firebase emulators:exec --only firestore --project demo-agora-identity --non-interactive 'node .github/firebase-staff/test-identity-rules.mjs'
