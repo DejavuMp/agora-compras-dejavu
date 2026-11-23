@@ -1137,3 +1137,30 @@ body.login-mode .cinema-subtitle{
   .credential.live-credential h2{max-width:100%}
 }
 @media(prefers-reduced-motion:reduce){.site-tile{transition:none}.site-tile:hover{transform:none}}
+
+/* Enlaces rápidos visibles al entrar, antes de la credencial */
+.quick-access{
+ display:flex;align-items:center;flex-wrap:wrap;gap:.55rem;
+ margin:1.15rem 0 1rem;padding:.5rem 0;
+}
+.quick-access>span{
+ color:#cbaa70;font-size:.63rem;letter-spacing:.11em;font-weight:800;
+ margin-right:.5rem;
+}
+.quick-access a{
+ display:inline-flex;align-items:center;justify-content:center;gap:.45rem;
+ padding:.58rem .85rem;
+ color:#f4e5c6;text-decoration:none;
+ border:1px solid rgba(226,186,115,.34);border-radius:999px;
+ background:rgba(226,177,93,.08);font-size:.79rem;font-weight:700;
+ transition:background .15s,border-color .15s;
+}
+.quick-access a:hover,.quick-access a:focus-visible{
+ background:rgba(224,179,99,.21);border-color:#f0c67d;
+}
+.quick-access a span{color:#dcad62}
+@media(max-width:580px){
+ .quick-access{gap:.38rem}
+ .quick-access>span{width:100%;margin:0 0 .2rem}
+ .quick-access a{font-size:.73rem;padding:.53rem .68rem}
+}
