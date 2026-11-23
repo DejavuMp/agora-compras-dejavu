@@ -1437,6 +1437,225 @@ match /agora_finance_requests/{requestId} {
         );
       allow delete: if false;
     }
+    // Invitaciones individuales a proveedores. El token aleatorio de 256 bits
+    // es la única llave pública: sin listados, sin acceso al expediente interno.
+    function validRepairInviteRequest(token) {
+      return canEdit() && token.matches('^[A-Za-z0-9_-]{43}
+      allow get, list: if canEdit();
+      allow create: if repairUser() &&
+        request.resource.data.keys().hasOnly([
+          'requestId','actorUid','actorEmail','action','detail','createdAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'requestId','actorUid','actorEmail','action','detail','createdAt'
+        ]) &&
+        request.resource.data.actorUid == request.auth.uid &&
+        request.resource.data.actorEmail == request.auth.token.email &&
+        request.resource.data.requestId is string &&
+        request.resource.data.action in [
+          'creada','decisión','cotización','selección de cotización','evidencia',
+          'invitación','cotización externa'
+        ] &&
+        request.resource.data.detail is string &&
+        request.resource.data.detail.size() <= 500 &&
+        request.resource.data.createdAt == request.time &&
+        existsAfter(repairRequestPath(request.resource.data.requestId)) &&
+        (canEdit() || getAfter(repairRequestPath(request.resource.data.requestId)).data.createdBy == request.auth.uid);
+      allow update, delete: if false;
+    }
+
+    // Todas las demás colecciones permanecen cerradas.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+) &&
+        request.resource.data.keys().hasOnly([
+          'requestId','snapshot','supplierHint','createdBy','createdAt',
+          'updatedAt','expiresAt','status','response','submittedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'requestId','snapshot','supplierHint','createdBy','createdAt',
+          'updatedAt','expiresAt','status','response','submittedAt'
+        ]) &&
+        request.resource.data.requestId is string &&
+        request.resource.data.requestId.matches('^[a-f0-9-]{36}
+      allow get, list: if canEdit();
+      allow create: if repairUser() &&
+        request.resource.data.keys().hasOnly([
+          'requestId','actorUid','actorEmail','action','detail','createdAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'requestId','actorUid','actorEmail','action','detail','createdAt'
+        ]) &&
+        request.resource.data.actorUid == request.auth.uid &&
+        request.resource.data.actorEmail == request.auth.token.email &&
+        request.resource.data.requestId is string &&
+        request.resource.data.action in [
+          'creada','decisión','cotización','selección de cotización','evidencia'
+        ] &&
+        request.resource.data.detail is string &&
+        request.resource.data.detail.size() <= 500 &&
+        request.resource.data.createdAt == request.time &&
+        existsAfter(repairRequestPath(request.resource.data.requestId)) &&
+        (canEdit() || getAfter(repairRequestPath(request.resource.data.requestId)).data.createdBy == request.auth.uid);
+      allow update, delete: if false;
+    }
+
+    // Todas las demás colecciones permanecen cerradas.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+) &&
+        exists(repairRequestPath(request.resource.data.requestId)) &&
+        request.resource.data.snapshot is map &&
+        request.resource.data.snapshot.keys().hasOnly([
+          'project','asset','area','problem','scope','priority','dueDate','materialLink'
+        ]) &&
+        request.resource.data.snapshot.keys().hasAll([
+          'project','asset','area','problem','scope','priority','dueDate','materialLink'
+        ]) &&
+        request.resource.data.snapshot.project is string &&
+        request.resource.data.snapshot.project.size() <= 120 &&
+        request.resource.data.snapshot.asset is string &&
+        request.resource.data.snapshot.asset.size() <= 120 &&
+        request.resource.data.snapshot.area is string &&
+        request.resource.data.snapshot.area.size() <= 120 &&
+        request.resource.data.snapshot.problem is string &&
+        request.resource.data.snapshot.problem.size() <= 2000 &&
+        request.resource.data.snapshot.scope is string &&
+        request.resource.data.snapshot.scope.size() <= 60 &&
+        request.resource.data.snapshot.priority is string &&
+        request.resource.data.snapshot.priority.size() <= 10 &&
+        request.resource.data.snapshot.dueDate is string &&
+        request.resource.data.snapshot.dueDate.size() <= 10 &&
+        request.resource.data.snapshot.materialLink is string &&
+        request.resource.data.snapshot.materialLink.size() <= 1000 &&
+        request.resource.data.supplierHint is string &&
+        request.resource.data.supplierHint.size() <= 160 &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.expiresAt is timestamp &&
+        request.resource.data.expiresAt > request.time &&
+        request.resource.data.expiresAt <= request.time + duration.value(21,'d') &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.response == null &&
+        request.resource.data.submittedAt == null;
+    }
+    function validRepairExternalQuote(token) {
+      return token.matches('^[A-Za-z0-9_-]{43}
+      allow get, list: if canEdit();
+      allow create: if repairUser() &&
+        request.resource.data.keys().hasOnly([
+          'requestId','actorUid','actorEmail','action','detail','createdAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'requestId','actorUid','actorEmail','action','detail','createdAt'
+        ]) &&
+        request.resource.data.actorUid == request.auth.uid &&
+        request.resource.data.actorEmail == request.auth.token.email &&
+        request.resource.data.requestId is string &&
+        request.resource.data.action in [
+          'creada','decisión','cotización','selección de cotización','evidencia'
+        ] &&
+        request.resource.data.detail is string &&
+        request.resource.data.detail.size() <= 500 &&
+        request.resource.data.createdAt == request.time &&
+        existsAfter(repairRequestPath(request.resource.data.requestId)) &&
+        (canEdit() || getAfter(repairRequestPath(request.resource.data.requestId)).data.createdBy == request.auth.uid);
+      allow update, delete: if false;
+    }
+
+    // Todas las demás colecciones permanecen cerradas.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+) &&
+        resource.data.status == 'pending' &&
+        resource.data.expiresAt > request.time &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status','response','submittedAt','updatedAt']) &&
+        request.resource.data.status == 'submitted' &&
+        request.resource.data.submittedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.response is map &&
+        request.resource.data.response.keys().hasOnly([
+          'provider','email','amount','scope','note','link'
+        ]) &&
+        request.resource.data.response.keys().hasAll([
+          'provider','email','amount','scope','note','link'
+        ]) &&
+        request.resource.data.response.provider is string &&
+        request.resource.data.response.provider.size() > 1 &&
+        request.resource.data.response.provider.size() <= 160 &&
+        request.resource.data.response.email is string &&
+        request.resource.data.response.email.size() <= 240 &&
+        request.resource.data.response.amount is number &&
+        request.resource.data.response.amount >= 0 &&
+        request.resource.data.response.amount <= 99999999 &&
+        request.resource.data.response.scope is string &&
+        request.resource.data.response.scope.size() > 0 &&
+        request.resource.data.response.scope.size() <= 500 &&
+        request.resource.data.response.note is string &&
+        request.resource.data.response.note.size() <= 500 &&
+        request.resource.data.response.link is string &&
+        request.resource.data.response.link.size() <= 1000;
+    }
+    match /agora_repair_invites/{token} {
+      allow get: if canEdit() ||
+        (token.matches('^[A-Za-z0-9_-]{43}
+      allow get, list: if canEdit();
+      allow create: if repairUser() &&
+        request.resource.data.keys().hasOnly([
+          'requestId','actorUid','actorEmail','action','detail','createdAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'requestId','actorUid','actorEmail','action','detail','createdAt'
+        ]) &&
+        request.resource.data.actorUid == request.auth.uid &&
+        request.resource.data.actorEmail == request.auth.token.email &&
+        request.resource.data.requestId is string &&
+        request.resource.data.action in [
+          'creada','decisión','cotización','selección de cotización','evidencia'
+        ] &&
+        request.resource.data.detail is string &&
+        request.resource.data.detail.size() <= 500 &&
+        request.resource.data.createdAt == request.time &&
+        existsAfter(repairRequestPath(request.resource.data.requestId)) &&
+        (canEdit() || getAfter(repairRequestPath(request.resource.data.requestId)).data.createdBy == request.auth.uid);
+      allow update, delete: if false;
+    }
+
+    // Todas las demás colecciones permanecen cerradas.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+) &&
+          resource.data.expiresAt > request.time &&
+          resource.data.status in ['pending','submitted']);
+      allow list: if canEdit();
+      allow create: if validRepairInviteRequest(token);
+      allow update: if validRepairExternalQuote(token) ||
+        (canEdit() && resource.data.status in ['pending','submitted'] &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status','updatedAt']) &&
+          request.resource.data.status == 'revoked' &&
+          request.resource.data.updatedAt == request.time);
+      allow delete: if false;
+    }
+
     match /agora_repair_events/{eventId} {
       allow get, list: if canEdit();
       allow create: if repairUser() &&
