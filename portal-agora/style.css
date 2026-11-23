@@ -950,3 +950,40 @@ body.login-mode .cinema-content{gap:1.25rem}
   }
   body.login-mode .cinema-subtitle span{flex-basis:12px}
 }
+
+
+/* Marca auténtica con canal alfa del press kit; no usar 'screen' con WebP transparente. */
+body.login-mode .cinema-brand img[src$="agora-wordmark-transparent.webp"]{
+  mix-blend-mode:normal;
+  background:transparent;
+  width:min(408px,82vw);
+  max-width:min(408px,82vw);
+  height:auto;
+  border:0;
+  box-shadow:none;
+  filter:drop-shadow(0 0 9px rgba(237,189,109,.2));
+}
+body.login-mode .cinema-brand{
+  gap:.65rem;
+  margin-bottom:.5rem;
+}
+body.login-mode .cinema-subtitle{
+  position:relative;
+  isolation:isolate;
+  margin-top:0;
+  line-height:1.45;
+  max-width:min(590px,92vw);
+}
+@media(max-width:700px){
+  body.login-mode .cinema-brand img[src$="agora-wordmark-transparent.webp"]{
+    width:min(340px,81vw);
+    max-width:min(340px,81vw);
+  }
+  body.login-mode .cinema-brand{gap:.44rem}
+}
+@media(max-width:400px){
+  body.login-mode .cinema-brand img[src$="agora-wordmark-transparent.webp"]{
+    width:min(289px,82vw);
+    max-width:min(289px,82vw);
+  }
+}
