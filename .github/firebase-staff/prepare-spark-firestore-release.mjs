@@ -44,18 +44,34 @@ if(process.argv.includes("--verify")){
  if(!publishedHash||sha256(live)!==publishedHash)throw Error("Las reglas publicadas no coinciden con la versión preparada.");
  console.log("Firestore real verificado: ampliación Spark coincide con la versión aprobada.");
 }else{
- if(sha256(live)!==liveBaseline)throw Error("Las reglas reales cambiaron desde el respaldo del 23/11: detener, no sobrescribir.");
- if(live.includes(marker)||live.includes("match /agora_repair_photos/{id}"))throw Error("Ya existe otro bloque: reconciliación requerida");
- const merged=live.slice(0,sep)+fragment+live.slice(sep);
- if(!merged.startsWith(live.slice(0,sep))||!merged.endsWith(live.slice(sep)))
-   throw Error("Se detectó alteración fuera del módulo");
  const folder=".github/firebase-staff/.preflight";
  mkdirSync(folder,{recursive:true});
  writeFileSync(folder+"/antes-firestore-spark.rules",live,"utf8");
  writeFileSync(folder+"/release-firestore-spark.txt",release.rulesetName+"\n","utf8");
+ const atLive=live.indexOf(marker);
+ let merged,mode;
+ if(atLive>=0){
+  // Idempotencia: una segunda ejecución no debe intentar reemplazar una
+  // instalación que ya se comprobó y publicó.
+  if(live.indexOf(marker,atLive+1)!==-1||atLive>=sep||
+    live.slice(atLive,sep)!==fragment){
+    throw Error("Hay un módulo Reparaciones distinto al revisado: detener sin sobrescribir.");
+  }
+  merged=live;mode="already_installed";
+  console.log("Reparaciones Spark ya está publicado con el bloque exacto. No se modificará Firebase.");
+ }else{
+  if(sha256(live)!==liveBaseline){
+   throw Error("Las reglas actuales no son la base auditada y aún no incluyen el módulo. Revisar antes de escribir.");
+  }
+  merged=live.slice(0,sep)+fragment+live.slice(sep);
+  if(!merged.startsWith(live.slice(0,sep))||!merged.endsWith(live.slice(sep)))
+    throw Error("Se detectó alteración fuera del módulo");
+  mode="deploy";
+  console.log("Reglas aditivas Spark preparadas. La versión original permanece respaldada.");
+ }
  writeFileSync("firestore.rules",merged,"utf8");
  const digest=sha256(merged);
- if(process.env.GITHUB_ENV)appendFileSync(process.env.GITHUB_ENV,"AGORA_SPARK_EXPECTED_SHA256="+digest+"\n");
- console.log("Reglas aditivas Spark preparadas. Firestore real permanece sin cambios.");
- console.log("Se guardó el respaldo anterior para subirlo como artefacto obligatorio.");
+ if(process.env.GITHUB_ENV)appendFileSync(process.env.GITHUB_ENV,
+   "AGORA_SPARK_EXPECTED_SHA256="+digest+"\nAGORA_SPARK_ACTION="+mode+"\n");
+ console.log("Modo seguro: "+mode+". Respaldo completo preparado como artefacto obligatorio.");
 }
