@@ -53,3 +53,18 @@ node --test portal-agora/tests/*.test.mjs
 La CI de reglas Firebase existente prueba también Finanzas y Operaciones para prevenir regresiones, aunque **ningún módulo de ellos se incorpora al portal**.
 
 **No publicar ni redirigir la portada antigua** hasta realizar pruebas reales de Firebase y crear el repositorio y dominio aprobados.
+
+
+## Identidad visual del archivo «Portal Dejavú press.pdf»
+
+Los siguientes recursos visuales se extrajeron del documento de referencia aportado por Dejavú Marketing, conservando su composición original y adaptando sus dimensiones a la web:
+
+- `assets/pdf-hero.webp` — imagen «ÁGORA / Ecosistema Central» de la página **18**, fondo del acceso.
+- `assets/pdf-zeus.webp` — imagen clásica oscura con órbitas doradas de la página **4**, utilizada en la credencial.
+- `assets/pdf-agora-icon.webp` y `assets/pdf-agora-wordmark.webp` — identidad del portal completo, página **13**.
+- `assets/pdf-staff-icon.webp` — icono de Staff, página **14**.
+- `assets/pdf-agency-icon.webp` — icono Operaciones Agencia, página **16**.
+
+La página **17** sirvió como referencia del sistema visual y la separación de pantallas. Por decisión de alcance, los espacios siguen mostrando **únicamente ID, credencial, QR y datos básicos de la propia sesión**, sin añadir módulos de trabajo, actividades, pagos ni cotizaciones.
+
+Los archivos WebP son recursos locales de la carpeta, no direcciones de terceros. También se conserva el logotipo original Dejavú de la versión anterior. No se han modificado los usuarios ni las reglas de Firebase como parte de este rediseño visual.
