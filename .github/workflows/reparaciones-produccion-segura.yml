@@ -166,8 +166,12 @@ jobs:
         run: npm install --no-save 'firebase@^12.0.0' '@firebase/rules-unit-testing@^5.0.0' firebase-tools
       - name: Probar reglas fusionadas que realmente se van a publicar
         run: npx firebase emulators:exec --only firestore --project demo-agora-repairs --non-interactive 'node .github/firebase-staff/test-repair-rules.mjs'
-      - name: Publicar exclusivamente reglas Firestore, sin Cloud Storage
+      - name: Publicar exclusivamente reglas Firestore cuando falte el módulo
+        if: env.AGORA_SPARK_ACTION == 'deploy'
         run: npx firebase deploy --only firestore:rules --project agora-dejavu-38b8c --non-interactive
+      - name: Confirmar que las reglas ya estaban activadas (sin republicar)
+        if: env.AGORA_SPARK_ACTION == 'already_installed'
+        run: echo "Reparaciones Spark ya estaba activado. Sin nuevas escrituras en Firebase."
       - name: Confirmar que las reglas publicadas coinciden con las aprobadas
         env:
           FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
