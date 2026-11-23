@@ -203,6 +203,7 @@ function credentialDialog(){
       '<button type="button" data-action="close-credential" aria-label="Cerrar">×</button></div>'+
     '<div class="credential-face">'+
       '<img src="'+esc(iconSrc("logo-agora-hq.webp"))+'" alt="ÁGORA Dejavú Marketing" class="credential-logo">'+
+      '<div class="credential-photo-wrap">'+photoMarkup("credential")+'</div>'+
       '<span class="profile-kicker">Identidad Dejavú</span>'+
       '<h2 id="credential-dialog-title">'+esc(name())+'</h2>'+
       '<p>'+esc(job())+'</p><strong class="credential-number">'+esc(id())+'</strong>'+
@@ -228,44 +229,94 @@ function drawQr(){
     correctLevel:window.QRCode.CorrectLevel.M
   });
 }
+// La fotografía es REAL y procede de Firebase Auth / proveedor Google.
+// No se dibujan retratos ficticios ni se guardan imágenes en Firestore.
+function profilePhotoUrl(){
+  const user=state.user;
+  const sources=[user?.photoURL,...(user?.providerData||[]).map(p=>p.photoURL)];
+  for(const source of sources){
+    try{
+      if(!source)continue;
+      const url=new URL(source);
+      if(url.protocol==="https:")return url.href;
+    }catch{ /* La foto no es una URL HTTPS válida. */ }
+  }
+  return "";
+}
+function profileInitials(){
+  const words=name().split(/\s+/).filter(Boolean);
+  return words.slice(0,2).map(w=>w.charAt(0)).join("").toLocaleUpperCase("es-MX")||"DV";
+}
+function photoMarkup(kind="profile"){
+  const source=profilePhotoUrl();
+  const label=esc(name());
+  return '<div class="person-photo person-photo--'+kind+'">'+
+    '<span class="person-photo-fallback" aria-hidden="true">'+esc(profileInitials())+'</span>'+
+    (source?'<img class="person-photo-image" src="'+esc(source)+
+      '" alt="Foto de perfil de '+label+'" referrerpolicy="no-referrer" decoding="async">':"")+
+  '</div>';
+}
+function prepareProfilePhotos(){
+  app.querySelectorAll(".person-photo-image").forEach(img=>{
+    img.addEventListener("error",()=>img.remove(),{once:true});
+    if(img.complete&&!img.naturalWidth)img.remove();
+  });
+}
 function pageShell(){
-  const icon=allowed("administrador")?"icono-administrador-hq.webp":
-    allowed("agencia")?"icono-agencia-hq.webp":"icono-staff-hq.webp";
   return '<div class="profile-identity">'+
-    '<img class="profile-avatar" src="'+esc(iconSrc(icon))+'" alt="" width="72" height="72">'+
-    '<div><div class="profile-kicker">Mi cuenta</div>'+
-      '<strong>'+esc(name())+'</strong>'+
-      '<span>'+esc(job())+'</span></div></div>';
+    photoMarkup()+
+    '<div class="profile-person">'+
+      '<div class="profile-identity-label"><span class="identity-dot" aria-hidden="true"></span> IDENTIDAD ACREDITADA</div>'+
+      '<h2>'+esc(name())+'</h2>'+
+      '<p>'+esc(job())+'</p>'+
+    '</div></div>';
 }
 function profile(){
   const fields=[
-    ["Nombre",name()],
     ["ID Dejavú",id()||"No registrado"],
-    ["Puesto",job()],
-    ["Correo",email()],
-    ["Acreditación",verifiedId()?"Vigente":"En revisión"]
+    ["Correo electrónico",email()],
+    ["Estado","Vigente"]
   ];
+  // Los nombres Staff y Agencia ya forman parte de los iconos oficiales.
+  // Por accesibilidad, cada tarjeta conserva un nombre descriptivo accesible.
   const cards=spaces().map(([key,meta])=>
-    '<a class="profile-space-link" href="'+esc(href(key+"/"))+'">'+
-      '<img src="'+esc(iconSrc(meta.icon))+'" alt="" width="58" height="58">'+
-      '<span><strong>'+meta.title+'</strong><small>Entrar al espacio</small></span>'+
-      '<span class="profile-space-arrow" aria-hidden="true">›</span></a>').join("");
+    '<a class="profile-space-link" href="'+esc(href(key+"/"))+
+      '" aria-label="Abrir espacio '+esc(meta.title)+'">'+
+      '<span class="profile-space-visual"><img src="'+esc(iconSrc(meta.icon))+
+         '" alt="" width="92" height="92" loading="lazy"></span>'+
+      (key==="administrador"?'<span class="profile-space-role">Administrador</span>':"")+
+      '<span class="profile-space-action" aria-hidden="true">Entrar <span>↗</span></span>'+
+    '</a>').join("");
   app.innerHTML='<section class="profile-page" aria-label="Mi perfil">'+
-    '<header class="profile-heading"><div><div class="profile-kicker">ÁGORA · Dejavú Marketing</div>'+
-      '<h1>Mi perfil</h1><p>Tu información de identidad, en un solo lugar.</p></div>'+
-      '<span class="profile-status"><span aria-hidden="true"></span> Acreditación vigente</span></header>'+
-    '<div class="profile-layout"><section class="profile-main">'+
-      pageShell()+
-      '<dl class="profile-fields">'+fields.map(([label,val])=>
-        '<div><dt>'+esc(label)+'</dt><dd>'+esc(val)+'</dd></div>').join("")+'</dl>'+
-      '<button class="profile-button profile-button-outline" type="button" data-action="open-credential">Ver credencial digital</button>'+
-    '</section><section class="profile-spaces"><div class="profile-section-top">'+
-      '<h2>Mis espacios</h2><p>Solo los que tienes autorizados.</p></div>'+
-      '<nav aria-label="Espacios autorizados" class="profile-space-list">'+cards+'</nav>'+
-    '</section></div>'+
+    '<header class="profile-heading">'+
+      '<div><div class="profile-kicker">MI CUENTA DEJAVÚ</div>'+
+        '<h1>Mi perfil</h1><p>Tu identidad y tus espacios, en un mismo lugar.</p></div>'+
+      '<span class="profile-id-label">'+esc(id())+'</span>'+
+    '</header>'+
+    '<div class="profile-layout">'+
+      '<section class="profile-main" aria-labelledby="profile-data-heading">'+
+        '<h2 id="profile-data-heading" class="sr-only">Información de mi perfil</h2>'+
+        pageShell()+
+        '<dl class="profile-fields">'+fields.map(([label,val])=>
+          '<div><dt>'+esc(label)+'</dt><dd>'+esc(val)+'</dd></div>').join("")+'</dl>'+
+        '<div class="profile-actions"><button class="profile-button profile-button-primary" type="button" data-action="open-credential">'+
+          'Ver mi credencial <span aria-hidden="true">↗</span></button>'+
+          '<span class="profile-photo-hint">'+(profilePhotoUrl()?
+            "Fotografía de tu cuenta Google":
+            "Sin foto en Google; se muestran tus iniciales")+'</span>'+
+        '</div>'+
+      '</section>'+
+      '<section class="profile-spaces" aria-labelledby="profile-spaces-heading">'+
+        '<div class="profile-section-top"><h2 id="profile-spaces-heading">Mis espacios</h2>'+
+        '<p>Selecciona el área que deseas abrir.</p></div>'+
+        '<nav aria-label="Mis espacios autorizados" class="profile-space-list">'+cards+'</nav>'+
+      '</section>'+
+    '</div>'+
     credentialDialog()+
   '</section>';
+  prepareProfilePhotos();
 }
+
 function routeDenied(unauthenticated=false){
   app.innerHTML='<section class="empty-space-page">'+
     '<img src="'+esc(iconSrc("logo-agora-hq.webp"))+'" alt="ÁGORA" class="empty-space-brand">'+
@@ -342,7 +393,7 @@ app.addEventListener("click",event=>{
     const modal=document.getElementById("credential-dialog");
     if(!modal)return;
     if(modal.showModal)modal.showModal();else modal.setAttribute("open","");
-    drawQr();return;
+    drawQr();prepareProfilePhotos();return;
   }
   if(task==="close-credential"){
     const modal=document.getElementById("credential-dialog");
