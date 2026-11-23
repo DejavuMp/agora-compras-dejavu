@@ -1281,7 +1281,7 @@ match /agora_finance_requests/{requestId} {
         'id','assetId','project','asset','scope','area','cause','problem','solutionMode',
         'instructions','materialLink','dueDate','priority','createdBy',
         'createdByEmail','createdByName','createdAt','updatedAt','status',
-        'repairRoute','assignedTo','decisionBy','decisionNote','estimatedCost',
+        'repairRoute','assignedTo','assignedUid','decisionBy','decisionNote','estimatedCost',
         'quotes','selectedQuoteId','photos','revision'
       ];
     }
@@ -1330,6 +1330,8 @@ match /agora_finance_requests/{requestId} {
         ] &&
         request.resource.data.assignedTo is string &&
         request.resource.data.assignedTo.size() <= 160 &&
+        request.resource.data.assignedUid is string &&
+        request.resource.data.assignedUid.size() <= 128 &&
         request.resource.data.decisionBy is string &&
         request.resource.data.decisionBy.size() <= 120 &&
         request.resource.data.decisionNote is string &&
@@ -1400,7 +1402,9 @@ match /agora_finance_requests/{requestId} {
       allow delete: if false;
     }
     match /agora_repair_requests/{id} {
-      allow get, list: if canEdit() || (opsStaff() && resource.data.createdBy == request.auth.uid);
+      allow get, list: if canEdit() || (opsStaff() && (
+        resource.data.createdBy == request.auth.uid ||
+        resource.data.assignedUid == request.auth.uid));
       allow create: if repairUser() &&
         id.matches('^[a-f0-9-]{36}$') &&
         repairDocumentValid(id) &&
@@ -1412,6 +1416,7 @@ match /agora_finance_requests/{requestId} {
         request.resource.data.status == 'pendiente' &&
         request.resource.data.repairRoute == 'pendiente' &&
         request.resource.data.assignedTo == '' &&
+        request.resource.data.assignedUid == '' &&
         request.resource.data.decisionBy == '' &&
         request.resource.data.decisionNote == '' &&
         request.resource.data.estimatedCost == 0 &&
@@ -1427,7 +1432,8 @@ match /agora_finance_requests/{requestId} {
         request.resource.data.revision == resource.data.revision + 1 &&
         (
           canEdit() ||
-          (opsStaff() && resource.data.createdBy == request.auth.uid &&
+          (opsStaff() && (resource.data.createdBy == request.auth.uid ||
+              resource.data.assignedUid == request.auth.uid) &&
             request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['photos','revision','updatedAt']) &&
             request.resource.data.photos.size() == resource.data.photos.size() + 1 &&
@@ -1537,7 +1543,7 @@ match /agora_finance_requests/{requestId} {
       allow delete: if false;
     }
     match /agora_repair_events/{eventId} {
-      allow get, list: if canEdit();
+      allow get, list: if canEdit() || (opsStaff() && resource.data.actorUid == request.auth.uid);
       allow create: if repairUser() &&
         request.resource.data.keys().hasOnly([
           'requestId','actorUid','actorEmail','action','detail','createdAt'
@@ -1550,13 +1556,16 @@ match /agora_finance_requests/{requestId} {
         request.resource.data.requestId is string &&
         request.resource.data.action in [
           'creada','decisión','cotización','selección de cotización','evidencia',
-          'invitación','cotización externa'
+          'invitación','cotización externa','avance'
         ] &&
         request.resource.data.detail is string &&
         request.resource.data.detail.size() <= 500 &&
         request.resource.data.createdAt == request.time &&
         existsAfter(repairRequestPath(request.resource.data.requestId)) &&
-        (canEdit() || getAfter(repairRequestPath(request.resource.data.requestId)).data.createdBy == request.auth.uid);
+        (canEdit() || (opsStaff() &&
+           request.resource.data.action in ['creada','evidencia','avance'] &&
+           (getAfter(repairRequestPath(request.resource.data.requestId)).data.createdBy == request.auth.uid ||
+            getAfter(repairRequestPath(request.resource.data.requestId)).data.assignedUid == request.auth.uid)));
       allow update, delete: if false;
     }
 
