@@ -102,3 +102,16 @@ Se ven únicamente **Usuario (prefijo visible y fijo `DJV-`) + contraseña** y *
 5. Solo tras pruebas reales y despliegue controlado, activar el botón. Google debe seguir funcionando como alternativa.
 
 Esta etapa es **un cambio de interfaz sin migración de credenciales**.
+
+
+## Reparación visual y operativa del espacio autenticado (23 NOV 2026)
+
+Este ajuste responde a la revisión real del usuario de `/portal-agora/`:
+
+- **Credencial real:** nombres, ID, cargo y vigencia consultados de `agora_identity_registry`; token opaco `credentialId` para URL `verificar.html?id=...`; código QR generado en tiempo de ejecución, botón para abrir una credencial ampliada y enlace individual para compartir/verificar. No es una fotografía estática de una credencial ni se generan IDs artificiales.
+- **Herramientas existentes:** se incorporan accesos directos a `Operaciones`, `Compras`, `Recursos`, `Archivos`, `Fichas`, `Identidad` y el `Visor de jornadas` del repositorio actual. Se muestran por espacio acreditado; no se importan ni duplican módulos, ni se sustituyen las reglas de cada herramienta.
+- **Cuenta administradora:** si `admi.agora@gmail.com` ve únicamente Staff, el portal explica que requiere `agora_users/{uid}.role == 'admin'` y `active == true`, además de la cuenta verificada y credencial vigente. Se facilita copiar el UID de la sesión para comprobarlo en Firebase Console. **No se autoconceden permisos por correo ni se modifica Firestore desde el portal.**
+- **Identidad visual HQ:** se sustituyen en la zona autenticada los recursos PNG/WebP extraídos en baja resolución por recursos oficiales originales con transparencia: logo del usuario `1772×660`, icono Staff `886×886`, icono Operaciones Agencia `886×886`, icono ÁGORA `1772×1772`. Todo queda empaquetado en `portal-agora/assets/`.
+- **Acceso previo al portal:** sin cambios. Google permanece como el método operativo; ID/contraseña continúa pendiente de su backend seguro.
+
+Antes de asumir que la cuenta administradora puede acceder, **verificar el UID y el rol de esa cuenta en Firestore**. No se ha realizado una actualización del registro de producción desde este cambio.
