@@ -46,3 +46,18 @@ node --test portal-agora/tests/*.test.mjs
 Las pruebas de estructura cubren las tres rutas, el comportamiento de la credencial, los permisos y la exclusión de enlaces operativos. Las pruebas automatizadas no equivalen a una validación interactiva con usuarios reales en Firebase; realizar esa validación antes de afirmar que el acceso está probado en producción.
 
 No modificar datos ni reglas de Firebase para este rediseño de interfaz.
+
+
+## Mejoras visuales de Mi perfil (23 nov 2026)
+
+Se aplica el diseño guiado por la captura compartida por Dejavú Marketing:
+
+- **Foto personal de la cuenta real:** se intenta usar `Firebase Auth.currentUser.photoURL` y, como alternativa, la fotografía del proveedor de acceso Google vinculado. Solo se aceptan URLs HTTPS. Si no hay foto disponible o falla su carga, aparece un círculo con las iniciales del nombre, sin inventar una fotografía ni publicar material privado.
+- **Encabezado limpio:** se retira el texto «PORTAL ÁGORA» junto al logotipo porque ya figura en el recurso oficial. El enlace del logotipo conserva nombre accesible y navegación a Mi perfil.
+- **Navegación por iconografía aprobada:** Staff y Agencia presentan sus iconos con el nombre ya impreso dentro de la imagen y un gesto discreto «Entrar»; no se duplica el rótulo. Administrador mantiene el texto «Administrador» porque su símbolo de ÁGORA no lo identifica por sí solo. Cada enlace incorpora su nombre completo accesible mediante `aria-label`.
+- **Legibilidad:** los textos son más grandes, aumenta el área táctil de botones, el foco de teclado es visible, existen diseños adaptables y se respeta la preferencia por movimiento reducido.
+- **Credencial digital:** la foto verificada también aparece en la vista privada de credencial cuando está disponible, junto con el QR de verificación ya existente; el QR sigue oculto en Mi perfil.
+
+**La foto no se sube todavía a un almacén propio de ÁGORA.** El archivo `storage.rules` actual no concede escritura de fotografías de perfil; modificarlo o publicar reglas nuevas sin un flujo probado de subida y permisos no sería seguro. El usuario podrá configurar su fotografía en la cuenta Google asociada y actualizar su sesión para verla en ÁGORA. No se crean ni se modifican documentos de Firestore.
+
+El resto permanece sin cambios: tres espacios iniciales vacíos, sin herramientas ni módulos añadidos.
