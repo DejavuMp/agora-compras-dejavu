@@ -435,6 +435,32 @@ app.addEventListener("click",event=>{
   }
   const btn=event.target.closest("[data-action]");if(!btn)return;
   const task=btn.dataset.action;
+  if(task==="open-credential"){
+    const dialog=document.getElementById("credential-dialog");
+    if(!dialog)return;
+    if(typeof dialog.showModal==="function")dialog.showModal();
+    else dialog.setAttribute("open","");
+    drawQr();return;
+  }
+  if(task==="close-credential"){
+    const dialog=document.getElementById("credential-dialog");
+    if(dialog?.close)dialog.close();else dialog?.removeAttribute("open");
+    return;
+  }
+  if(task==="copy-uid"){
+    if(!state.user?.uid)return;
+    return action(async()=>{await navigator.clipboard.writeText(state.user.uid)},
+      "UID copiado. Puedes consultarlo en Firebase.");
+  }
+  if(task==="share-credential"){
+    const url=credentialVerificationLink();
+    if(!url)return message("La credencial no dispone de un token válido.","error");
+    return action(async()=>{
+      const data={title:"ÁGORA · Verificación de credencial",url};
+      if(navigator.share){try{await navigator.share(data);return}catch(e){if(e.name==="AbortError")return}}
+      await navigator.clipboard.writeText(url);
+    },"Enlace individual de verificación listo para compartir.");
+  }
   if(task==="google")return action(google,"Autenticación de Google solicitada.");
   if(task==="retry")return action(refresh);
   if(task==="request"||task==="login"){state.page=task;render();return}
