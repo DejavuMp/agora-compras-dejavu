@@ -45,7 +45,7 @@ const principalAdmin=()=>state.user?.email?.toLowerCase()===ADMIN_EMAIL&&
 const allowed=key=>{
   if(!verifiedId())return false;
   if(key==="staff")return true;
-  if(key==="agencia")return ["admin","coordinador","consulta"].includes(role());
+  if(key==="agencia")return state.user?.emailVerified===true&&["admin","coordinador","consulta"].includes(role());
   if(key==="administrador")return principalAdmin()&&role()==="admin";
   return false;
 };
@@ -65,10 +65,15 @@ const errorText=e=>{
 async function run(fn,success=""){
   if(state.busy)return;
   state.busy=true;
-  document.querySelectorAll("button").forEach(button=>button.disabled=true);
+  const buttons=[...document.querySelectorAll("button")];
+  const wasDisabled=buttons.map(button=>button.disabled);
+  buttons.forEach(button=>button.disabled=true);
   try{await fn();if(success)notice(success,"ok")}
   catch(e){console.error(e);notice(errorText(e),"error")}
-  finally{state.busy=false;document.querySelectorAll("button").forEach(button=>button.disabled=false)}
+  finally{
+    state.busy=false;
+    buttons.forEach((button,i)=>{button.disabled=wasDisabled[i]});
+  }
 }
 function renderLogin(){
   document.body.classList.add("login-mode");
