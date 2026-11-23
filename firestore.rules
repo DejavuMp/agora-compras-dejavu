@@ -1278,7 +1278,7 @@ match /agora_finance_requests/{requestId} {
     }
     function repairAllowedFields() {
       return [
-        'id','project','asset','scope','area','cause','problem','solutionMode',
+        'id','assetId','project','asset','scope','area','cause','problem','solutionMode',
         'instructions','materialLink','dueDate','priority','createdBy',
         'createdByEmail','createdByName','createdAt','updatedAt','status',
         'repairRoute','assignedTo','decisionBy','decisionNote','estimatedCost',
@@ -1289,6 +1289,8 @@ match /agora_finance_requests/{requestId} {
       return request.resource.data.keys().hasOnly(repairAllowedFields()) &&
         request.resource.data.keys().hasAll(repairAllowedFields()) &&
         request.resource.data.id == id &&
+        request.resource.data.assetId is string &&
+        request.resource.data.assetId.size() <= 36 &&
         request.resource.data.project is string &&
         request.resource.data.project.size() > 0 &&
         request.resource.data.project.size() <= 120 &&
@@ -1343,6 +1345,143 @@ match /agora_finance_requests/{requestId} {
         request.resource.data.photos.size() <= 12 &&
         request.resource.data.revision is int &&
         request.resource.data.revision >= 1;
+    }
+    // Inventario de piezas reutilizables, accesible solo a ÁGORA autorizado.
+    function repairAssetValid(id) {
+      return request.resource.data.keys().hasOnly([
+        'id','project','stand','piece','description','materialLink','condition',
+        'photoPaths','createdBy','createdAt','updatedAt','revision'
+      ]) &&
+      request.resource.data.keys().hasAll([
+        'id','project','stand','piece','description','materialLink','condition',
+        'photoPaths','createdBy','createdAt','updatedAt','revision'
+      ]) &&
+      request.resource.data.id == id &&
+      request.resource.data.project is string &&
+      request.resource.data.project.size() > 0 &&
+      request.resource.data.project.size() <= 120 &&
+      request.resource.data.stand is string &&
+      request.resource.data.stand.size() > 0 &&
+      request.resource.data.stand.size() <= 120 &&
+      request.resource.data.piece is string &&
+      request.resource.data.piece.size() > 0 &&
+      request.resource.data.piece.size() <= 120 &&
+      request.resource.data.description is string &&
+      request.resource.data.description.size() <= 800 &&
+      request.resource.data.materialLink is string &&
+      request.resource.data.materialLink.size() <= 1000 &&
+      request.resource.data.condition in [
+        'Por revisar','Disponible','Requiere reparación','En reparación'
+      ] &&
+      request.resource.data.photoPaths is list &&
+      request.resource.data.photoPaths.size() <= 20 &&
+      request.resource.data.createdBy is string &&
+      request.resource.data.revision is int &&
+      request.resource.data.revision > 0;
+    }
+    match /agora_repair_assets/{id} {
+      allow get, list: if repairUser();
+      allow create: if canEdit() &&
+        id.matches('^[a-f0-9-]{36}
+      allow get: if canEdit() || (opsStaff() && resource.data.createdBy == request.auth.uid);
+      // Las consultas staff DEBEN filtrar createdBy == auth.uid.
+      allow list: if canEdit() || (opsStaff() && resource.data.createdBy == request.auth.uid);
+      allow create: if repairUser() &&
+        id.matches('^[a-f0-9-]{36}
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+) &&
+        repairDocumentValid(id) &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.createdByEmail == request.auth.token.email &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.revision == 1 &&
+        request.resource.data.status == 'pendiente' &&
+        request.resource.data.repairRoute == 'pendiente' &&
+        request.resource.data.assignedTo == '' &&
+        request.resource.data.decisionBy == '' &&
+        request.resource.data.decisionNote == '' &&
+        request.resource.data.estimatedCost == 0 &&
+        request.resource.data.quotes.size() == 0 &&
+        request.resource.data.photos.size() == 0 &&
+        request.resource.data.selectedQuoteId == '';
+      allow update: if repairUser() &&
+        repairDocumentValid(id) &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.revision == resource.data.revision + 1 &&
+        (
+          canEdit() ||
+          (opsStaff() && resource.data.createdBy == request.auth.uid &&
+            request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['photos','revision','updatedAt']) &&
+            request.resource.data.photos.size() == resource.data.photos.size() + 1 &&
+            request.resource.data.photos.hasAll(resource.data.photos) &&
+            request.resource.data.photos[request.resource.data.photos.size() - 1].path
+              .matches('^agora-repairs/' + id + '/' + request.auth.uid + '/[a-f0-9-]{36}\\.jpg
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+))
+        );
+      allow delete: if false;
+    }
+    match /agora_repair_events/{eventId} {
+      allow get, list: if canEdit();
+      allow create: if repairUser() &&
+        request.resource.data.keys().hasOnly([
+          'requestId','actorUid','actorEmail','action','detail','createdAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'requestId','actorUid','actorEmail','action','detail','createdAt'
+        ]) &&
+        request.resource.data.actorUid == request.auth.uid &&
+        request.resource.data.actorEmail == request.auth.token.email &&
+        request.resource.data.requestId is string &&
+        request.resource.data.action in [
+          'creada','decisión','cotización','selección de cotización','evidencia'
+        ] &&
+        request.resource.data.detail is string &&
+        request.resource.data.detail.size() <= 500 &&
+        request.resource.data.createdAt == request.time &&
+        existsAfter(repairRequestPath(request.resource.data.requestId)) &&
+        (canEdit() || getAfter(repairRequestPath(request.resource.data.requestId)).data.createdBy == request.auth.uid);
+      allow update, delete: if false;
+    }
+
+    // Todas las demás colecciones permanecen cerradas.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+) &&
+        repairAssetValid(id) &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.revision == 1 &&
+        request.resource.data.photoPaths.size() == 0;
+      allow update: if canEdit() &&
+        repairAssetValid(id) &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.revision == resource.data.revision + 1 &&
+        request.resource.data.photoPaths.size() >= resource.data.photoPaths.size() &&
+        request.resource.data.photoPaths.hasAll(resource.data.photoPaths);
+      allow delete: if false;
     }
     match /agora_repair_requests/{id} {
       allow get: if canEdit() || (opsStaff() && resource.data.createdBy == request.auth.uid);
