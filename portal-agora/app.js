@@ -547,7 +547,8 @@ function staffOperationsSpace(){
       '<p>Una jornada puede incluir varias actividades. Consulta tus asignaciones personales.</p></div>'+
       '<a class="profile-button profile-button-primary" href="'+esc(href("mi-operacion/"))+'">Abrir Mi operación</a></header>'+
     roleNotice()+
-    (staff?assigned.length?'<div class="role-jornada-list">'+assigned.map(staffJornadaCard).join("")+'</div>':
+    (staff?assigned.length?'<div class="role-jornada-list">'+assigned.slice(0,3).map(staffJornadaCard).join("")+'</div>'+
+      (assigned.length>3?'<details class="role-more-jornadas"><summary>Ver otras jornadas ('+(assigned.length-3)+')</summary><div class="role-jornada-list">'+assigned.slice(3).map(staffJornadaCard).join("")+'</div></details>':""):
       '<p class="role-empty">No hay jornadas vigentes o próximas en tu ficha personal.</p>':
       '<p class="role-empty">Todavía no encontramos una ficha de Operaciones vinculada a tu cuenta. Coordinación debe vincular tu UID al personal asignado.</p>')+
     '<div class="role-legacy-links"><a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/visor.html"))+'" target="_blank" rel="noopener noreferrer">Registrar entrada / salida · sistema actual ↗</a></div>'+
@@ -613,7 +614,8 @@ function coordinationOperationsSpace(admin=false){
     (edit?'<div class="role-metrics"><div><small>Jornadas hoy</small><strong>'+totals.today+'</strong></div>'+
       '<div><small>Próximas jornadas</small><strong>'+totals.upcoming+'</strong></div>'+
       '<div><small>Personal asignado (turnos)</small><strong>'+totals.assignments+'</strong></div></div>'+
-      (list.length?'<div class="role-jornada-list">'+list.slice(0,20).map(scheduleCard).join("")+'</div>':
+      (list.length?'<div class="role-jornada-list">'+list.slice(0,6).map(scheduleCard).join("")+'</div>'+
+        (list.length>6?'<details class="role-more-jornadas"><summary>Ver otras jornadas ('+(list.length-6)+')</summary><div class="role-jornada-list">'+list.slice(6).map(scheduleCard).join("")+'</div></details>':""):
        '<p class="role-empty">No hay jornadas próximas en el cronograma operativo.</p>')+
       '<div class="role-legacy-links"><a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/"))+'" target="_blank" rel="noopener noreferrer">Editar agenda vigente ↗</a>'+
         '<a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/control-jornadas.html"))+'" target="_blank" rel="noopener noreferrer">Control de asistencia ↗</a></div>'+
