@@ -33,7 +33,10 @@ for(const phrase of [
 ])if(!block.includes(phrase))throw Error("Bloque de reglas incompleto: "+phrase);
 if(candidate[a-1]!=='\n')throw Error("Bloque de asistencia sin delimitador de línea seguro.");
 const without=candidate.slice(0,a-1)+candidate.slice(b);
-const before=execFileSync("git",["show","HEAD^:firestore.rules"],{encoding:"utf8"});
+// Línea base inmutable: main ANTES de fusionar la asistencia (#57).
+// Esto permite reintentar manualmente días después sin autorizar nuevas reglas ajenas.
+const baseCommit="8960ea9e75899fd9a61499be894979a2beb5125a";
+const before=execFileSync("git",["show",baseCommit+":firestore.rules"],{encoding:"utf8"});
 // Confirmar que el PR cambió ÚNICAMENTE el módulo nuevo.
 if(without!==before)throw Error("Las reglas anteriores cambiaron junto con asistencia; intervención manual necesaria.");
 const headers={Authorization:"Bearer "+token,Accept:"application/json"};
