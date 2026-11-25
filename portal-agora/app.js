@@ -561,7 +561,9 @@ function staffOperationsSpace(){
   return '<section class="role-module" aria-label="Mis jornadas y actividades">'+
     '<header class="role-module-heading"><div><h2>Mis jornadas</h2>'+
       '<p>Una jornada puede incluir varias actividades. Consulta tus asignaciones personales.</p></div>'+
-      '<a class="profile-button profile-button-primary" href="'+esc(href("mi-operacion/"))+'">Abrir Mi operación</a></header>'+
+      '<div class="role-space-actions">'+
+        '<a class="profile-button profile-button-primary" href="'+esc(href("?asistencia=1"))+'">Mi credencial · Entrada / salida</a>'+
+        '<a class="profile-button profile-button-outline" href="'+esc(href("mi-operacion/"))+'">Mi operación</a></div></header>'+
     roleNotice()+
     (staff?assigned.length?'<div class="role-jornada-list">'+assigned.slice(0,3).map(staffJornadaCard).join("")+'</div>'+
       (assigned.length>3?'<details class="role-more-jornadas"><summary>Ver otras jornadas ('+(assigned.length-3)+')</summary><div class="role-jornada-list">'+assigned.slice(3).map(staffJornadaCard).join("")+'</div></details>':""):
