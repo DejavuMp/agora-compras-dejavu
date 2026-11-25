@@ -1712,6 +1712,79 @@ match /agora_finance_requests/{requestId} {
         exists(shiftClockPath(get(attendanceRosterPath(eventId,personId)).data.uid,eventId)) &&
         get(shiftClockPath(get(attendanceRosterPath(eventId,personId)).data.uid,eventId)).data.status == 'finalizada';
     }
+    // Solicitudes de jornadas de Coordinación. Se guarda una captura pequeña
+    // de evidencia como JPEG privada en Firestore, sin URLs ni buckets públicos.
+    match /agora_ops_assignment_requests/{requestId} {
+      allow get, list: if canEdit();
+      allow create: if canEdit() &&
+        requestId.matches('^[a-f0-9-]{36}$') &&
+        request.resource.data.keys().hasOnly([
+          'id','requester','channel','contact','requestedAt','project','site',
+          'date','start','end','headcount','description','activities',
+          'evidenceNote','evidenceImage','capturedBy','createdAt',
+          'status','linkedEventId','updatedAt','updatedBy'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'id','requester','channel','contact','requestedAt','project','site',
+          'date','start','end','headcount','description','activities',
+          'evidenceNote','evidenceImage','capturedBy','createdAt',
+          'status','linkedEventId','updatedAt','updatedBy'
+        ]) &&
+        request.resource.data.id == requestId &&
+        request.resource.data.requester is string &&
+        request.resource.data.requester.size() >= 2 &&
+        request.resource.data.requester.size() <= 140 &&
+        request.resource.data.channel in [
+          'WhatsApp','Llamada','Correo','Presencial','Otro'
+        ] &&
+        request.resource.data.contact is string &&
+        request.resource.data.contact.size() <= 120 &&
+        request.resource.data.requestedAt is string &&
+        request.resource.data.requestedAt.size() <= 40 &&
+        request.resource.data.project is string &&
+        request.resource.data.project.size() >= 2 &&
+        request.resource.data.project.size() <= 150 &&
+        request.resource.data.site is string &&
+        request.resource.data.site.size() >= 2 &&
+        request.resource.data.site.size() <= 150 &&
+        request.resource.data.date is string &&
+        request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        request.resource.data.start is string &&
+        request.resource.data.start.matches('^[0-9]{2}:[0-9]{2}$') &&
+        request.resource.data.end is string &&
+        request.resource.data.end.matches('^[0-9]{2}:[0-9]{2}$') &&
+        request.resource.data.headcount is int &&
+        request.resource.data.headcount >= 1 &&
+        request.resource.data.headcount <= 999 &&
+        request.resource.data.description is string &&
+        request.resource.data.description.size() <= 600 &&
+        request.resource.data.activities is list &&
+        request.resource.data.activities.size() <= 500 &&
+        request.resource.data.evidenceNote is string &&
+        request.resource.data.evidenceNote.size() <= 400 &&
+        request.resource.data.evidenceImage is string &&
+        request.resource.data.evidenceImage.size() <= 185000 &&
+        (request.resource.data.evidenceImage == '' ||
+         request.resource.data.evidenceImage.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]{100,184900}$')) &&
+        request.resource.data.capturedBy == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        request.resource.data.status == 'pendiente' &&
+        request.resource.data.linkedEventId == '';
+      allow update: if canEdit() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status','linkedEventId','updatedAt','updatedBy'
+        ]) &&
+        request.resource.data.status in [
+          'pendiente','confirmada','cancelada'
+        ] &&
+        request.resource.data.linkedEventId is string &&
+        request.resource.data.linkedEventId.size() <= 100 &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if false;
+    }
     match /agora_ops_attendance_sheets/{eventId} {
       // La lista revela solo metadatos mínimos ya delegados. Una jornada
       // cerrada no permite leer roster/entradas ni crear nuevos registros.
