@@ -228,3 +228,22 @@ Instrucción al administrador con acceso de GitHub:
 4. Revisar resultado y descargar `respaldo-obligatorio-asistencia-firestore`. **No desplegar manualmente el archivo completo** si el preflight detecta deriva entre producción y la línea base; primero conciliar las diferencias con respaldo.
 
 El preflight compara el nuevo ruleset con el ruleset que había antes de la integración (commit fijo `8960ea9e75899fd9a61499be894979a2beb5125a`), nunca con el padre más reciente de `main`. Reconsulta las reglas reales después del backup y antes de publicar, y verifica la versión resultante. Si la condición OIDC de Google también rechaza el workflow manual por su ruta, un administrador de IAM debe autorizar **explícitamente** ese workflow; **no se debe suplantar ni bypassar el proveedor WIF**. Mientras no exista despliegue confirmado, el frontend mostrará permiso denegado para las nuevas colecciones; no se debe presentar como funcional el guardado productivo.
+
+
+## Conciliación segura de reglas reales (25 NOV 2026)
+
+La ejecución manual de GitHub Actions `45588886202` ya autenticó correctamente con Google Cloud y guardó el ruleset real `15d41d21-5847-438f-8084-4c931694f68c`, pero lo encontró diferente a la línea base histórica; el despliegue se detuvo sin sobrescribir producción.
+
+La revisión del respaldo confirmó que las rutas nuevas `agora_ops_attendance_sheets` y `agora_ops_assignment_requests` no estaban presentes. Por eso el activador manual fue corregido con una **conciliación estrictamente aditiva sobre las reglas reales**:
+
+1. Autenticación WIF manual desde `main` y descarga del ruleset vivo.
+2. Respaldo del contenido y nombre exacto del ruleset antes de cambios.
+3. Validación de que el archivo del repositorio sólo añade el módulo aprobado respecto al commit original `8960ea9e75899fd9a61499be894979a2beb5125a`.
+4. Verificación de cierre `deny-all` idéntico y ausencia de colisiones de colecciones o funciones. Construcción de un archivo reconciliado con **inserción literal** del bloque de asistencia, manteniendo todos los bytes anteriores.
+5. Pruebas del emulador **sobre el archivo reconciliado**, incluyendo asistencia, Operaciones e Identidad.
+6. Comparación del hash y nombre del ruleset vivo nuevamente antes del despliegue. Si cambió, se detiene.
+7. Publicación de **solo reglas Firestore** y verificación de hash exacto del ruleset resultante. El proceso queda restringido al `workflow_dispatch` autorizado y no modifica Storage ni datos históricos.
+
+**No se debe pulsar «Re-run jobs» de la ejecución anterior:** debe utilizarse un nuevo `Run workflow` desde `main` para que GitHub utilice la versión corregida del script.
+
+El éxito del workflow confirma publicación de reglas, pero todavía corresponde ejecutar una prueba de registro en Firebase con cuentas reales de Supervisor, Staff y Coordinación antes de tratar el módulo como control de nómina definitivo.
