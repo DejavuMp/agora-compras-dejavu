@@ -78,6 +78,9 @@ jobs:
       - name: Probar marcaje GPS, bloqueo horario, cupo de horas y traslados
         run: npx firebase emulators:exec --only firestore --project demo-agora-jornadas --non-interactive 'node .github/firebase-staff/test-clock-rules.mjs'
 
+      - name: Probar pases QR/manual, supervisores delegados, actividades y horas
+        run: npx firebase emulators:exec --only firestore --project demo-agora-asistencia --non-interactive 'node .github/firebase-staff/test-attendance-rules.mjs'
+
   rules-deploy:
     name: "Activar únicamente reglas Firestore cuando la base actual coincida"
     needs: rules-tests
