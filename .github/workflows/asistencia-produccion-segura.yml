@@ -58,6 +58,11 @@ jobs:
           retention-days: 30
           include-hidden-files: true
           if-no-files-found: error
+      - name: Usar exclusivamente las reglas reales conciliadas (sin modificar el repositorio)
+        run: |
+          test -s .github/firebase-staff/.preflight/attendance/firestore-asistencia-reconciliada.rules
+          cp .github/firebase-staff/.preflight/attendance/firestore-asistencia-reconciliada.rules firestore.rules
+          node --check .github/firebase-staff/prepare-attendance-rules.mjs
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -69,6 +74,10 @@ jobs:
         run: npm install --no-save 'firebase@^12.0.0' '@firebase/rules-unit-testing@^5.0.0' firebase-tools
       - name: Probar permisos que se van a activar en emulador aislado
         run: npx firebase emulators:exec --only firestore --project demo-agora-asistencia --non-interactive 'node .github/firebase-staff/test-attendance-rules.mjs'
+      - name: Verificar protección de reglas existentes (operaciones e identidad)
+        run: |
+          npx firebase emulators:exec --only firestore --project demo-agora-ops --non-interactive 'node .github/firebase-staff/test-ops-rules.mjs'
+          npx firebase emulators:exec --only firestore --project demo-agora-identity --non-interactive 'node .github/firebase-staff/test-identity-rules.mjs'
       - name: Confirmar que producción no cambió desde el respaldo
         env:
           FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
