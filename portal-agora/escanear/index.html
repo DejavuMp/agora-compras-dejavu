@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#111214">
+  <meta name="description" content="Escáner autorizado de QR de jornadas de ÁGORA Dejavú.">
+  <title>ÁGORA · Escáner de jornadas</title>
+  <link rel="icon" href="../assets/icono-administrador-hq.webp" type="image/webp">
+  <link rel="stylesheet" href="../style.css">
+  <link rel="stylesheet" href="../perfil.css">
+  <script type="module" src="../scan-jornada.js"></script>
+</head>
+<body>
+  <a class="skip" href="#scan-main">Ir al escáner</a>
+  <header class="header">
+    <a class="brand" href="../" aria-label="Volver a ÁGORA">
+      <img class="brand-mark" src="../assets/logo-agora-hq.webp" alt="ÁGORA Dejavú Marketing" width="144" height="54">
+    </a>
+    <div class="session">
+      <span id="scan-session">Sin sesión</span>
+      <button type="button" id="scan-logout" hidden>Cerrar sesión</button>
+    </div>
+  </header>
+  <main id="scan-main">
+    <section class="qr-scan-page">
+      <div class="profile-kicker">ÁGORA · OPERACIONES</div>
+      <h1>Escanear jornada</h1>
+      <p class="qr-scan-intro">Escanea el QR específico que te muestra cada colaborador. No uses el QR de su credencial de identificación.</p>
+      <div id="scan-status" class="qr-scan-status" role="status" aria-live="polite">Comprobando sesión…</div>
+      <div id="scan-login" hidden class="qr-scan-access">
+        <h2>Acceso para coordinación</h2>
+        <p>El escaneo requiere una cuenta autorizada de Coordinación o Administración.</p>
+        <button type="button" id="scan-google" class="profile-button profile-button-primary">Acceder con Google</button>
+      </div>
+      <div id="scan-restricted" hidden class="qr-scan-access">
+        <h2>No tienes permiso para registrar asistencia</h2>
+        <p>Administración debe asignarte un rol de coordinación. El puesto «Supervisor» por sí solo no concede permiso para modificar asistencia.</p>
+        <a class="profile-button profile-button-outline" href="../">Volver a mi perfil</a>
+      </div>
+      <div id="scan-workspace" hidden class="qr-scan-workspace">
+        <div class="qr-scan-actions">
+          <button type="button" id="scan-open-camera" class="profile-button profile-button-primary">Abrir cámara y escanear QR</button>
+          <span class="profile-muted">O pega el enlace del QR cuando no esté disponible la cámara.</span>
+        </div>
+        <div id="scan-camera" class="qr-scan-camera" hidden>
+          <video id="scan-video" autoplay playsinline muted aria-label="Vista de la cámara para escanear QR"></video>
+          <button type="button" class="profile-button profile-button-outline" id="scan-close-camera">Cerrar cámara</button>
+        </div>
+        <label class="qr-scan-manual" for="scan-input">Enlace de QR de jornada
+          <textarea id="scan-input" rows="2" placeholder="Pega aquí el enlace del QR de jornada" autocapitalize="off" autocomplete="off" spellcheck="false"></textarea>
+        </label>
+        <button type="button" id="scan-verify" class="profile-button profile-button-outline">Verificar jornada y asignación</button>
+        <section id="scan-result" class="qr-scan-result" hidden aria-labelledby="scan-review-heading">
+          <h2 id="scan-review-heading">Verificación presencial</h2>
+          <div class="qr-scan-identity" id="scan-identity"></div>
+          <p>Comprueba que quien presenta el QR es la persona asignada y que está físicamente presente. Este QR no es una identificación personal.</p>
+          <div class="qr-scan-submit">
+            <button type="button" id="scan-entry" class="profile-button profile-button-primary" hidden>Confirmar entrada por QR</button>
+            <button type="button" id="scan-exit" class="profile-button profile-button-primary" hidden>Confirmar salida por QR</button>
+            <button type="button" id="scan-activity" class="profile-button profile-button-primary" hidden>Confirmar actividad por QR</button>
+          </div>
+          <p class="profile-muted">La validación queda guardada con hora de Firebase y responsable de coordinación. Es distinta del reloj oficial de Jornadas.</p>
+        </section>
+      </div>
+      <p class="qr-scan-foot">Se conservarán las entradas y salidas anteriores. El escaneo no crea jornadas nuevas ni cambia su horario original.</p>
+    </section>
+  </main>
+  <footer>ÁGORA · Dejavú Marketing · Control presencial por coordinación</footer>
+  <noscript>Activa JavaScript para usar el escáner.</noscript>
+</body>
+</html>
