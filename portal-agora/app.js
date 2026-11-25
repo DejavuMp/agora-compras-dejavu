@@ -11,57 +11,6 @@ import {showShiftQr} from "./staff-shift-qr.js";
 import {renderStaffTasks,readStaffTasks} from "./staff-activities.js";
 import {mountRoster} from "./attendance-roster.js";
 
-// GA4 del portal: consentimiento explícito, sin identificadores de cuenta ni URL query/hash.
-const AGORA_GA4_ID="G-YP7BT4LJ2Q";
-let agoraGaLoaded=false;
-let agoraGaPageSent=false;
-const agoraGaConsentKey="agora.analytics.consent.v1";
-const agoraGaLocation=()=>location.origin+location.pathname;
-function agoraLoadGa4(){
-  if(agoraGaLoaded)return;
-  agoraGaLoaded=true;
-  window.dataLayer=window.dataLayer||[];
-  window.gtag=window.gtag||function(){window.dataLayer.push(arguments);};
-  window.gtag("consent","default",{
-    analytics_storage:"denied",ad_storage:"denied",ad_user_data:"denied",
-    ad_personalization:"denied",wait_for_update:500
-  });
-  const tag=document.createElement("script");
-  tag.async=true;
-  tag.src="https://www.googletagmanager.com/gtag/js?id="+encodeURIComponent(AGORA_GA4_ID);
-  tag.onload=()=>{
-    window.gtag("js",new Date());
-    window.gtag("consent","update",{
-      analytics_storage:"granted",ad_storage:"denied",
-      ad_user_data:"denied",ad_personalization:"denied"
-    });
-    window.gtag("config",AGORA_GA4_ID,{
-      send_page_view:false,allow_google_signals:false,
-      allow_ad_personalization_signals:false,
-      page_location:agoraGaLocation(),page_referrer:location.origin+"/",
-      page_title:"ÁGORA · Portal Dejavú Marketing"
-    });
-    if(!agoraGaPageSent){
-      window.gtag("event","page_view",{
-        page_location:agoraGaLocation(),page_referrer:location.origin+"/",
-        page_title:"ÁGORA · Portal Dejavú Marketing"
-      });
-      agoraGaPageSent=true;
-    }
-  };
-  document.head.appendChild(tag);
-}
-window.agoraSetAnalyticsConsent=granted=>{
-  try{localStorage.setItem(agoraGaConsentKey,granted?"granted":"denied");}catch{}
-  if(granted)agoraLoadGa4();
-  else if(window.gtag)window.gtag("consent","update",{
-    analytics_storage:"denied",ad_storage:"denied",
-    ad_user_data:"denied",ad_personalization:"denied"
-  });
-};
-try{if(localStorage.getItem(agoraGaConsentKey)==="granted")agoraLoadGa4();}catch{}
-
-
 // Una sola identidad Firebase para todas las vistas. Sin módulos operativos.
 const ROOT=new URL("./",import.meta.url);
 const ADMIN_EMAIL="admi.agora@gmail.com";
