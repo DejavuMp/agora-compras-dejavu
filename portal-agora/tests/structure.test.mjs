@@ -241,3 +241,14 @@ test("Staff, Agencia y Administrador conectan al mismo Firestore sin escrituras 
   assert.match(css,/\.role-jornada/);
   assert.match(css,/\.role-assignment-form/);
 });
+
+
+test("el acceso por contraseña del portal se limita a los dos usuarios QA y exige correo verificado",async()=>{
+  const app=await read("app.js");
+  assert.match(app,/signInWithEmailAndPassword\(auth,qaEmail,password\)/);
+  assert.match(app,/QA_LOGIN_USERS\.has\(qaEmail\)/);
+  assert.match(app,/credential\.user\.emailVerified/);
+  assert.match(app,/qa\/email-not-verified/);
+  assert.match(app,/admi\.agora\+qa\.staff@gmail\.com/);
+  assert.match(app,/admi\.agora\+qa\.supervisor@gmail\.com/);
+});
