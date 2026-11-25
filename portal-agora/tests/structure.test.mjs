@@ -14,7 +14,7 @@ test("el portal conserva la autenticación Google y el mismo proyecto Firebase",
   assert.match(app,/getDoc\(doc\(db,"agora_identity_links",user\.uid\)\)/);
   assert.match(app,/getDoc\(doc\(db,"agora_identity_registry",linked\.agoraId\)\)/);
   assert.match(app,/getDoc\(doc\(db,"agora_users",user\.uid\)\)/);
-  assert.match(html,/src="\.\/app\.js"/);
+  assert.match(html,/src="\.\/app\.js(?:\?v=[^"]+)?"/);
   assert.match(html,/href="\.\/perfil\.css"/);
   assert.match(app,/type="submit" disabled/);
   assert.match(app,/data-action="google"/);
@@ -89,7 +89,7 @@ test("las tres páginas tienen ruta propia, etiqueta y regreso al perfil",async(
   for(const path of ["staff","agencia","administrador"]){
     const html=await read(path+"/index.html");
     assert.match(html,/<main id="app">/);
-    assert.match(html,/src="\.\.\/app\.js"/);
+    assert.match(html,/src="\.\.\/app\.js(?:\?v=[^"]+)?"/);
     assert.match(html,/href="\.\.\/perfil\.css"/);
     assert.match(html,/href="\.\.\/"/);
     assert.match(app,new RegExp(''+path));
@@ -116,7 +116,7 @@ test("Mi perfil integra solo Mi operación y Expediente privado sin salir del po
     const html=await read(name+"/index.html");
     assert.ok(html.includes("<title>ÁGORA · "+title+"</title>"));
     assert.match(html,/name="robots" content="noindex,nofollow"/);
-    assert.match(html,/src="\.\.\/app\.js"/);
+    assert.match(html,/src="\.\.\/app\.js(?:\?v=[^"]+)?"/);
     assert.match(html,/href="\.\.\/perfil\.css"/);
     assert.match(html,/href="\.\.\/"/);
   }
