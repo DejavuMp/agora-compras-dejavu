@@ -1655,7 +1655,9 @@ match /agora_finance_requests/{requestId} {
     }
     function attendanceExistingPerson(eventId,d) {
       return d.source in ['qr','manual'] &&
-        d.ownerUid is string && d.ownerUid.size() > 0 &&
+        d.ownerUid is string &&
+        ((d.source == 'qr' && d.ownerUid.size() > 0) ||
+         (d.source == 'manual' && (d.ownerUid.size() > 0 || d.reason.size() >= 10))) &&
         exists(attendanceRosterPath(eventId,d.personId)) &&
         get(attendanceRosterPath(eventId,d.personId)).data.uid == d.ownerUid &&
         get(attendanceRosterPath(eventId,d.personId)).data.name == d.personName &&
@@ -1797,10 +1799,10 @@ match /agora_finance_requests/{requestId} {
 
 ) &&
           request.resource.data.keys().hasOnly([
-            'eventId','personId','uid','name','createdBy','createdAt'
+            'eventId','personId','uid','name','activityKeys','createdBy','createdAt'
           ]) &&
           request.resource.data.keys().hasAll([
-            'eventId','personId','uid','name','createdBy','createdAt'
+            'eventId','personId','uid','name','activityKeys','createdBy','createdAt'
           ]) &&
           request.resource.data.eventId == eventId &&
           request.resource.data.personId == personId &&
@@ -1809,6 +1811,8 @@ match /agora_finance_requests/{requestId} {
           request.resource.data.name is string &&
           request.resource.data.name.size() >= 2 &&
           request.resource.data.name.size() <= 140 &&
+          request.resource.data.activityKeys is list &&
+          request.resource.data.activityKeys.size() <= 100 &&
           request.resource.data.createdBy == request.auth.uid &&
           request.resource.data.createdAt == request.time;
         allow update, delete: if false;
