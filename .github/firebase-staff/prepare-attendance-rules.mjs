@@ -31,7 +31,8 @@ for(const phrase of [
  "match /entries/{id}","match /activities/{activityId}",
  "match /approvals/{personId}","function attendanceSupervisor(eventId)"
 ])if(!block.includes(phrase))throw Error("Bloque de reglas incompleto: "+phrase);
-const without=candidate.slice(0,a)+candidate.slice(b);
+if(candidate[a-1]!=='\n')throw Error("Bloque de asistencia sin delimitador de línea seguro.");
+const without=candidate.slice(0,a-1)+candidate.slice(b);
 const before=execFileSync("git",["show","HEAD^:firestore.rules"],{encoding:"utf8"});
 // Confirmar que el PR cambió ÚNICAMENTE el módulo nuevo.
 if(without!==before)throw Error("Las reglas anteriores cambiaron junto con asistencia; intervención manual necesaria.");
