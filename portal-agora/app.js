@@ -2,12 +2,13 @@ import {auth,db} from "./firebase.js";
 import {
   onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signInWithRedirect,signOut
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
-import {doc,getDoc,setDoc,serverTimestamp}
+import {doc,getDoc,getDocs,collection,query,orderBy,limit,setDoc,updateDoc,serverTimestamp}
   from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 import {saveProfile,saveFinancial} from "../identidad/firebase-identity.js";
 import {projectTodayAssignments} from "../identidad/domain.mjs";
 import {ownJornadas,coordinationJornadas,operationTotals,validateAssignmentDraft,assignmentDraftText,REQUEST_CHANNELS} from "./roles-operacion.mjs";
 import {showShiftQr} from "./staff-shift-qr.js";
+import {renderStaffTasks,readStaffTasks} from "./staff-activities.js";
 import {mountRoster} from "./attendance-roster.js";
 
 // Una sola identidad Firebase para todas las vistas. Sin módulos operativos.
@@ -531,6 +532,10 @@ function staffJornadaCard(item){
       (item.instructions?'<p class="role-instructions">'+esc(item.instructions)+'</p>':"")+
     '</div>'+
     '<button type="button" class="profile-button profile-button-primary" data-action="show-shift-qr" data-event-id="'+esc(item.key)+'">Mostrar QR de jornada / actividad</button>'+
+    '<div class="attendance-task-container">'+
+      '<button type="button" class="profile-button profile-button-outline" data-action="open-tasks" data-event-id="'+esc(item.key)+'">Mis actividades · Agregar o marcar</button>'+
+      '<div class="attendance-task-content" data-task-for="'+esc(item.key)+'" hidden></div>'+
+    '</div>'+
     '<details class="role-add-activity"><summary>+ Proponer otra actividad en esta jornada</summary>'+
       '<form data-draft-activity="'+esc(item.key)+'" class="role-proposal-form">'+
         '<label>Actividad adicional<input name="activity" required maxlength="200" placeholder="¿Qué otra actividad realizarás?"></label>'+
@@ -550,7 +555,7 @@ function staffOperationsSpace(){
       '<p>Una jornada puede incluir varias actividades. Consulta tus asignaciones personales.</p></div>'+
       '<div class="role-space-actions">'+
         '<a class="profile-button profile-button-primary" href="'+esc(href("mi-operacion/"))+'">Mi operación</a>'+
-        '<span class="profile-muted">El QR de jornada está en cada asignación.</span></div></header>'+
+        '<a class="profile-button profile-button-outline" href="'+esc(href("escanear/"))+'">Pasar lista (supervisores)</a></div></header>'+
     roleNotice()+
     (staff?assigned.length?'<div class="role-jornada-list">'+assigned.slice(0,3).map(staffJornadaCard).join("")+'</div>'+
       (assigned.length>3?'<details class="role-more-jornadas"><summary>Ver otras jornadas ('+(assigned.length-3)+')</summary><div class="role-jornada-list">'+assigned.slice(3).map(staffJornadaCard).join("")+'</div></details>':""):
@@ -575,14 +580,102 @@ function scheduleCard(item){
       '<div><dt>Actividades registradas</dt><dd>'+item.activitiesCount+'</dd></div>'+
       '<div><dt>Estado</dt><dd>'+esc(item.status)+'</dd></div></dl></article>';
 }
+
+async function compressAssignmentImage(file){
+  if(!file)return "";
+  if(!["image/jpeg","image/png","image/webp"].includes(file.type))
+    throw Error("Adjunta una captura en JPEG, PNG o WEBP. Audio y PDF no pueden guardarse aquí.");
+  if(file.size>12*1024*1024)throw Error("La imagen supera 12 MB. Usa una más pequeña.");
+  const source=URL.createObjectURL(file);
+  const image=new Image();
+  try{
+    await new Promise((resolve,reject)=>{
+      image.onload=resolve;
+      image.onerror=()=>reject(Error("No se pudo leer la captura."));
+      image.src=source;
+    });
+    const canvas=document.createElement("canvas"),ctx=canvas.getContext("2d");
+    if(!ctx)throw Error("El navegador no permite procesar la imagen.");
+    for(const max of [1400,1100,900,700,500]){
+      const ratio=Math.min(1,max/Math.max(image.naturalWidth,image.naturalHeight));
+      canvas.width=Math.max(1,Math.round(image.naturalWidth*ratio));
+      canvas.height=Math.max(1,Math.round(image.naturalHeight*ratio));
+      ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(image,0,0,canvas.width,canvas.height);
+      for(const quality of [.8,.7,.55,.4]){
+        const data=canvas.toDataURL("image/jpeg",quality);
+        if(data.length<=170000)return data;
+      }
+    }
+    throw Error("La captura sigue siendo muy grande. Recórtala antes de agregarla.");
+  }finally{URL.revokeObjectURL(source)}
+}
+async function showAssignmentHistory(){
+  if(!["admin","coordinador"].includes(role())||!allowed(routeSpace))
+    throw Error("No tienes permiso para consultar solicitudes.");
+  const box=document.getElementById("assignment-history");
+  if(!box)return;
+  box.textContent="Consultando solicitudes privadas…";
+  const snaps=await getDocs(query(
+    collection(db,"agora_ops_assignment_requests"),orderBy("createdAt","desc"),limit(12)
+  ));
+  if(!snaps.size){box.textContent="Aún no hay solicitudes guardadas.";return}
+  box.innerHTML=snaps.docs.map(d=>{
+    const a=d.data(),image=typeof a.evidenceImage==="string"&&
+      /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(a.evidenceImage)?
+        '<img class="assignment-history-image" src="'+esc(a.evidenceImage)+
+          '" alt="Captura asociada al folio '+esc(a.id)+'">':"";
+    const when=a.createdAt?.toDate?.();
+    const date=when?new Intl.DateTimeFormat("es-MX",{
+      day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"
+    }).format(when):"Fecha por confirmar";
+    return '<details class="assignment-history-item"><summary><span><strong>'+
+      esc(a.project||"Solicitud")+'</strong><small>'+esc(a.requester||"Solicitante")+
+      ' · '+esc(a.channel||"Medio")+' · '+esc(a.status||"pendiente")+
+      '</small></span><small>'+esc(date)+'</small></summary>'+
+      '<div class="assignment-history-body">'+
+        '<p><b>Folio:</b> '+esc(a.id)+'</p>'+
+        '<p><b>Registrado por UID:</b> '+esc(a.capturedBy)+'</p>'+
+        '<p><b>Jornada:</b> '+esc(a.date)+' · '+esc(a.start)+' – '+esc(a.end)+
+        ' · '+esc(a.site)+'</p>'+
+        '<p><b>Detalle:</b> '+esc(a.description||"Sin observaciones")+'</p>'+
+        '<p><b>Origen:</b> '+esc(a.evidenceNote||"No proporcionado")+'</p>'+
+        '<p><b>Actividades:</b> '+esc((a.activities||[]).join(" · ")||"Por definir")+'</p>'+
+        (a.linkedEventId?'<p><b>Jornada vinculada:</b> '+esc(a.linkedEventId)+'</p>':"")+
+        image+
+        (a.status==="pendiente"?'<div class="assignment-history-actions">'+
+          '<button type="button" class="profile-button profile-button-outline" data-action="confirm-assignment" data-request-id="'+esc(a.id)+'">Vincular jornada publicada</button>'+
+          '<button type="button" class="profile-button profile-button-outline" data-action="cancel-assignment" data-request-id="'+esc(a.id)+'">Cancelar solicitud</button>'+
+          '</div>':"")+'</div></details>';
+  }).join("");
+}
+function requestStatusChange(requestId,nextStatus){
+  if(!["admin","coordinador"].includes(role())||!allowed(routeSpace))return;
+  const schedule=state.roleData?.schedule?.payload?.events||[];
+  let eventId="";
+  if(nextStatus==="confirmada"){
+    eventId=clean(prompt("Escribe el ID de la jornada publicada en Operaciones:",""));
+    if(!eventId)return;
+    if(!schedule.some(e=>String(e.id)===eventId&&e.status!=="cancelado"&&e.status!=="borrador"))
+      return notice("La jornada no existe o no está publicada. Primero regístrala en Operaciones.","error");
+  }else if(!confirm("¿Cancelar esta solicitud? Quedará en el historial."))return;
+  return run(async()=>{
+    await updateDoc(doc(db,"agora_ops_assignment_requests",requestId),{
+      status:nextStatus,linkedEventId:eventId,
+      updatedBy:state.user.uid,updatedAt:serverTimestamp()
+    });
+    await showAssignmentHistory();
+  },"Solicitud actualizada; se conserva el historial.");
+}
+
 function assignmentDialog(){
   const now=new Date();
   const localDate=[now.getFullYear(),String(now.getMonth()+1).padStart(2,"0"),String(now.getDate()).padStart(2,"0")].join("-");
   return '<dialog class="role-dialog" id="assignment-dialog" aria-label="Asignaciones de jornada">'+
     '<div class="role-dialog-head"><div><strong>Asignaciones de jornada</strong>'+
-      '<p>Registra la solicitud como borrador previo a la autorización.</p></div>'+
+      '<p>Guarda el origen de la solicitud y vincúlala después a una jornada publicada.</p></div>'+
       '<button type="button" data-action="close-assignment" aria-label="Cerrar formulario">×</button></div>'+
-    '<div class="role-draft-warning" role="note">Todavía no se guardan solicitudes ni evidencias en Firebase. Este borrador puede copiarse, pero no publica jornadas ni asigna personal.</div>'+
+    '<div class="role-draft-warning" role="note">La solicitud sí se guarda en Firebase de forma privada. No publica ni autoriza automáticamente una jornada.</div>'+
     '<form id="assignment-form" class="role-assignment-form">'+
       '<label>Quién solicita<input name="requester" required maxlength="140" placeholder="Nombre de la persona o cliente"></label>'+
       '<label>Medio de solicitud<select name="channel" required>'+
@@ -601,13 +694,16 @@ function assignmentDialog(){
         '<div id="assignment-activities" class="role-activity-inputs"></div>'+
         '<p class="role-help">Puedes agregar tantas actividades como necesites, incluso cuando el trabajo ya haya comenzado. Este formulario no registra todavía su ejecución.</p></div>'+
       '<label class="role-wide">Descripción de evidencia recibida<textarea name="evidenceNote" rows="2" maxlength="400" placeholder="Ej.: solicitud por llamada el día… o captura de WhatsApp disponible"></textarea></label>'+
-      '<div class="role-wide"><label>Adjuntar captura, correo o audio <input type="file" disabled aria-disabled="true"></label>'+
-        '<small class="role-help">La carga privada de archivos se habilitará cuando existan permisos de Storage validados. No se publicarán archivos en enlaces abiertos.</small></div>'+
-      '<div class="role-wide role-dialog-actions"><button type="submit" class="profile-button profile-button-primary">Preparar borrador</button></div>'+
+      '<div class="role-wide"><label>Adjuntar captura de solicitud (opcional)<input id="assignment-evidence" name="attachment" type="file" accept="image/jpeg,image/png,image/webp"></label>'+
+        '<small class="role-help">La captura se comprime a JPEG y se almacena privada en la solicitud (máximo 170 KB). Audio/PDF siguen sin carga en este formulario; registra la información por escrito.</small></div>'+
+      '<div class="role-wide role-dialog-actions"><button type="submit" class="profile-button profile-button-primary">Guardar solicitud</button></div>'+
     '</form>'+
-    '<div id="assignment-result" hidden><h3>Solicitud preparada · No guardada</h3>'+
+    '<div id="assignment-result" hidden><h3>Solicitud guardada · Pendiente de asignación</h3>'+
       '<textarea id="assignment-preview" rows="12" readonly aria-label="Texto del borrador"></textarea>'+
       '<button type="button" data-action="copy-assignment" class="profile-button profile-button-outline">Copiar texto</button></div>'+
+    '<div class="assignment-history-header"><strong>Historial de solicitudes</strong>'+
+      '<button type="button" class="profile-button profile-button-outline" data-action="load-assignment-requests">Actualizar historial</button></div>'+
+    '<div id="assignment-history" class="assignment-history"></div>'+
   '</dialog>';
 }
 function coordinationOperationsSpace(admin=false){
@@ -627,7 +723,7 @@ function coordinationOperationsSpace(admin=false){
       (list.length?'<div class="role-jornada-list">'+list.slice(0,6).map(scheduleCard).join("")+'</div>'+
         (list.length>6?'<details class="role-more-jornadas"><summary>Ver otras jornadas ('+(list.length-6)+')</summary><div class="role-jornada-list">'+list.slice(6).map(scheduleCard).join("")+'</div></details>':""):
        '<p class="role-empty">No hay jornadas próximas en el cronograma operativo.</p>')+
-      '<div class="role-legacy-links"><a class="profile-button profile-button-primary" href="'+esc(href("escanear/"))+'">Escanear QR de jornada</a>'+
+      '<div class="role-legacy-links"><a class="profile-button profile-button-primary" href="'+esc(href("escanear/"))+'">Pasar lista · QR o manual</a>'+
       '<button type="button" data-action="view-attendance" class="profile-button profile-button-outline">Pase de lista</button>'+
         '<a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/"))+'" target="_blank" rel="noopener noreferrer">Editar agenda vigente ↗</a>'+
         '<a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/control-jornadas.html"))+'" target="_blank" rel="noopener noreferrer">Control de asistencia ↗</a></div>'+
@@ -707,6 +803,19 @@ app.addEventListener("click",event=>{
   const target=event.target.closest("[data-action]");
   if(!target)return;
   const task=target.dataset.action;
+  if(task==="open-tasks"){
+    if(!allowed("staff")||!state.user||!state.roleData?.staff)return;
+    const eventId=clean(target.dataset.eventId);
+    const section=app.querySelector('[data-task-for="'+CSS.escape(eventId)+'"]');
+    if(!section)return;
+    section.hidden=!section.hidden;
+    if(section.hidden)return;
+    renderStaffTasks({
+      target:section,eventId,personId:state.roleData.staff.personId,
+      uid:state.user.uid
+    });
+    return;
+  }
   if(task==="show-shift-qr"){
     if(!allowed("staff")||!state.user||!state.roleData?.staff)return;
     const eventId=clean(target.dataset.eventId);
@@ -715,8 +824,16 @@ app.addEventListener("click",event=>{
     const dialog=document.getElementById("staff-shift-qr-dialog");
     const container=document.getElementById("staff-shift-qr-content");
     if(!shift||!dialog||!container)return notice("Jornada no disponible.","error");
-    showShiftQr({target:container,uid:state.user.uid,personId:state.roleData.staff.personId,shift});
     if(dialog.showModal)dialog.showModal();else dialog.setAttribute("open","");
+    container.innerHTML='<p class="profile-muted">Generando QR de jornada…</p>';
+    readStaffTasks(eventId,state.user.uid).catch(()=>[]).then(tasks=>{
+      if(!dialog.open||state.user?.uid!==auth.currentUser?.uid)return;
+      const activities=[...shift.activities,...tasks.map(a=>({
+        key:a.id,name:a.name,status:a.status
+      }))];
+      showShiftQr({target:container,uid:state.user.uid,
+        personId:state.roleData.staff.personId,shift:{...shift,activities}});
+    });
     return;
   }
   if(task==="close-shift-qr"){
@@ -738,10 +855,19 @@ app.addEventListener("click",event=>{
     if(dialog?.close)dialog.close();else dialog?.removeAttribute("open");
     return;
   }
+  if(task==="load-assignment-requests"){
+    if(!["admin","coordinador"].includes(role())||!allowed(routeSpace))return;
+    return run(showAssignmentHistory);
+  }
+  if(task==="confirm-assignment"||task==="cancel-assignment"){
+    return requestStatusChange(clean(target.dataset.requestId),
+      task==="confirm-assignment"?"confirmada":"cancelada");
+  }
   if(task==="new-assignment"){
     if(!["admin","coordinador"].includes(role())||!allowed(routeSpace))return;
     const dlg=document.getElementById("assignment-dialog");
     if(dlg?.showModal)dlg.showModal();else dlg?.setAttribute("open","");
+    run(showAssignmentHistory);
     return;
   }
   if(task==="close-assignment"){
@@ -808,18 +934,32 @@ app.addEventListener("submit",event=>{
   if(form.id==="assignment-form"){
     if(!["admin","coordinador"].includes(role())||!allowed(routeSpace))
       return notice("No tienes permiso de coordinación.","error");
-    try{
+    return run(async()=>{
       const data=Object.fromEntries(new FormData(form));
       data.activities=[...form.querySelectorAll('input[name="activity[]"]')].map(x=>x.value);
       data.capturedBy=name()+" · "+state.user.uid;
       const draft=validateAssignmentDraft(data);
-      const output=document.getElementById("assignment-preview");
-      if(!output)return;
-      output.value=assignmentDraftText(draft);
-      document.getElementById("assignment-result").hidden=false;
-      notice("Borrador preparado. No se ha guardado en Firebase.","ok");
-    }catch(error){notice(errorText(error),"error")}
-    return;
+      const file=form.querySelector("#assignment-evidence")?.files?.[0];
+      const evidenceImage=await compressAssignmentImage(file);
+      const requestId=crypto.randomUUID();
+      await setDoc(doc(db,"agora_ops_assignment_requests",requestId),{
+        ...draft,id:requestId,capturedBy:state.user.uid,
+        evidenceImage,status:"pendiente",linkedEventId:"",
+        createdAt:serverTimestamp(),updatedAt:serverTimestamp(),
+        updatedBy:state.user.uid
+      });
+      const preview=document.getElementById("assignment-preview");
+      if(preview)preview.value=assignmentDraftText(draft)
+        .replace("BORRADOR DE SOLICITUD (NO REGISTRADO)",
+          "SOLICITUD REGISTRADA · Folio "+requestId)
+        .replace("Estado: BORRADOR. No hay autorización, asignación ni archivo guardado en Firebase.",
+          "Estado: REGISTRADA EN FIREBASE. PENDIENTE DE ASIGNACIÓN.");
+      const panel=document.getElementById("assignment-result");
+      if(panel)panel.hidden=false;
+      form.reset();
+      form.querySelector("#assignment-activities")?.replaceChildren();
+      await showAssignmentHistory();
+    },"Solicitud guardada con folio; pendiente de asignación.");
   }
   if(form.hasAttribute("data-draft-activity")){
     const formData=new FormData(form);

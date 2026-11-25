@@ -1184,3 +1184,236 @@ body:not(.login-mode) footer{
 .role-dialog [hidden]{
  display:none !important;
 }
+
+
+/* Pase de lista único y móvil: QR, manual, provisional y horas validadas. */
+.attendance-role{
+ display:inline-flex;align-items:center;width:max-content;
+ color:#d9e5dd;background:#28352d;border:1px solid #425e49;
+ border-radius:999px;padding:7px 12px;font-size:11px;font-weight:700;
+}
+.attendance-setup,.attendance-current,.attendance-event-intro,
+.attendance-history,.attendance-payment{
+ background:#1a1c20;border:1px solid #383c43;
+ border-radius:12px;padding:19px;
+}
+.attendance-setup summary{
+ cursor:pointer;list-style:none;font-weight:700;color:#f4f3f0;
+ padding:2px 0;font-size:14px;
+}
+.attendance-setup summary::after{content:"⌄";float:right;color:#c9c1b1}
+.attendance-setup summary::-webkit-details-marker{display:none}
+.attendance-setup-content{display:grid;gap:11px;padding:20px 0 0}
+.attendance-setup-content p,.attendance-history>p,.attendance-payment>p{
+ color:#bec2c7;line-height:1.6;font-size:12px;margin:0 0 9px;
+}
+.attendance-setup-content>label,.attendance-current label,
+.attendance-method-content>label,.attendance-payment>label{
+ display:grid;gap:7px;color:#e6e6e4;font-size:13px;font-weight:650;
+}
+.attendance-setup-content input,.attendance-setup-content select,
+.attendance-current select,.attendance-method-content input,
+.attendance-method-content select,.attendance-method-content textarea,
+.attendance-payment input,.attendance-payment select,.attendance-payment textarea{
+ width:100%;box-sizing:border-box;min-height:42px;
+ color:#f5f5f3;background:#111316;
+ border:1px solid #60656b;border-radius:8px;
+ padding:10px 12px;font:13px/1.5 Arial,Helvetica,sans-serif;
+}
+.attendance-method-content textarea,
+.attendance-payment textarea{resize:vertical;min-height:68px}
+.attendance-current-head{display:flex;align-items:end;gap:13px}
+.attendance-current-head label{flex:1;min-width:0}
+.attendance-current-head button{white-space:nowrap}
+.attendance-supervisor-list{
+ display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));
+ gap:7px;
+}
+.attendance-person-option{
+ display:flex;align-items:center;gap:8px;
+ border:1px solid #42464a;border-radius:8px;padding:12px;
+ font-size:12px;line-height:1.4;color:#f4f4ef;background:#23262a;
+ cursor:pointer;
+}
+.attendance-person-option input{width:16px;height:16px;min-height:0;flex-shrink:0}
+.attendance-section-caption{font-weight:700;font-size:13px;margin-top:6px}
+.attendance-event-intro{
+ display:flex;justify-content:space-between;gap:16px;
+ align-items:flex-start;margin-bottom:13px;
+}
+.attendance-event-intro h2{
+ font-size:22px;line-height:1.2;letter-spacing:-.02em;
+ color:#f8f8f5;margin:0 0 5px;
+}
+.attendance-event-intro p{
+ margin:0 0 5px;color:#bfc3c6;font-size:12px;line-height:1.5;
+}
+.attendance-event-intro small{font-size:11px;color:#d9dcda}
+.attendance-methods{display:grid;gap:11px;margin:16px 0}
+.attendance-methods details{
+ border:1px solid #3d4148;background:#1b1e22;border-radius:12px;
+ overflow:hidden;
+}
+.attendance-methods summary{
+ cursor:pointer;display:flex;gap:12px;align-items:center;
+ padding:16px 18px;color:#f6f5f0;font-size:15px;font-weight:700;
+ list-style:none;
+}
+.attendance-methods summary::-webkit-details-marker{display:none}
+.attendance-methods summary span{
+ width:27px;height:27px;display:grid;place-items:center;
+ background:#32363b;border:1px solid #64666a;border-radius:8px;
+ font-size:12px;
+}
+.attendance-methods details[open]>summary{border-bottom:1px solid #3d4148}
+.attendance-method-content{display:grid;gap:11px;padding:17px 18px 20px}
+.attendance-method-content p{
+ margin:0;color:#bfc2c7;font-size:12px;line-height:1.5;
+}
+.attendance-method-content button{justify-self:start;max-width:100%}
+.attendance-qr-result{
+ padding:16px;border:1px solid #52745b;border-radius:9px;
+ background:#1c2a20;display:grid;gap:12px;
+}
+.attendance-qr-result p{color:#c9dbc9;margin:0}
+.attendance-qr-actions{display:flex;flex-wrap:wrap;gap:9px}
+.attendance-history h2,.attendance-payment h2{
+ color:#f5f4f1;font-size:20px;margin:0 0 12px;
+ letter-spacing:-.02em;
+}
+.attendance-payment{
+ margin-top:14px;display:grid;gap:13px;
+}
+.attendance-time-grid{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:10px;
+}
+.attendance-time-grid label{display:grid;gap:7px;font-size:12px;color:#e0e1df;font-weight:650}
+.attendance-row{
+ display:flex;justify-content:space-between;gap:10px;align-items:center;
+ padding:12px 0;border-bottom:1px solid #383d43;
+}
+.attendance-row:last-child{border-bottom:0}
+.attendance-row>div:first-child{min-width:0;display:grid;gap:5px}
+.attendance-row strong{font-size:14px;color:#f4f4f1}
+.attendance-row small{
+ font-size:12px;line-height:1.45;color:#bfc2c7;
+ overflow-wrap:anywhere;
+}
+.attendance-row-actions{display:flex;flex-wrap:wrap;gap:6px}
+.attendance-row-actions button{min-height:37px;font-size:11px}
+.attendance-status{
+ border-radius:7px;display:inline-flex;padding:7px 8px;
+ background:#2a3230;border:1px solid #546862;
+ color:#d2e6d9;font-size:11px;white-space:nowrap;
+}
+.qr-scan-status[data-tone="error"]{border-color:#945b58;background:#432b2c}
+.qr-scan-status[data-tone="success"]{border-color:#4b7458;background:#24362c}
+#scan-event-content[hidden],.qr-scan-page [hidden]{display:none!important}
+#scan-event-content{display:block}
+#scan-payment-panel[hidden]{display:none!important}
+@media(max-width:660px){
+ .attendance-setup,.attendance-current,.attendance-event-intro,
+ .attendance-history,.attendance-payment{padding:14px}
+ .attendance-event-intro{flex-wrap:wrap}
+ .attendance-methods summary{padding:13px}
+ .attendance-method-content{padding:14px}
+ .attendance-current-head{display:grid}
+ .attendance-current-head button{justify-self:start}
+ .attendance-time-grid{grid-template-columns:1fr}
+ .attendance-row{align-items:flex-start;flex-wrap:wrap}
+ .attendance-row-actions{width:100%}
+ .attendance-row-actions button{flex:1}
+ .attendance-qr-actions{display:grid}
+ .attendance-qr-actions button{width:100%}
+}
+
+
+/* Actividades reales, libres y por misma jornada (Staff). */
+.attendance-task-container{
+ display:grid;gap:11px;margin:14px 0 0;
+}
+.attendance-task-container>[data-action="open-tasks"]{justify-self:start}
+.attendance-task-content{
+ border:1px solid #3e4348;border-radius:10px;
+ background:#202226;padding:16px;
+}
+.attendance-task-list{display:grid;gap:10px;margin-bottom:14px}
+.attendance-task{
+ display:flex;gap:12px;align-items:center;
+ justify-content:space-between;padding:12px;
+ background:#272a2e;border-radius:9px;border:1px solid #3e444c;
+}
+.attendance-task>div{display:grid;gap:4px;min-width:0}
+.attendance-task strong{
+ font-size:13px;line-height:1.5;
+ color:#f5f5f2;overflow-wrap:anywhere;
+}
+.attendance-task small{font-size:11px;color:#bcbfc5}
+.attendance-task select{
+ min-height:41px;min-width:137px;border:1px solid #656971;
+ padding:9px;color:#f9f8f5;background:#181a1d;
+ border-radius:8px;font:12px/1.4 Arial,Helvetica,sans-serif;
+}
+.attendance-task-form{
+ display:grid;gap:11px;border-top:1px solid #42464b;padding-top:16px;
+}
+.attendance-task-form label{
+ display:grid;gap:8px;font-size:12px;
+ color:#e0e1df;font-weight:700;
+}
+.attendance-task-form input{
+ width:100%;box-sizing:border-box;min-height:45px;
+ background:#121416;color:#f6f6f3;
+ padding:10px 12px;border:1px solid #686a6e;border-radius:9px;
+ font-size:13px;
+}
+.attendance-task-form button{justify-self:start}
+@media(max-width:530px){
+ .attendance-task{display:grid}
+ .attendance-task select{width:100%}
+ .attendance-task-container>[data-action="open-tasks"]{width:100%}
+}
+
+
+/* Solicitudes de jornada almacenadas, con evidencia fotográfica privada pequeña. */
+.assignment-history-header{
+ display:flex;justify-content:space-between;align-items:center;
+ flex-wrap:wrap;gap:12px;margin:22px 0 11px;
+ padding-top:18px;border-top:1px solid #41444a;
+}
+.assignment-history-header strong{color:#f4f5f2;font-size:15px}
+.assignment-history-header button{font-size:11px}
+.assignment-history{display:grid;gap:8px}
+.assignment-history-item{
+ border:1px solid #3e4247;border-radius:10px;
+ background:#202327;overflow:hidden;
+}
+.assignment-history-item summary{
+ display:flex;align-items:center;justify-content:space-between;
+ flex-wrap:wrap;gap:12px;padding:13px 15px;
+ cursor:pointer;list-style:none;color:#f5f4f2;
+}
+.assignment-history-item summary::-webkit-details-marker{display:none}
+.assignment-history-item summary span{display:grid;gap:5px;min-width:0}
+.assignment-history-item summary strong{font-size:13px}
+.assignment-history-item summary small{font-size:11px;color:#bfc2c7}
+.assignment-history-body{
+ border-top:1px solid #43464c;padding:15px;
+ display:grid;gap:8px;
+}
+.assignment-history-body p{
+ margin:0;font-size:12px;line-height:1.55;
+ color:#d5d8da;overflow-wrap:anywhere;
+}
+.assignment-history-image{
+ max-width:min(100%,540px);max-height:480px;
+ object-fit:contain;border-radius:7px;background:#161819;
+ border:1px solid #41454b;margin:6px 0;
+}
+.assignment-history-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:6px}
+.assignment-history-actions .profile-button{font-size:11px}
+@media(max-width:560px){
+ .assignment-history-actions{display:grid}
+ .assignment-history-header{align-items:flex-start}
+}

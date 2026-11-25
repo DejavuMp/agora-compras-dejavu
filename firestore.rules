@@ -1633,6 +1633,331 @@ match /agora_finance_requests/{requestId} {
       allow update, delete: if false;
     }
 
+
+    // ÁGORA ASISTENCIA · Registro mínimo delegado por jornada.
+    // No otorga acceso de Supervisor al cronograma, finanzas o expedientes.
+    function attendanceSheetPath(eventId) {
+      return /databases/$(database)/documents/agora_ops_attendance_sheets/$(eventId);
+    }
+    function attendanceRosterPath(eventId,personId) {
+      return /databases/$(database)/documents/agora_ops_attendance_sheets/$(eventId)/roster/$(personId);
+    }
+    function attendanceEntryPath(eventId,entryId) {
+      return /databases/$(database)/documents/agora_ops_attendance_sheets/$(eventId)/entries/$(entryId);
+    }
+    function attendanceSupervisor(eventId) {
+      return signedIn() &&
+        exists(attendanceSheetPath(eventId)) &&
+        get(attendanceSheetPath(eventId)).data.active == true &&
+        request.auth.uid in get(attendanceSheetPath(eventId)).data.supervisorUids &&
+        exists(identityLinkPath(request.auth.uid)) &&
+        get(identityLinkPath(request.auth.uid)).data.active == true;
+    }
+    function attendanceExistingPerson(eventId,d) {
+      return d.source in ['qr','manual'] &&
+        d.ownerUid is string &&
+        ((d.source == 'qr' && d.ownerUid.size() > 0) ||
+         (d.source == 'manual' && (d.ownerUid.size() > 0 || d.reason.size() >= 10))) &&
+        exists(attendanceRosterPath(eventId,d.personId)) &&
+        get(attendanceRosterPath(eventId,d.personId)).data.uid == d.ownerUid &&
+        get(attendanceRosterPath(eventId,d.personId)).data.name == d.personName &&
+        d.actorUid != d.ownerUid;
+    }
+    function attendanceProvisional(d) {
+      return d.source == 'provisional' &&
+        d.ownerUid == '' &&
+        d.personId.matches('^prov_[a-f0-9]{20}$') &&
+        d.reason.size() >= 10;
+    }
+    function attendanceEntryCreate(eventId,id) {
+      let d=request.resource.data;
+      return attendanceSupervisor(eventId) &&
+        d.keys().hasOnly([
+          'id','eventId','personId','ownerUid','personName','source','action',
+          'activityKey','reason','notes','actorUid','createdAt','status'
+        ]) &&
+        d.keys().hasAll([
+          'id','eventId','personId','ownerUid','personName','source','action',
+          'activityKey','reason','notes','actorUid','createdAt','status'
+        ]) &&
+        d.id == id && d.eventId == eventId &&
+        d.personId is string &&
+        d.personId.matches('^[A-Za-z0-9_-]{1,90}$') &&
+        d.personName is string && d.personName.size() >= 2 && d.personName.size() <= 140 &&
+        d.action in ['entrada','salida','actividad'] &&
+        d.activityKey is string &&
+        d.activityKey.matches('^[A-Za-z0-9_-]{1,80}$') &&
+        ((d.action in ['entrada','salida'] && d.activityKey == 'jornada') ||
+         (d.action == 'actividad' && d.activityKey != 'jornada')) &&
+        id == d.personId + '__' + d.action + '__' + d.activityKey &&
+        d.source in ['qr','manual','provisional'] &&
+        d.reason is string && d.reason.size() <= 400 &&
+        d.notes is string && d.notes.size() <= 400 &&
+        (attendanceExistingPerson(eventId,d) || attendanceProvisional(d)) &&
+        d.actorUid == request.auth.uid &&
+        d.status == 'pendiente' && d.createdAt == request.time &&
+        request.time >= get(attendanceSheetPath(eventId)).data.startsAt -
+          duration.value(30,'m') &&
+        request.time <= get(attendanceSheetPath(eventId)).data.endsAt +
+          duration.value(30,'m');
+    }
+    function attendanceValidated(eventId,personId,action) {
+      let id=personId + '__' + action + '__jornada';
+      return exists(attendanceEntryPath(eventId,id)) &&
+        get(attendanceEntryPath(eventId,id)).data.status == 'validado';
+    }
+    function attendanceClockCompleted(eventId,personId) {
+      return exists(attendanceRosterPath(eventId,personId)) &&
+        get(attendanceRosterPath(eventId,personId)).data.uid != '' &&
+        exists(shiftClockPath(get(attendanceRosterPath(eventId,personId)).data.uid,eventId)) &&
+        get(shiftClockPath(get(attendanceRosterPath(eventId,personId)).data.uid,eventId)).data.status == 'finalizada';
+    }
+    // Solicitudes de jornadas de Coordinación. Se guarda una captura pequeña
+    // de evidencia como JPEG privada en Firestore, sin URLs ni buckets públicos.
+    match /agora_ops_assignment_requests/{requestId} {
+      allow get, list: if canEdit();
+      allow create: if canEdit() &&
+        requestId.matches('^[a-f0-9-]{36}$') &&
+        request.resource.data.keys().hasOnly([
+          'id','requester','channel','contact','requestedAt','project','site',
+          'date','start','end','headcount','description','activities',
+          'evidenceNote','evidenceImage','capturedBy','createdAt',
+          'status','linkedEventId','updatedAt','updatedBy'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'id','requester','channel','contact','requestedAt','project','site',
+          'date','start','end','headcount','description','activities',
+          'evidenceNote','evidenceImage','capturedBy','createdAt',
+          'status','linkedEventId','updatedAt','updatedBy'
+        ]) &&
+        request.resource.data.id == requestId &&
+        request.resource.data.requester is string &&
+        request.resource.data.requester.size() >= 2 &&
+        request.resource.data.requester.size() <= 140 &&
+        request.resource.data.channel in [
+          'WhatsApp','Llamada','Correo','Presencial','Otro'
+        ] &&
+        request.resource.data.contact is string &&
+        request.resource.data.contact.size() <= 120 &&
+        request.resource.data.requestedAt is string &&
+        request.resource.data.requestedAt.size() <= 40 &&
+        request.resource.data.project is string &&
+        request.resource.data.project.size() >= 2 &&
+        request.resource.data.project.size() <= 150 &&
+        request.resource.data.site is string &&
+        request.resource.data.site.size() >= 2 &&
+        request.resource.data.site.size() <= 150 &&
+        request.resource.data.date is string &&
+        request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        request.resource.data.start is string &&
+        request.resource.data.start.matches('^[0-9]{2}:[0-9]{2}$') &&
+        request.resource.data.end is string &&
+        request.resource.data.end.matches('^[0-9]{2}:[0-9]{2}$') &&
+        request.resource.data.headcount is int &&
+        request.resource.data.headcount >= 1 &&
+        request.resource.data.headcount <= 999 &&
+        request.resource.data.description is string &&
+        request.resource.data.description.size() <= 600 &&
+        request.resource.data.activities is list &&
+        request.resource.data.activities.size() <= 500 &&
+        request.resource.data.evidenceNote is string &&
+        request.resource.data.evidenceNote.size() <= 400 &&
+        request.resource.data.evidenceImage is string &&
+        request.resource.data.evidenceImage.size() <= 185000 &&
+        (request.resource.data.evidenceImage == '' ||
+         request.resource.data.evidenceImage.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')) &&
+        request.resource.data.capturedBy == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        request.resource.data.status == 'pendiente' &&
+        request.resource.data.linkedEventId == '';
+      allow update: if canEdit() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status','linkedEventId','updatedAt','updatedBy'
+        ]) &&
+        request.resource.data.status in [
+          'pendiente','confirmada','cancelada'
+        ] &&
+        request.resource.data.linkedEventId is string &&
+        request.resource.data.linkedEventId.size() <= 100 &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if false;
+    }
+    match /agora_ops_attendance_sheets/{eventId} {
+      // La lista revela solo metadatos mínimos ya delegados. Una jornada
+      // cerrada no permite leer roster/entradas ni crear nuevos registros.
+      allow get, list: if canEdit() ||
+        (signedIn() &&
+         request.auth.uid in resource.data.supervisorUids &&
+         exists(identityLinkPath(request.auth.uid)) &&
+         get(identityLinkPath(request.auth.uid)).data.active == true);
+      allow create: if canEdit() && eventId.matches('^[A-Za-z0-9_-]{1,100}$') &&
+        request.resource.data.keys().hasOnly([
+          'eventId','title','site','startsAt','endsAt','active',
+          'supervisorUids','createdBy','createdAt','updatedBy','updatedAt','revision'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'eventId','title','site','startsAt','endsAt','active',
+          'supervisorUids','createdBy','createdAt','updatedBy','updatedAt','revision'
+        ]) &&
+        request.resource.data.eventId == eventId &&
+        request.resource.data.title is string &&
+        request.resource.data.title.size() >= 2 &&
+        request.resource.data.title.size() <= 180 &&
+        request.resource.data.site is string &&
+        request.resource.data.site.size() <= 180 &&
+        request.resource.data.startsAt is timestamp &&
+        request.resource.data.endsAt is timestamp &&
+        request.resource.data.endsAt > request.resource.data.startsAt &&
+        request.resource.data.endsAt <= request.resource.data.startsAt +
+          duration.value(48,'h') &&
+        request.resource.data.supervisorUids is list &&
+        request.resource.data.supervisorUids.size() <= 20 &&
+        request.resource.data.active == true &&
+        request.resource.data.revision == 1 &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time;
+      allow update: if canEdit() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'supervisorUids','active','updatedAt','updatedBy','revision'
+        ]) &&
+        request.resource.data.supervisorUids is list &&
+        request.resource.data.supervisorUids.size() <= 20 &&
+        request.resource.data.active is bool &&
+        request.resource.data.revision == resource.data.revision + 1 &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+
+      match /roster/{personId} {
+        allow get, list: if canEdit() || attendanceSupervisor(eventId);
+        allow create: if canEdit() &&
+          existsAfter(attendanceSheetPath(eventId)) &&
+          personId.matches('^[A-Za-z0-9_-]{1,90}$') &&
+          request.resource.data.keys().hasOnly([
+            'eventId','personId','uid','name','activityKeys','createdBy','createdAt'
+          ]) &&
+          request.resource.data.keys().hasAll([
+            'eventId','personId','uid','name','activityKeys','createdBy','createdAt'
+          ]) &&
+          request.resource.data.eventId == eventId &&
+          request.resource.data.personId == personId &&
+          request.resource.data.uid is string &&
+          request.resource.data.uid.size() <= 128 &&
+          request.resource.data.name is string &&
+          request.resource.data.name.size() >= 2 &&
+          request.resource.data.name.size() <= 140 &&
+          request.resource.data.activityKeys is list &&
+          request.resource.data.activityKeys.size() <= 100 &&
+          request.resource.data.createdBy == request.auth.uid &&
+          request.resource.data.createdAt == request.time;
+        allow update, delete: if false;
+      }
+      match /entries/{id} {
+        allow get, list: if canEdit() || attendanceSupervisor(eventId);
+        allow create: if attendanceEntryCreate(eventId,id);
+        allow update: if canEdit() && resource.data.status == 'pendiente' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status','validatedBy','validatedAt','validationNote'
+          ]) &&
+          request.resource.data.status in ['validado','rechazado'] &&
+          request.resource.data.validatedBy == request.auth.uid &&
+          request.resource.data.validatedAt == request.time &&
+          request.resource.data.validationNote is string &&
+          request.resource.data.validationNote.size() <= 600;
+        allow delete: if false;
+      }
+      match /activities/{activityId} {
+        allow get, list: if canEdit() || attendanceSupervisor(eventId) ||
+          (opsStaff() && resource.data.uid == request.auth.uid);
+        allow create: if
+          activityId.matches('^[A-Za-z0-9_-]{10,70}$') &&
+          request.resource.data.keys().hasOnly([
+            'id','eventId','personId','uid','name','status','createdAt','createdBy',
+            'updatedAt','updatedBy'
+          ]) &&
+          request.resource.data.keys().hasAll([
+            'id','eventId','personId','uid','name','status','createdAt','createdBy',
+            'updatedAt','updatedBy'
+          ]) &&
+          request.resource.data.id == activityId &&
+          request.resource.data.eventId == eventId &&
+          request.resource.data.personId.matches('^[A-Za-z0-9_-]{1,90}$') &&
+          request.resource.data.uid is string &&
+          request.resource.data.uid.size() > 0 &&
+          exists(attendanceRosterPath(eventId,request.resource.data.personId)) &&
+          get(attendanceRosterPath(eventId,request.resource.data.personId)).data.uid ==
+            request.resource.data.uid &&
+          (attendanceSupervisor(eventId) ||
+           (opsStaff() && request.resource.data.uid == request.auth.uid)) &&
+          request.resource.data.name is string &&
+          request.resource.data.name.size() >= 3 &&
+          request.resource.data.name.size() <= 200 &&
+          request.resource.data.status == 'pendiente' &&
+          request.resource.data.createdAt == request.time &&
+          request.resource.data.updatedAt == request.time &&
+          request.resource.data.createdBy == request.auth.uid &&
+          request.resource.data.updatedBy == request.auth.uid;
+        allow update: if
+          (canEdit() || attendanceSupervisor(eventId) ||
+           (opsStaff() && resource.data.uid == request.auth.uid)) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status','updatedAt','updatedBy'
+          ]) &&
+          request.resource.data.status in [
+            'pendiente','en_curso','terminada','no_realizada'
+          ] &&
+          request.resource.data.updatedAt == request.time &&
+          request.resource.data.updatedBy == request.auth.uid;
+        allow delete: if false;
+      }
+      match /approvals/{personId} {
+        allow get, list: if canEdit();
+        allow create: if canEdit() &&
+          personId.matches('^[A-Za-z0-9_-]{1,90}$') &&
+          request.resource.data.keys().hasOnly([
+            'eventId','personId','personName','startAt','endAt',
+            'breakMinutes','approvedMinutes','notes','status',
+            'approvedBy','approvedAt','source'
+          ]) &&
+          request.resource.data.keys().hasAll([
+            'eventId','personId','personName','startAt','endAt',
+            'breakMinutes','approvedMinutes','notes','status',
+            'approvedBy','approvedAt','source'
+          ]) &&
+          request.resource.data.eventId == eventId &&
+          request.resource.data.personId == personId &&
+          request.resource.data.personName is string &&
+          request.resource.data.personName.size() >= 2 &&
+          request.resource.data.personName.size() <= 140 &&
+          request.resource.data.startAt is timestamp &&
+          request.resource.data.endAt is timestamp &&
+          request.resource.data.endAt > request.resource.data.startAt &&
+          request.resource.data.endAt <= request.resource.data.startAt +
+            duration.value(36,'h') &&
+          request.resource.data.breakMinutes is int &&
+          request.resource.data.breakMinutes >= 0 &&
+          request.resource.data.breakMinutes <= 600 &&
+          request.resource.data.approvedMinutes is int &&
+          request.resource.data.approvedMinutes > 0 &&
+          request.resource.data.approvedMinutes <= 1440 &&
+          request.resource.data.notes is string &&
+          request.resource.data.notes.size() <= 600 &&
+          request.resource.data.status == 'horas_validadas' &&
+          request.resource.data.source in ['qr','manual','provisional','reloj'] &&
+          request.resource.data.approvedBy == request.auth.uid &&
+          request.resource.data.approvedAt == request.time &&
+          ((attendanceValidated(eventId,personId,'entrada') &&
+            attendanceValidated(eventId,personId,'salida')) ||
+           attendanceClockCompleted(eventId,personId));
+        allow update, delete: if false;
+      }
+    }
+
     // Todas las demás colecciones permanecen cerradas.
     match /{document=**} {
       allow read, write: if false;
