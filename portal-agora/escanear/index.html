@@ -77,6 +77,7 @@
               <p>Solo las cuentas seleccionadas podrán pasar lista en esta jornada. No verán tarifas ni datos de pagos.</p>
               <div id="scan-supervisor-options" class="attendance-supervisor-list"></div>
               <button type="button" data-write id="scan-update-supervisors" class="profile-button profile-button-outline">Guardar supervisores autorizados</button>
+              <button type="button" data-write id="scan-toggle-active" class="profile-button profile-button-outline">Cerrar pase de lista</button>
             </div>
           </details>
           <div class="attendance-methods">
@@ -132,6 +133,16 @@
               <summary><span>3</span> Persona no encontrada</summary>
               <div class="attendance-method-content">
                 <p>Registra una presencia provisional. Coordinación deberá verificar la asignación y la identidad antes de validar horas para pago.</p>
+                <label for="scan-provisional-requester">¿Quién solicitó este apoyo?</label>
+                <input type="text" id="scan-provisional-requester" maxlength="140" placeholder="Cliente, coordinador o responsable">
+                <label for="scan-provisional-channel">¿Cómo lo solicitó?</label>
+                <select id="scan-provisional-channel">
+                  <option value="WhatsApp">WhatsApp / mensaje</option>
+                  <option value="Llamada">Llamada telefónica</option>
+                  <option value="Correo">Correo electrónico</option>
+                  <option value="Presencial">Presencial</option>
+                  <option value="Otro">Otro</option>
+                </select>
                 <label for="scan-provisional-name">Nombre completo</label>
                 <input type="text" id="scan-provisional-name" maxlength="140" placeholder="Nombre del colaborador">
                 <label for="scan-provisional-reason">Por qué no aparece en la lista</label>
