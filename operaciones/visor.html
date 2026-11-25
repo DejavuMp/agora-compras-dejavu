@@ -166,7 +166,9 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
 #viewer-staff .staff-featured h4{font-size:18px;margin:4px 0 12px}
 #viewer-staff .staff-featured p{margin:7px 0;color:#58616a;font-size:13px}
 #viewer-staff .staff-featured .staff-featured-actions{display:flex;gap:8px;flex-wrap:wrap;margin:15px 0 2px}
-#viewer-staff .staff-featured .staff-featured-actions button{min-height:41px}
+#viewer-staff .staff-featured .staff-featured-actions button,
+#viewer-staff .staff-featured .staff-featured-actions a{min-height:41px;display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border:1px solid #c9c6bf;border-radius:9px;background:white;color:#202223;font-weight:700;text-decoration:none}
+#viewer-staff .staff-featured .staff-featured-actions a.primary{background:#202223;color:white;border-color:#202223}
 #viewer-staff .staff-upcoming-item{padding:13px 0;border-bottom:1px solid #eee}
 #viewer-staff .staff-upcoming-item:last-child{border:0}
 #viewer-staff .staff-upcoming-item strong{font-size:13px}
@@ -269,8 +271,6 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
 #viewer-staff #j-home-attendance .staff-location-consent input{width:18px;height:18px;flex-shrink:0}
 #viewer-staff #j-home-attendance .disclaimer{display:none}
 #viewer-staff #j-home-attendance #j-active .card{border:0;box-shadow:none;padding:10px 0}
-#viewer-staff #j-home-attendance #start-shift,
-#viewer-staff #j-home-attendance #end-shift{display:block;width:100%;min-height:54px;font-size:17px;font-weight:800;margin:15px 0 8px;border-radius:12px}
 #viewer-staff .staff-my-pay{margin:0}
 #viewer-staff .staff-my-pay>.staff-section-heading{margin-bottom:9px}
 #viewer-staff .staff-my-pay .own-pay-total{font-size:36px;margin:0 0 4px}
@@ -345,7 +345,7 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
     </nav><div class="staff-more-tools"><button type="button" data-staff-tab="traslados">Traslados</button><button type="button" data-staff-tab="asistencia">Asistencia detallada</button><button type="button" id="j-reminders-show" class="staff-extra-button">Recordatorios</button></div></details><button type="button" id="j-return-home" data-staff-tab="inicio" hidden>← Volver a Mi día</button>
     <section class="staff-tab-panel" data-staff-panel="inicio" aria-label="Resumen de mi jornada">
       <div class="staff-dashboard">
-        <section class="panel"><div class="staff-section-heading"><div><h3>Mi jornada</h3><p>Tu lugar, horario y entrada/salida aquí mismo.</p></div></div><div id="j-today"></div></section><div id="j-home-attendance"></div><section class="panel staff-my-pay"><div class="staff-section-heading"><div><h3>Mi pago de esta jornada</h3><p>Importe previsto o aprobado exclusivamente para ti.</p></div><button type="button" class="staff-subtle" data-staff-tab="pagos">Ver detalle</button></div><div id="j-home-pay"></div></section>
+        <section class="panel"><div class="staff-section-heading"><div><h3>Mi jornada</h3><p>Tu lugar, horario y QR de acceso rápido. La asistencia la registra tu responsable.</p></div></div><div id="j-today"></div></section><div id="j-home-attendance"></div><section class="panel staff-my-pay"><div class="staff-section-heading"><div><h3>Mi pago de esta jornada</h3><p>Importe previsto o aprobado exclusivamente para ti.</p></div><button type="button" class="staff-subtle" data-staff-tab="pagos">Ver detalle</button></div><div id="j-home-pay"></div></section>
         <section class="panel"><div class="staff-section-heading"><div><h3>Enseguida</h3><p>Actividades asignadas para los próximos días.</p></div><button type="button" class="staff-subtle" data-staff-tab="cronograma">Ver todo el cronograma</button></div><div id="j-upcoming"></div></section>
       </div>
       <div class="staff-hint">Tus datos se actualizan desde Firebase. Solo tú y coordinación pueden consultar tus registros de asistencia y pagos.</div>
@@ -371,8 +371,8 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
         <label class="staff-select-label">Elegir jornada<select id="j-select-attendance" data-choose-event></select></label>
         <div id="policy-state" class="staff-policy" role="status"></div>
         <div id="j-active"></div><div id="j-punches"></div>
-        <div class="staff-location-consent"><label><input type="checkbox" id="live-location"> Permito compartir mi ubicación al registrar entrada y mientras esta página esté abierta. Puedo desactivarla cuando quiera.</label><p id="location-state" class="geo">Ubicación continua desactivada.</p></div>
-        <p class="disclaimer">La hora de marcaje se guarda desde Firebase. Para iniciar debes permitir ubicación puntual y seguimiento visible mientras tengas esta página abierta. Puedes revocar el permiso en cualquier momento; si cierras la app el seguimiento se detendrá y no se simulará ubicación en segundo plano.</p>
+        <p class="disclaimer">Presenta el QR de esta jornada. Tu Supervisor o Coordinador registra la asistencia y ubicación desde el pase de lista autorizado.</p>
+        <div hidden aria-hidden="true"><input type="checkbox" id="live-location"><p id="location-state"></p></div>
       </section>
     </section>
     <section class="staff-tab-panel" data-staff-panel="traslados" hidden aria-label="Mis traslados">

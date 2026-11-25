@@ -566,11 +566,14 @@ function staffJornadaCard(item){
 function staffOperationsSpace(){
   const staff=state.roleData?.staff;
   const assigned=ownJornadas(staff,new Date(),35);
+  const now=Date.now();
+  const quickQr=assigned.find(x=>x.start<=now&&x.end>=now)||assigned.find(x=>x.start>now)||assigned[0];
   return '<section class="role-module" aria-label="Mis jornadas y actividades">'+
     '<header class="role-module-heading"><div><h2>Mis jornadas</h2>'+
       '<p>Una jornada puede incluir varias actividades. Consulta tus asignaciones personales.</p></div>'+
       '<div class="role-space-actions">'+
         '<button type="button" class="profile-button profile-button-primary" data-action="new-work-claim">+ Registrar trabajo o asignación</button>'+
+        (quickQr?'<button type="button" class="profile-button profile-button-outline" data-action="show-shift-qr" data-event-id="'+esc(quickQr.key)+'">Abrir QR de mi jornada</button>':"")+
         '<a class="profile-button profile-button-primary" href="'+esc(href("mi-operacion/"))+'">Mi operación</a>'+
         '<a class="profile-button profile-button-outline" href="'+esc(href("escanear/"))+'">Pasar lista (supervisores)</a></div></header>'+
     roleNotice()+
@@ -585,8 +588,7 @@ function staffOperationsSpace(){
       '<p>Preséntalo al coordinador o supervisor autorizado. Es distinto de tu identificación.</p></div>'+
       '<button type="button" data-action="close-shift-qr" aria-label="Cerrar QR de jornada">×</button></div>'+
       '<div id="staff-shift-qr-content"></div></dialog>'+
-    '<div class="role-legacy-links"><a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/visor.html"))+'">Registrar entrada / salida</a></div>'+
-    '<p class="role-transition">El marcaje oficial sigue en Jornadas mientras se integra en esta pantalla. Se conserva tu historial.</p>'+
+    '<p class="role-transition">La asistencia oficial la registra tu Supervisor o Coordinador al escanear el QR o pasar lista. Este espacio conserva tus declaraciones de trabajo por separado.</p>'+
   '</section>';
 }
 function scheduleCard(item){
@@ -753,7 +755,7 @@ async function loadWorkClaims(){
     const amount=hours!=null?" · Horas "+Number(hours).toFixed(2)+(x.declaredHours!=null&&x.approvedHours==null?" declaradas":" aprobadas")+(rate!=null?" · Importe "+(x.approvedAmount==null?"estimado ":"aprobado ")+Number(x.approvedAmount??(Number(rate)*Number(hours))).toFixed(2)+" MXN":" · Tarifa pendiente de confirmar"):" · Horas pendientes de confirmar";
     let review="";
     if(!isStaff&&["pendiente","aclaracion"].includes(x.status))review='<form class="work-claim-review" data-claim-id="'+esc(x.id)+'"><label>Decisión<select name="status"><option value="validado">Validar</option><option value="aclaracion">Requiere aclaración</option><option value="rechazado">Rechazar</option></select></label><label>Horas aprobadas<input name="approvedHours" type="number" min="0" max="36" step="0.25" value="'+(Number(hours)||"")+'"></label><label>Tarifa aprobada MXN/h<input name="approvedRate" type="number" min="0.01" step="0.01" value="'+(Number(rate)||"")+'"></label><label>Comentario<input name="validationNote" maxlength="400"></label><button class="profile-button profile-button-primary" type="submit">Guardar revisión</button></form>';
-    const finish=isStaff&&x.recordType==="en_curso"&&!x.actualEnd?'<form class="work-claim-finish" data-claim-id="'+esc(x.id)+'"><label>Hora de salida declarada<input name="actualEnd" type="time" required></label><button class="profile-button profile-button-outline" type="submit">Terminar trabajo</button></form>':"";
+    const finish=isStaff&&x.recordType==="en_curso"&&!x.actualEnd?'<form class="work-claim-finish" data-claim-id="'+esc(x.id)+'"><label>Hora final declarada del trabajo<input name="actualEnd" type="time" required></label><button class="profile-button profile-button-outline" type="submit">Completar declaración</button><small>Esto no registra ni verifica tu asistencia.</small></form>':"";
     return '<article class="work-claim-card"><div><strong>'+esc(x.project||"Trabajo")+'</strong><span class="role-time">'+esc(status)+'</span></div><p>'+esc(x.date||"")+' · '+esc(type)+' · '+esc(x.site||"")+'</p><p>Solicitó: '+esc(x.requester||"No indicado")+' · '+esc(x.channel||"")+'</p><p>'+esc(x.description||"")+esc(amount)+'</p>'+(Number(x.overtimeHours)>0?'<p>Horas extra declaradas: '+Number(x.overtimeHours).toFixed(2)+'</p>':"")+(Number(x.expenses)>0?'<p>Gastos declarados: $'+Number(x.expenses).toFixed(2)+' MXN (pendientes de revisión)</p>':"")+(x.validationNote?'<p>Revisión: '+esc(x.validationNote)+'</p>':"")+(x.evidenceImage?'<img class="assignment-history-image" src="'+esc(x.evidenceImage)+'" alt="Evidencia privada del trabajo '+esc(x.id)+'">':"")+finish+review+'</article>';
   }).join("");
 }

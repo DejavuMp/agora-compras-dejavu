@@ -77,13 +77,13 @@ const statusOf=e=>{
   const clock=records.get(key(user?.uid||"",e.id));
   const policy=access.get(key(user?.uid||"",e.id));
   if(e.status==="cancelado")return ["Cancelada","blocked"];
-  if(clock?.status==="finalizada")return ["Salida registrada · pendiente de validación","done"];
-  if(clock?.status==="en_curso")return ["Entrada registrada · jornada abierta","active"];
+  if(clock?.status==="finalizada")return ["Asistencia registrada · pendiente de validación","done"];
+  if(clock?.status==="en_curso")return ["Registro anterior · consultar a coordinación","blocked"];
   const from=instant(eventStart(e,personId)),until=instant(eventEnd(e,personId)),now=Date.now();
   if(Number.isFinite(from)&&now<from)return ["Programada","blocked"];
   if(Number.isFinite(until)&&now>until)return ["Horario terminado · asistencia por revisar","done"];
-  if(policy?.enabled&&allowedByPolicy(policy).ok)return ["En horario · puedes registrar entrada","active"];
-  return ["En horario · permiso pendiente","blocked"];
+  if(policy?.enabled&&allowedByPolicy(policy).ok)return ["En horario · asistencia con tu responsable","active"];
+  return ["En horario · asistencia por registrar con responsable","blocked"];
 };
 const eventSite=e=>(staff?.sites||[]).find(s=>s.id===e.siteId);
 const destination=e=>e?.venueAddress||eventSite(e)?.address||e?.venueName||eventSite(e)?.name||e?.location||"";
@@ -189,7 +189,7 @@ function renderHome(events){
     '<p>'+eventDescription(featured)+'</p>'+
     '<p>Campaña: '+esc(featured.campaign||featured.project||"No especificada")+'</p>'+
     '<p>Transporte: '+esc(tripLabel(featured))+'</p>'+
-    '<div class="staff-featured-actions"><button type="button" class="primary" data-open-event="'+esc(featured.id)+'" data-open-tab="inicio">Entrada / salida</button>'+
+    '<div class="staff-featured-actions"><a class="primary" href="../portal-agora/staff/">Abrir QR de mi jornada</a>'+
     '<button type="button" data-open-event="'+esc(featured.id)+'" data-open-tab="traslados">Ver traslado</button></div></div>';
   const others=upcoming.filter(e=>e.id!==featured.id).slice(0,4);
   $("j-upcoming").innerHTML=others.length?others.map(e=>
@@ -248,7 +248,7 @@ function renderSelectors(events){
   }
 }
 function renderAttendance(){
-  const e=currentEvent(),p=currentPolicy(),r=currentClock();
+  const e=currentEvent(),r=currentClock();
   if(!e){
     $("policy-state").textContent="Todavía no tienes jornadas asignadas.";
     $("j-active").innerHTML='<div class="staff-empty">Selecciona una jornada del cronograma cuando esté disponible.</div>';
@@ -256,68 +256,19 @@ function renderAttendance(){
     $("live-location").disabled=true;
     return;
   }
-  const check=allowedByPolicy(p);
-  const shiftBreaks=currentBreaks(),currentRest=openBreak(shiftBreaks);
-  const restSummary=verifiedBreakSummary(r,shiftBreaks);
-  const pauseMarkup=!breaksReady?
-    '<div class="staff-break-zone"><p>El control de descansos no está habilitado en Firebase. Al terminar podrás declarar los minutos en tu comprobante.</p></div>':
-    currentRest?
-    '<div class="staff-break-zone"><strong>En descanso desde '+esc(when(currentRest.startedAt))+'</strong>'+
-    '<p>Tu jornada sigue abierta. Pulsa Reanudar para continuar.</p>'+
-    '<button type="button" id="j-break-resume" '+(busy?"disabled":"")+'>Reanudar jornada</button></div>':
-    '<div class="staff-break-zone"><p>Descansos: '+restSummary.minutes+' min · '+shiftBreaks.length+' pausa(s)</p>'+
-    (nextBreakSlot(shiftBreaks)?
-      '<button type="button" id="j-break-start" '+(busy?"disabled":"")+'>Iniciar descanso</button>':
-      '<small>Límite de ocho pausas alcanzado.</small>')+'</div>';
-  $("policy-state").textContent=p?
-    (p.enabled?"Acceso "+(check.ok?"habilitado":"fuera de horario")+" · "+(p.mode==="horas"?"Cupo de "+(p.maxMinutes/60).toFixed(1)+" horas":"Horario fijo")+
-      " · "+when(p.startsAt)+" a "+when(p.endsAt):"Permiso suspendido por coordinación"):
-    "El permiso de esta jornada está sincronizándose. Si el horario ya comenzó, coordinación debe revisar tu asignación.";
-  const remaining=r?.status==="en_curso"?timeLeft(p,r.startedAt):null;
-  const canStart=check.ok&&!r&&!busy;
-  const ended=r?.status==="finalizada";
-  const paymentRecord=logsLoaded?[...logs.values()].find(l=>l.eventId===e.id&&l.ownerUid===user.uid&&l.personId===personId):null;
-  const existingBreak=$("j-submit-break")?.value??"0";
   const assignedBy=shiftOf(e,personId)?.assignedByName||e.assignedByName||"";
-  const paymentStatus=paymentRecord?.paymentStatus||"capturado";
-  const submitBreakAvailable=!(breaksReady&&shiftBreaks.length);
-  const sendHoursControls=ended?(!logsLoaded?
-    '<p class="staff-pay-flow">Consultando tu solicitud de horas…</p>':
-    paymentRecord&&["solicitado","validado","programado","pagado"].includes(paymentStatus)?
-    '<div class="staff-pay-flow"><b>Horas enviadas a coordinación</b><p>Estado: '+esc(payLabel[paymentStatus]||paymentStatus)+
-      '. No necesitas mandar PDF ni correo. Coordinación recibe el registro en ÁGORA.</p></div>':
-    paymentRecord&&paymentStatus==="revision"?
-    '<div class="staff-pay-flow"><b>Coordinación pidió una corrección</b><p>Entra a Mis pagos para corregir y reenviar tu reporte.</p><button type="button" data-staff-tab="pagos">Corregir mi reporte</button></div>':
-    '<div class="staff-pay-flow"><b>Último paso: enviar tus horas para pago</b><p>Tu entrada y salida ya se guardaron. Confirma las horas y pulsa enviar. No tienes que generar ni adjuntar un PDF.</p>'+
-      (submitBreakAvailable&&!paymentRecord?'<label>Minutos de descanso (si no tomaste, escribe 0)<input id="j-submit-break" type="number" min="0" step="1" value="'+esc(existingBreak)+'"></label>':
-        '<p>Descanso registrado: '+(paymentRecord?.breakMins??restSummary.minutes)+' min.</p>')+
-      '<button type="button" class="primary" id="j-send-hours" '+(busy?"disabled":"")+'>Confirmar y enviar horas a coordinación</button></div>'
-  ):"";
-  const existingNote=$("end-note")?.value||"";
-  const existingActivity=$("start-activity")?.value||"";
+  $("policy-state").textContent="Asistencia registrada por Supervisor o Coordinador mediante QR o lista.";
   $("j-active").innerHTML='<div class="card"><b>'+esc(e.title||"Jornada")+'</b>'+
     '<p>Horario asignado: '+esc(when(eventStart(e,personId)))+' a '+esc(when(eventEnd(e,personId)))+'</p>'+
     '<p>Sede: '+esc(placeLabel(e))+'</p>'+
     '<p><b>Asignado por:</b> '+esc(assignedBy||"No registrado en esta asignación anterior")+'</p>'+
-    (r?'<p><b>Entrada oficial:</b> '+esc(when(r.startedAt))+'<br>'+linkGeo(r.startGeo,"Ver punto de entrada")+'</p>':"")+
-    (ended?'<p><b>Salida oficial:</b> '+esc(when(r.endedAt))+'<br>'+linkGeo(r.endGeo,"Ver punto de salida")+
-      '</p><p>Actividad realizada: '+esc(r.endNote||"Sin descripción")+'</p>':"")+
-    (r?.status==="en_curso"?'<p><b>En curso.</b> '+(remaining!==null?(remaining>0?remaining+" min autorizados restantes.":"Límite autorizado alcanzado; finaliza tu jornada."):"")+'</p>':"")+
-    (!r?'<p><b>Actividad asignada:</b> '+esc(e.type||"Actividad")+' · '+esc(e.title||"Operación programada")+'</p>'+
-      (e.notes?'<p><b>Indicaciones:</b> '+esc(e.notes)+'</p>':"")+
-      '<button class="primary" id="start-shift" '+(!canStart?"disabled":"")+'>Confirmar GPS e iniciar jornada</button>':"")+
-    (r?.status==="en_curso"?pauseMarkup+'<details class="staff-incidents"><summary>¿Hubo alguna incidencia? Agrega un comentario (opcional)</summary>'+
-      '<label>Comentario de cierre<textarea id="end-note" maxlength="240" placeholder="Incidencia, resultado u observación"></textarea></label></details>'+
-      '<button class="primary" id="end-shift" '+(busy||!!currentRest?"disabled":"")+'>Registrar salida real</button>':"")+
-    (!check.ok&&!r?'<p class="notice">'+esc(check.reason)+'</p>':"")+
-    (ended?sendHoursControls:"")+
-    (ended&&breaksReady&&shiftBreaks.length?'<p><b>Descanso con marcajes:</b> '+restSummary.minutes+' min en '+shiftBreaks.length+' pausa(s)</p>':"")+
+    (e.notes?'<p><b>Indicaciones:</b> '+esc(e.notes)+'</p>':"")+
+    (r?'<p><b>Marcaje anterior:</b> '+esc(r.status==="finalizada"?"salida registrada":"jornada abierta")+'. Se conserva como antecedente.</p>':"")+ 
+    '<p><b>Asistencia:</b> tu Supervisor o Coordinador registrará entrada, descansos y salida. Presenta el QR de esta jornada desde Mi espacio.</p>'+
     '</div>';
-  if($("end-note")&&existingNote)$("end-note").value=existingNote;
-  if($("start-activity")&&existingActivity)$("start-activity").value=existingActivity;
   $("j-punches").innerHTML="";
-  $("live-location").disabled=(!r&&!check.ok)||r?.status==="finalizada"||(remaining!==null&&remaining===0);
-  if($("live-location").disabled&&geoWatch!==null)stopTracking();
+  $("live-location").disabled=true;
+  if(geoWatch!==null)stopTracking();
 }
 function renderTrips(){
   const e=currentEvent(),p=currentPolicy(),t=currentTrip();
@@ -421,8 +372,8 @@ function render(){
   const next=events.find(e=>instant(eventEnd(e,personId))>=Date.now());
   const stateEl=$("j-operational-status");
   if(current){
-    stateEl.textContent=(breaksReady&&openBreak(ownBreaks([...breaks.values()],user.uid,current.id))?"En descanso":"En jornada")+" · "+(current.title||"Actividad")+" · "+placeLabel(current);
-    stateEl.className="staff-current-state active";
+    stateEl.textContent="Registro de asistencia anterior pendiente de revisión · "+(current.title||"Actividad")+" · consulta a tu responsable";
+    stateEl.className="staff-current-state blocked";
   }else if(next&&access.get(key(user.uid,next.id))?.enabled===true){
     stateEl.textContent="Fuera de jornada · Próxima actividad: "+(next.title||"Actividad")+" · "+dateLabel(eventStart(next,personId));
     stateEl.className="staff-current-state";
