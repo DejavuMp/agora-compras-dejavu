@@ -61,7 +61,7 @@ jobs:
           path: .github/firebase-staff/.preflight/attendance/
           retention-days: 30
           include-hidden-files: true
-          if-no-files-found: warn
+          if-no-files-found: error
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
