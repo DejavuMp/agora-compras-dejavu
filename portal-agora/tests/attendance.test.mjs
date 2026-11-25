@@ -97,6 +97,8 @@ test("credencial, verificador y pase de lista tienen salvaguardas obligatorias",
  assert.match(live,/setDoc\(ref,entryPayload/);
  assert.match(live,/updateDoc\(ref,exitPayload/);
  assert.match(live,/checkbox\?\.checked/);
+ assert.match(live,/data-exit-location-consent/);
+ assert.match(live,/if\(exitConsent\?\.checked\)/);
  assert.match(live,/auth\.currentUser\?\.uid!==uid/);
  assert.match(verify,/Registrar mi propia entrada o salida/);
  assert.match(verify,/No registra asistencia automáticamente/);
