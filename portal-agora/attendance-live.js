@@ -160,14 +160,22 @@ async function mark(session,kind,index){
   // Si el dispositivo ofrece ubicación, se añade como verificación opcional.
   let geo=null;
   try{geo=await preciseLocation()}catch{
-    if(!confirm("No pudimos confirmar tu ubicación. ¿Registrar salida con hora oficial pero sin ubicación verificada?"))return;
+    if(!confirm("No pudimos confirmar tu ubicación. ¿Registrar salida con hora oficial pero sin ubicación verificada?")){
+      session.message="Salida cancelada. No se ha registrado ninguna hora.";
+      const message=session.target.querySelector(".credential-attendance-message");
+      if(message)message.textContent=session.message;
+      return;
+    }
   }
   const t=serverTimestamp();
   await updateDoc(ref,exitPayload(note,geo,t));
  }
- session.message=kind==="entry"?
-  "Entrada registrada en Firebase. Esta hora es oficial.":"Salida registrada en Firebase. Esta hora es oficial.";
+ const confirmation=kind==="entry"?
+  "Entrada registrada en Firebase con hora oficial.":"Salida registrada en Firebase con hora oficial.";
  await refresh(session);
+ session.message=confirmation;
+ const notice=session.target.querySelector(".credential-attendance-message");
+ if(notice)notice.textContent=confirmation;
 }
 export function mountOwnAttendance({auth,db,target,identity}){
  if(!target)return;
