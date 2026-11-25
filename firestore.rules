@@ -805,57 +805,9 @@ match /agora_finance_requests/{requestId} {
     match /agora_ops_clock/{id} {
       allow get, list: if canEdit() ||
         (opsStaff() && resource.data.ownerUid == request.auth.uid);
-      allow create: if shiftSelf(request.resource.data) &&
-        id == request.auth.uid + '_' + request.resource.data.eventId &&
-        shiftClockOpen(request.auth.uid, request.resource.data.eventId) &&
-        request.resource.data.keys().hasOnly([
-          'ownerUid','personId','eventId','activity','status','startGeo',
-          'startedAt','lastGeo','lastGeoAt','updatedAt'
-        ]) &&
-        request.resource.data.keys().hasAll([
-          'ownerUid','personId','eventId','activity','status','startGeo',
-          'startedAt','lastGeo','lastGeoAt','updatedAt'
-        ]) &&
-        request.resource.data.activity is string &&
-        request.resource.data.activity.size() >= 4 &&
-        request.resource.data.activity.size() <= 240 &&
-        request.resource.data.status == 'en_curso' &&
-        shiftGeoValid(request.resource.data.startGeo) &&
-        shiftGeoValid(request.resource.data.lastGeo) &&
-        request.resource.data.startedAt == request.time &&
-        request.resource.data.lastGeoAt == request.time &&
-        request.resource.data.updatedAt == request.time;
-      allow update: if shiftSelf(resource.data) &&
-        id == request.auth.uid + '_' + resource.data.eventId &&
-        resource.data.status == 'en_curso' &&
-        request.resource.data.ownerUid == resource.data.ownerUid &&
-        request.resource.data.personId == resource.data.personId &&
-        request.resource.data.eventId == resource.data.eventId &&
-        request.resource.data.startedAt == resource.data.startedAt &&
-        request.resource.data.startGeo == resource.data.startGeo &&
-        request.resource.data.activity == resource.data.activity &&
-        request.resource.data.updatedAt == request.time &&
-        (
-          (request.resource.data.status == 'en_curso' &&
-           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-             'lastGeo','lastGeoAt','updatedAt'
-           ]) &&
-           shiftClockTracking(request.auth.uid, resource.data.eventId, resource.data.startedAt) &&
-           shiftGeoValid(request.resource.data.lastGeo) &&
-           request.resource.data.lastGeoAt == request.time)
-          ||
-          (request.resource.data.status == 'finalizada' &&
-           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-             'status','endGeo','endNote','endedAt','updatedAt'
-           ]) &&
-           request.resource.data.keys().hasAll(['endNote','endedAt']) &&
-           (!request.resource.data.keys().hasAny(['endGeo']) ||
-             shiftGeoValid(request.resource.data.endGeo)) &&
-           request.resource.data.endNote is string &&
-           request.resource.data.endNote.size() >= 4 &&
-           request.resource.data.endNote.size() <= 240 &&
-           request.resource.data.endedAt == request.time)
-        );
+      // La asistencia nueva la registra coordinación mediante hojas delegadas de asistencia.
+      // Los marcajes legados siguen siendo consultables, pero ya no se escriben desde la cuenta Staff.
+      allow create, update: if false;
       allow delete: if false;
     }
     // Descansos certificados: cada inicio/reanudación usa hora del servidor.
@@ -873,38 +825,8 @@ match /agora_finance_requests/{requestId} {
     match /agora_ops_breaks/{id} {
       allow get, list: if canEdit() ||
         (opsStaff() && resource.data.ownerUid == request.auth.uid);
-      allow create: if breakOnOwnActiveClock(request.resource.data) &&
-        request.resource.data.keys().hasOnly([
-          'ownerUid','personId','eventId','slot','status','startedAt','updatedAt'
-        ]) &&
-        request.resource.data.keys().hasAll([
-          'ownerUid','personId','eventId','slot','status','startedAt','updatedAt'
-        ]) &&
-        request.resource.data.slot in ['1','2','3','4','5','6','7','8'] &&
-        id == request.auth.uid + '_' + request.resource.data.eventId + '_' + request.resource.data.slot &&
-        request.resource.data.status == 'en_descanso' &&
-        request.resource.data.startedAt == request.time &&
-        request.resource.data.updatedAt == request.time &&
-        request.time > get(shiftClockPath(request.auth.uid,request.resource.data.eventId)).data.startedAt;
-      allow update: if breakOnOwnActiveClock(resource.data) &&
-        id == request.auth.uid + '_' + resource.data.eventId + '_' + resource.data.slot &&
-        resource.data.status == 'en_descanso' &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'status','endedAt','updatedAt'
-        ]) &&
-        request.resource.data.keys().hasAll([
-          'ownerUid','personId','eventId','slot','status','startedAt',
-          'endedAt','updatedAt'
-        ]) &&
-        request.resource.data.ownerUid == resource.data.ownerUid &&
-        request.resource.data.personId == resource.data.personId &&
-        request.resource.data.eventId == resource.data.eventId &&
-        request.resource.data.slot == resource.data.slot &&
-        request.resource.data.startedAt == resource.data.startedAt &&
-        request.resource.data.status == 'reanudado' &&
-        request.resource.data.endedAt == request.time &&
-        request.resource.data.updatedAt == request.time &&
-        request.time > resource.data.startedAt;
+      // Descansos oficiales también se registran por el responsable en el flujo delegado.
+      allow create, update: if false;
       allow delete: if false;
     }
 

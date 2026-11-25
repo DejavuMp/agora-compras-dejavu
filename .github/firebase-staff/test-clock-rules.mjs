@@ -69,49 +69,32 @@ try{
   await no("staff no lista políticas ajenas",getDocs(collection(staff,"agora_ops_shift_access")));
   await yes("staff consulta solo sus políticas",getDocs(query(collection(staff,"agora_ops_shift_access"),where("ownerUid","==","staff1"))));
   await no("staff no cambia límites de horas",updateDoc(access(staff),{maxMinutes:720,updatedAt:serverTimestamp()}));
-  await no("otro integrante no marca asistencia ajena",setDoc(doc(other,"agora_ops_clock",id),createPunch()));
-  await no("marcaje falso fuera de rango GPS",setDoc(punch(staff),createPunch({startGeo:{lat:999,lng:-99.13,accuracy:20}})));
-  await no("personal no inventa hora de entrada",setDoc(punch(staff),createPunch({startedAt:Timestamp.fromMillis(Date.now()-600000)})));
-  await yes("entrada legítima registra hora del servidor",setDoc(punch(staff),createPunch()));
-  await yes("staff lee su entrada",getDoc(punch(staff)));
+  await env.withSecurityRulesDisabled(async ctx=>{
+    const db=ctx.firestore();
+    await setDoc(doc(db,"agora_ops_clock",id),createPunch({startedAt:Timestamp.fromMillis(Date.now()-3600000)}));
+    await setDoc(doc(db,"agora_ops_breaks",id+"_1"),breakRecord({startedAt:Timestamp.fromMillis(Date.now()-1800000)}));
+  });
+  await no("Staff no registra entrada nueva",setDoc(punch(staff),createPunch()));
+  await yes("Staff consulta su historial de asistencia",getDoc(punch(staff)));
   await no("otro integrante no consulta entrada",getDoc(punch(other)));
-  await no("staff no lista todas las entradas",getDocs(collection(staff,"agora_ops_clock")));
+  await no("Staff no lista todas las entradas",getDocs(collection(staff,"agora_ops_clock")));
   await yes("consulta filtrada por UID",getDocs(query(collection(staff,"agora_ops_clock"),where("ownerUid","==","staff1"))));
-  await no("imposible editar hora de inicio",updateDoc(punch(staff),{startedAt:serverTimestamp(),updatedAt:serverTimestamp()}));
-  await no("imposible cambiar cuenta propietaria",updateDoc(punch(staff),{ownerUid:"staff2",updatedAt:serverTimestamp()}));
-  await yes("actualiza último GPS durante jornada",updateDoc(punch(staff),{
-    lastGeo:{lat:19.434,lng:-99.132,accuracy:22},
-    lastGeoAt:serverTimestamp(),updatedAt:serverTimestamp()
-  }));
+  await no("Staff no altera su entrada ni salida",updateDoc(punch(staff),{status:"finalizada",endedAt:serverTimestamp(),updatedAt:serverTimestamp()}));
   await no("anónimo no consulta descanso",getDoc(pause(anon)));
-  await no("otra cuenta no crea descanso ajeno",setDoc(pause(other),breakRecord()));
-  await no("no se pueden registrar más de ocho descansos",setDoc(doc(staff,"agora_ops_breaks",id+"_9"),breakRecord({slot:"9"})));
-  await no("no se falsifica la hora de inicio de descanso",setDoc(pause(staff),breakRecord({
-    startedAt:Timestamp.fromMillis(Date.now()-300000)
-  })));
-  await yes("inicio de descanso certificado por Firebase",setDoc(pause(staff),breakRecord()));
-  await yes("staff consulta su descanso",getDoc(pause(staff)));
+  await no("Staff no registra descansos propios",setDoc(doc(staff,"agora_ops_breaks",id+"_2"),breakRecord({slot:"2"})));
+  await yes("Staff consulta su historial de descansos",getDoc(pause(staff)));
   await no("otro integrante no lee descanso",getDoc(pause(other)));
-  await no("staff no lista descansos de todo el equipo",getDocs(collection(staff,"agora_ops_breaks")));
-  await yes("staff consulta solo descansos propios",getDocs(query(collection(staff,"agora_ops_breaks"),where("ownerUid","==","staff1"))));
-  await no("no se cambia la cuenta de un descanso",updateDoc(pause(staff),{ownerUid:"staff2",updatedAt:serverTimestamp()}));
-  await no("no se falsifica la reanudación",updateDoc(pause(staff),{
-    status:"reanudado",endedAt:Timestamp.fromMillis(Date.now()-300000),updatedAt:serverTimestamp()
-  }));
-  await yes("reanudación certificada por Firebase",updateDoc(pause(staff),{
+  await no("Staff no modifica un descanso histórico",updateDoc(pause(staff),{
     status:"reanudado",endedAt:serverTimestamp(),updatedAt:serverTimestamp()
-  }));
-  await no("no se vuelve a abrir un descanso cerrado",updateDoc(pause(staff),{
-    status:"en_descanso",updatedAt:serverTimestamp()
   }));
   await yes("coordinación puede bloquear cuenta",setDoc(access(admin),policy({enabled:false})));
   await no("staff bloqueado no puede hacer nuevo traslado",setDoc(trip(staff),createTrip()));
-  await yes("salida sin GPS sigue permitida tras bloqueo",updateDoc(punch(staff),{
+  await no("Staff no cierra asistencia directamente",updateDoc(punch(staff),{
     status:"finalizada",endNote:"Jornada cerrada, GPS no disponible",
     endedAt:serverTimestamp(),updatedAt:serverTimestamp()
   }));
-  await no("no se inicia descanso después del cierre oficial",setDoc(doc(staff,"agora_ops_breaks",id+"_2"),breakRecord({slot:"2"})));
-  await no("no se puede reabrir jornada cerrada",updateDoc(punch(staff),{
+  await no("Staff no puede iniciar descanso oficial",setDoc(doc(staff,"agora_ops_breaks",id+"_2"),breakRecord({slot:"2"})));
+  await no("Staff no puede cambiar el estado de la asistencia",updateDoc(punch(staff),{
     status:"en_curso",updatedAt:serverTimestamp()
   }));
   await yes("coordinación reactiva al personal",setDoc(access(admin),policy()));

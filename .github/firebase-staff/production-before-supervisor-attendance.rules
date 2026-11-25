@@ -1,0 +1,2105 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null && request.auth.token.get('email_verified',false) == true;
+    }
+    function identitySignedIn() {
+      return signedIn() ||
+        (request.auth != null &&
+         request.auth.token.firebase.sign_in_provider == 'phone' &&
+         request.auth.token.phone_number is string);
+    }
+
+    function userPath() {
+      return /databases/$(database)/documents/agora_users/$(request.auth.uid);
+    }
+    function activeStaff() {
+      return signedIn() && exists(userPath()) &&
+        get(userPath()).data.active == true &&
+        get(userPath()).data.role in ['admin', 'coordinador', 'consulta'];
+    }
+    function role() { return get(userPath()).data.role; }
+    function canEdit() {
+      return activeStaff() && role() in ['admin', 'coordinador'];
+    }
+    function isAdmin() { return activeStaff() && role() == 'admin'; }
+    function validStaff() {
+      return request.resource.data.keys().hasOnly(['email','name','role','active','createdAt','updatedAt']) &&
+        request.resource.data.role in ['admin','coordinador','consulta'] &&
+        request.resource.data.active is bool;
+    }
+    match /agora_users/{uid} {
+      allow get: if identitySignedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      // El primer administrador se configura manualmente desde la consola Firebase.
+      allow create, update: if isAdmin() && validStaff();
+      allow delete: if isAdmin() && uid != request.auth.uid;
+    }
+    match /agora_records/{record} {
+      allow get, list: if activeStaff();
+      allow create: if canEdit() &&
+        request.resource.data.keys().hasOnly(['kind','recordId','payload','revision','updatedBy','updatedAt']) &&
+        request.resource.data.keys().hasAll(['kind','recordId','payload','revision','updatedBy','updatedAt']) &&
+        request.resource.data.kind in ['rfqs','orders','samples','suppliers','settings'] &&
+        request.resource.data.recordId is string &&
+        request.resource.data.revision == 1 &&
+        request.resource.data.updatedBy == request.auth.uid;
+      allow update: if canEdit() &&
+        request.resource.data.keys().hasOnly(['kind','recordId','payload','revision','updatedBy','updatedAt']) &&
+        request.resource.data.kind == resource.data.kind &&
+        request.resource.data.recordId == resource.data.recordId &&
+        request.resource.data.revision == resource.data.revision + 1 &&
+        request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if canEdit();
+    }
+    // Un vínculo secreto de 256 bits concede acceso sólo a esta invitación.
+    // El token no es enumerable y expira; nunca contiene credenciales de Firebase.
+    function validInviteCreate() {
+      return canEdit() &&
+        request.resource.data.keys().hasOnly([
+          'version','createdBy','createdAt','updatedAt','expiresAt','request',
+          'status','receivedAt','receiver','submittedAt','response'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'version','createdBy','createdAt','updatedAt','expiresAt','request',
+          'status','receivedAt','receiver','submittedAt','response'
+        ]) &&
+        request.resource.data.version == 1 &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.expiresAt is timestamp &&
+        request.resource.data.expiresAt > request.time &&
+        request.resource.data.expiresAt <= request.time + duration.value(30, 'd') &&
+        request.resource.data.request is map &&
+        request.resource.data.request.items is list &&
+        request.resource.data.request.items.size() <= 60 &&
+        request.resource.data.request.id is string &&
+        request.resource.data.request.kind in ['quote','sample','order'] &&
+        request.resource.data.status == 'pendiente' &&
+        request.resource.data.receivedAt == null &&
+        request.resource.data.receiver == '' &&
+        request.resource.data.submittedAt == null &&
+        request.resource.data.response == null;
+    }
+    function publicTokenIsValid(token) {
+      return token.matches('^[A-Za-z0-9_-]{43}$') &&
+        resource.data.expiresAt > request.time &&
+        resource.data.status in ['pendiente','recibida','cotizada'];
+    }
+    function validSupplierReceipt(token) {
+      return publicTokenIsValid(token) &&
+        resource.data.status == 'pendiente' &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['receivedAt','receiver','status','updatedAt']) &&
+        request.resource.data.status == 'recibida' &&
+        request.resource.data.receivedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.receiver is string &&
+        request.resource.data.receiver.size() > 1 &&
+        request.resource.data.receiver.size() <= 120;
+    }
+    function validSupplierResponse(token) {
+      return publicTokenIsValid(token) &&
+        resource.data.status == 'recibida' &&
+        resource.data.receivedAt is timestamp &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['response','submittedAt','status','updatedAt']) &&
+        request.resource.data.status == 'cotizada' &&
+        request.resource.data.submittedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.response is map &&
+        request.resource.data.response.keys().hasOnly(['company','email','general','items']) &&
+        request.resource.data.response.company is string &&
+        request.resource.data.response.company.size() <= 160 &&
+        request.resource.data.response.email is string &&
+        request.resource.data.response.email.size() <= 240 &&
+        request.resource.data.response.general is map &&
+        request.resource.data.response.items is list &&
+        request.resource.data.response.items.size() <= 60;
+    }
+    match /provider_invites/{token} {
+      allow get: if activeStaff() || publicTokenIsValid(token);
+      allow list: if activeStaff();
+      allow create: if token.matches('^[A-Za-z0-9_-]{43}$') && validInviteCreate();
+      allow update: if validSupplierReceipt(token) || validSupplierResponse(token) ||
+        (canEdit() &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status','updatedAt']) &&
+          request.resource.data.status == 'revocada' &&
+          request.resource.data.updatedAt == request.time);
+      allow delete: if isAdmin();
+    }
+    function deliveryPath(id) {
+      return /databases/$(database)/documents/agora_file_deliveries/$(id);
+    }
+    function isActiveDelivery(id) {
+      return id.matches('^[A-Za-z0-9_-]{43}$') &&
+        exists(deliveryPath(id)) &&
+        get(deliveryPath(id)).data.active == true &&
+        get(deliveryPath(id)).data.validUntil > request.time;
+    }
+    function isDeliveryReadAllowed(token) {
+      return token.matches('^[A-Za-z0-9_-]{43}$') &&
+        resource.data.active == true &&
+        resource.data.validUntil > request.time;
+    }
+    function validDeliveryData() {
+      return request.resource.data.keys().hasOnly([
+        'id','folio','createdBy','createdByEmail','createdAt','updatedAt','active',
+        'version','revisions','project','category','title','recipientName',
+        'recipientEmail','driveUrl','validUntil','notes','sampleImages','folderImages'
+      ]) &&
+      request.resource.data.keys().hasAll([
+        'id','folio','createdBy','createdByEmail','createdAt','updatedAt','active',
+        'version','revisions','project','category','title','recipientName',
+        'recipientEmail','driveUrl','validUntil','notes','sampleImages','folderImages'
+      ]) &&
+      request.resource.data.id is string &&
+      request.resource.data.title is string && request.resource.data.title.size() <= 160 &&
+      request.resource.data.project is string && request.resource.data.project.size() <= 120 &&
+      request.resource.data.recipientName is string && request.resource.data.recipientName.size() <= 120 &&
+      request.resource.data.recipientEmail is string && request.resource.data.recipientEmail.size() <= 240 &&
+      request.resource.data.driveUrl is string && request.resource.data.driveUrl.size() <= 2048 &&
+      request.resource.data.notes is string && request.resource.data.notes.size() <= 3000 &&
+      request.resource.data.sampleImages is list && request.resource.data.sampleImages.size() <= 8 &&
+      request.resource.data.folderImages is list && request.resource.data.folderImages.size() <= 6 &&
+      request.resource.data.revisions is list && request.resource.data.revisions.size() <= 30 &&
+      request.resource.data.validUntil is timestamp &&
+      request.resource.data.version is int && request.resource.data.version >= 1 && request.resource.data.version <= 30 &&
+      request.resource.data.active is bool;
+    }
+    match /agora_file_deliveries/{token} {
+      allow get: if activeStaff() || isDeliveryReadAllowed(token);
+      allow list: if activeStaff();
+      allow create: if canEdit() && token.matches('^[A-Za-z0-9_-]{43}$') &&
+        validDeliveryData() && request.resource.data.id == token &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.createdByEmail == request.auth.token.email &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.active == true &&
+        request.resource.data.version == 1 &&
+        request.resource.data.revisions.size() == 1 &&
+        request.resource.data.validUntil > request.time;
+      allow update: if canEdit() && validDeliveryData() &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.createdByEmail == resource.data.createdByEmail &&
+        request.resource.data.recipientName == resource.data.recipientName &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.recipientEmail == resource.data.recipientEmail &&
+        request.resource.data.updatedAt == request.time &&
+        (
+          // Una nueva revisión conserva el enlace y registra versión posterior.
+          (resource.data.active == true && request.resource.data.active == true &&
+           request.resource.data.version == resource.data.version + 1 &&
+           request.resource.data.revisions.size() == resource.data.revisions.size() + 1 &&
+           request.resource.data.validUntil > request.time)
+          ||
+          // Corrección del expediente pendiente: mismo token y misma versión.
+      // Se bloquea en cuanto exista una respuesta en esa versión.
+      (resource.data.active == true && request.resource.data.active == true &&
+       request.resource.data.version == resource.data.version &&
+       request.resource.data.revisions.size() == resource.data.revisions.size() &&
+       request.resource.data.validUntil > request.time &&
+       !exists(/databases/$(database)/documents/agora_file_responses/$(token)/agora_file_reply_versions/$(string(resource.data.version))) &&
+       request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+         'project','category','title','driveUrl','validUntil','notes',
+         'sampleImages','folderImages','revisions','updatedAt'
+       ]))
+      ||
+      // Expediente revocado: se permiten correcciones internas sin volver a
+      // activar el enlace. No se pueden modificar acuses ni el destinatario.
+      (resource.data.active == false && request.resource.data.active == false &&
+       request.resource.data.version == resource.data.version &&
+       request.resource.data.revisions.size() == resource.data.revisions.size() &&
+       request.resource.data.validUntil > request.time &&
+       !exists(/databases/$(database)/documents/agora_file_responses/$(token)/agora_file_reply_versions/$(string(resource.data.version))) &&
+       request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+         'project','category','title','driveUrl','validUntil','notes',
+         'sampleImages','folderImages','revisions','updatedAt'
+       ]))
+      ||
+      // Revocación sin borrar el expediente.
+          (resource.data.active == true && request.resource.data.active == false &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active','updatedAt']))
+        );
+      allow delete: if false;
+    }
+    // El token está en el segmento de ruta: permite verificar incluso si NO existe
+    // aún la respuesta. La colección de respuestas es de solo agregado.
+    match /agora_file_responses/{token}/agora_file_reply_versions/{versionId} {
+      allow get: if activeStaff() || isActiveDelivery(token);
+      allow list: if activeStaff();
+      allow create: if
+        isActiveDelivery(token) &&
+        request.resource.data.keys().hasOnly([
+          'deliveryId','version','status','receiverName','receiverEmail','comments','createdAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'deliveryId','version','status','receiverName','receiverEmail','comments','createdAt'
+        ]) &&
+        request.resource.data.deliveryId == token &&
+        request.resource.data.version is int &&
+        versionId == string(request.resource.data.version) &&
+        request.resource.data.version == get(deliveryPath(token)).data.version &&
+        request.resource.data.status in ['recibido','no_recibido','cambios','aprobado'] &&
+        request.resource.data.receiverName is string &&
+        request.resource.data.receiverName.size() >= 2 && request.resource.data.receiverName.size() <= 120 &&
+        request.resource.data.receiverEmail is string && request.resource.data.receiverEmail.size() <= 240 &&
+        request.resource.data.comments is string && request.resource.data.comments.size() <= 3000 &&
+        (request.resource.data.status in ['recibido','aprobado'] || request.resource.data.comments.size() >= 5) &&
+        request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+    // Consulta global del historial para los usuarios internos, nunca para visitantes.
+    match /{path=**}/agora_file_reply_versions/{versionId} {
+      allow list: if activeStaff();
+    }
+
+    // Dejavú Staff: archivo privado opcional por correo verificado.
+    // Se conserva separado del catálogo público de fichas.
+    function validStaffFichaFields() {
+      return request.resource.data.keys().hasOnly([
+        'id','campaign','responsible','activityDate','location',
+        'staffEmail','localUpdatedAt','active','revision',
+        'createdBy','createdAt','updatedBy','updatedAt'
+      ]) &&
+      request.resource.data.keys().hasAll([
+        'id','campaign','responsible','activityDate','location',
+        'staffEmail','localUpdatedAt','active','revision',
+        'createdBy','createdAt','updatedBy','updatedAt'
+      ]) &&
+      request.resource.data.id is string &&
+      request.resource.data.campaign is string &&
+      request.resource.data.campaign.size() >= 1 &&
+      request.resource.data.campaign.size() <= 95 &&
+      request.resource.data.responsible is string &&
+      request.resource.data.responsible.size() >= 1 &&
+      request.resource.data.responsible.size() <= 95 &&
+      request.resource.data.activityDate is string &&
+      request.resource.data.activityDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+      request.resource.data.location is string &&
+      request.resource.data.location.size() >= 1 &&
+      request.resource.data.location.size() <= 240 &&
+      request.resource.data.staffEmail is string &&
+      request.resource.data.staffEmail.size() <= 240 &&
+      (request.resource.data.staffEmail == '' ||
+        request.resource.data.staffEmail.matches('^[^ ]+@[^ ]+[.][^ ]+$')) &&
+      request.resource.data.localUpdatedAt is string &&
+      request.resource.data.localUpdatedAt.size() <= 40 &&
+      request.resource.data.active == true &&
+      request.resource.data.revision is int &&
+      request.resource.data.revision >= 1 &&
+      request.resource.data.createdBy is string &&
+      request.resource.data.createdAt is timestamp &&
+      request.resource.data.updatedBy is string &&
+      request.resource.data.updatedAt is timestamp;
+    }
+    function isFichaRecipient() {
+      return signedIn() &&
+        resource.data.staffEmail is string &&
+        resource.data.staffEmail != '' &&
+        resource.data.staffEmail == request.auth.token.email;
+    }
+    match /dejavu_staff_fichas/{fichaId} {
+      allow get, list: if canEdit() || isFichaRecipient();
+      allow create: if canEdit() &&
+        fichaId.matches('^DJV-[0-9]{8}-[0-9]{3,}$') &&
+        validStaffFichaFields() &&
+        request.resource.data.id == fichaId &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.revision == 1;
+      allow update: if canEdit() && validStaffFichaFields() &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.revision == resource.data.revision + 1;
+      allow delete: if canEdit();
+    }
+
+    // Catálogo de fichas que un coordinador DECIDIÓ publicar para todo el staff.
+    // Nunca publica correo, datos bancarios, fotografías ni evidencia personal.
+    function validPublicStaffCard() {
+      return request.resource.data.keys().hasOnly([
+        'id','campaign','responsible','activityDate','location',
+        'publishedAt','updatedAt','publishedBy'
+      ]) &&
+      request.resource.data.keys().hasAll([
+        'id','campaign','responsible','activityDate','location',
+        'publishedAt','updatedAt','publishedBy'
+      ]) &&
+      request.resource.data.id is string &&
+      request.resource.data.campaign is string &&
+      request.resource.data.campaign.size() > 0 &&
+      request.resource.data.campaign.size() <= 95 &&
+      request.resource.data.responsible is string &&
+      request.resource.data.responsible.size() > 0 &&
+      request.resource.data.responsible.size() <= 95 &&
+      request.resource.data.activityDate is string &&
+      request.resource.data.activityDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+      request.resource.data.location is string &&
+      request.resource.data.location.size() > 0 &&
+      request.resource.data.location.size() <= 240 &&
+      request.resource.data.publishedBy is string &&
+      request.resource.data.publishedAt is timestamp &&
+      request.resource.data.updatedAt is timestamp;
+    }
+    match /dejavu_staff_publicadas/{fichaId} {
+      // Solo fichas publicadas. Lectura abierta: no requiere inicio de sesión.
+      allow get, list: if true;
+      allow create: if canEdit() &&
+        fichaId.matches('^DJV-[0-9]{8}-[0-9]{3,}$') &&
+        validPublicStaffCard() &&
+        request.resource.data.id == fichaId &&
+        request.resource.data.publishedBy == request.auth.uid &&
+        request.resource.data.publishedAt == request.time &&
+        request.resource.data.updatedAt == request.time;
+      allow update: if canEdit() && validPublicStaffCard() &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.publishedBy == resource.data.publishedBy &&
+        request.resource.data.publishedAt == resource.data.publishedAt &&
+        request.resource.data.updatedAt == request.time;
+      allow delete: if canEdit();
+    }
+        // Fotos de evidencia compartidas: acceso a fichas publicadas.
+    function publicStaffPath(fichaId) {
+      return /databases/$(database)/documents/dejavu_staff_publicadas/$(fichaId);
+    }
+    function validPublishedEvidence(fichaId) {
+      return request.resource.data.keys().hasOnly([
+        'id','photoBytes','photoName','mime','sourceHash','updatedAt','uploadedBy'
+      ]) &&
+      request.resource.data.keys().hasAll([
+        'id','photoBytes','photoName','mime','sourceHash','updatedAt','uploadedBy'
+      ]) &&
+      request.resource.data.id == fichaId &&
+      request.resource.data.photoBytes is bytes &&
+      request.resource.data.photoBytes.size() > 0 &&
+      request.resource.data.photoBytes.size() <= 850000 &&
+      request.resource.data.photoName is string &&
+      request.resource.data.photoName.size() >= 5 &&
+      request.resource.data.photoName.size() <= 160 &&
+      request.resource.data.mime == 'image/jpeg' &&
+      request.resource.data.sourceHash is string &&
+      request.resource.data.sourceHash.matches('^[0-9a-f]{8}$') &&
+      request.resource.data.uploadedBy == request.auth.uid &&
+      request.resource.data.updatedAt == request.time;
+    }
+    match /dejavu_staff_evidencias/{fichaId} {
+      allow get: if exists(publicStaffPath(fichaId));
+      allow list: if false;
+      allow create, update: if canEdit() &&
+        exists(publicStaffPath(fichaId)) &&
+        validPublishedEvidence(fichaId);
+      allow delete: if canEdit();
+    }
+
+// ÁGORA · Recursos y Finanzas 2026
+// PEGAR DENTRO de match /databases/{database}/documents,
+// justo ANTES del match /{document=**} final.
+// Reutiliza signedIn(), activeStaff(), canEdit(), isAdmin() de firestore.rules.
+// Nunca abre lectura ni aprobación anónimas de datos bancarios o nóminas.
+
+function financeBaseValid() {
+  return request.resource.data.keys().hasOnly([
+    'schema','id','folio','category','project','client','requester','dateNeeded',
+    'priority','reason','paymentType','paymentMethod','beneficiary','beneficiaryEmail',
+    'bank','account','notes','attachments','items','total','status','approvedAmount',
+    'paidAmount','payments','decisionNote','decisionBy','history',
+    'createdBy','createdByEmail','createdAt','updatedAt','updatedBy'
+  ]) &&
+  request.resource.data.keys().hasAll([
+    'schema','id','folio','category','project','requester','dateNeeded','reason',
+    'beneficiary','items','total','status','approvedAmount','paidAmount','payments',
+    'createdBy','createdAt','updatedAt','updatedBy','history'
+  ]) &&
+  request.resource.data.schema == 1 &&
+  request.resource.data.id is string && request.resource.data.id.size() <= 80 &&
+  request.resource.data.folio is string && request.resource.data.folio.size() <= 35 &&
+  request.resource.data.category in ['materiales','productos','proveedor','nomina','otro'] &&
+  request.resource.data.project is string && request.resource.data.project.size() <= 130 &&
+  request.resource.data.client is string && request.resource.data.client.size() <= 100 &&
+  request.resource.data.requester is string && request.resource.data.requester.size() <= 100 &&
+  request.resource.data.dateNeeded is string &&
+  request.resource.data.dateNeeded.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+  request.resource.data.reason is string && request.resource.data.reason.size() <= 2000 &&
+  request.resource.data.beneficiary is string && request.resource.data.beneficiary.size() <= 120 &&
+  request.resource.data.beneficiaryEmail is string && request.resource.data.beneficiaryEmail.size() <= 180 &&
+  request.resource.data.bank is string && request.resource.data.bank.size() <= 100 &&
+  request.resource.data.account is string && request.resource.data.account.size() <= 32 &&
+  request.resource.data.notes is string && request.resource.data.notes.size() <= 2000 &&
+  request.resource.data.items is list && request.resource.data.items.size() > 0 &&
+  request.resource.data.items.size() <= 50 &&
+  request.resource.data.attachments is list && request.resource.data.attachments.size() <= 12 &&
+  request.resource.data.history is list && request.resource.data.history.size() <= 60 &&
+  request.resource.data.payments is list && request.resource.data.payments.size() <= 40 &&
+  request.resource.data.total is number && request.resource.data.total > 0 &&
+  request.resource.data.total < 1000000000 &&
+  request.resource.data.approvedAmount is number &&
+  request.resource.data.approvedAmount >= 0 &&
+  request.resource.data.approvedAmount <= request.resource.data.total &&
+  request.resource.data.paidAmount is number &&
+  request.resource.data.paidAmount >= 0 &&
+  request.resource.data.paidAmount <= request.resource.data.approvedAmount &&
+  request.resource.data.status in [
+    'pendiente','ajustes','aprobada','aprobada_parcial',
+    'pago_parcial','pagada','rechazada'
+  ] &&
+  request.resource.data.updatedBy == request.auth.uid &&
+  request.resource.data.updatedAt == request.time;
+}
+function financeDecision() {
+  return resource.data.status in ['pendiente','ajustes'] &&
+    request.resource.data.status in ['aprobada','aprobada_parcial','ajustes','rechazada'] &&
+    request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+      'status','approvedAmount','decisionNote','decisionBy','history','updatedBy','updatedAt'
+    ]) &&
+    request.resource.data.history.size() == resource.data.history.size() + 1 &&
+    request.resource.data.paidAmount == 0 &&
+    request.resource.data.payments.size() == 0 &&
+    request.resource.data.decisionBy == request.auth.token.email &&
+    (
+      (request.resource.data.status == 'aprobada' &&
+       request.resource.data.approvedAmount == request.resource.data.total) ||
+      (request.resource.data.status == 'aprobada_parcial' &&
+       request.resource.data.approvedAmount > 0 &&
+       request.resource.data.approvedAmount < request.resource.data.total) ||
+      (request.resource.data.status in ['ajustes','rechazada'] &&
+       request.resource.data.approvedAmount == 0 &&
+       request.resource.data.decisionNote.size() >= 5)
+    );
+}
+function financePay() {
+  return resource.data.status in ['aprobada','aprobada_parcial','pago_parcial'] &&
+    request.resource.data.status in ['pago_parcial','pagada'] &&
+    request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+      'status','payments','paidAmount','history','updatedBy','updatedAt'
+    ]) &&
+    request.resource.data.history.size() == resource.data.history.size() + 1 &&
+    request.resource.data.payments.size() == resource.data.payments.size() + 1 &&
+    request.resource.data.paidAmount > resource.data.paidAmount &&
+    request.resource.data.paidAmount <= resource.data.approvedAmount &&
+    (
+      (request.resource.data.status == 'pagada' &&
+       request.resource.data.paidAmount == resource.data.approvedAmount) ||
+      (request.resource.data.status == 'pago_parcial' &&
+       request.resource.data.paidAmount < resource.data.approvedAmount)
+    );
+}
+function financeCorrection() {
+  return resource.data.createdBy == request.auth.uid &&
+    resource.data.status in ['pendiente','ajustes'] &&
+    request.resource.data.status == 'pendiente' &&
+    request.resource.data.approvedAmount == 0 &&
+    request.resource.data.paidAmount == 0 &&
+    request.resource.data.payments.size() == 0 &&
+    request.resource.data.history.size() == resource.data.history.size() + 1 &&
+    request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+      'category','project','client','requester','dateNeeded','priority','reason',
+      'paymentType','paymentMethod','beneficiary','beneficiaryEmail','bank','account',
+      'notes','attachments','items','total','status','history','updatedBy','updatedAt'
+    ]);
+}
+match /agora_finance_requests/{requestId} {
+  // Las cuentas autorizadas acceden solo a sus propias solicitudes.
+  // Los administradores pueden revisar, decidir y registrar pagos.
+  // Consultas para coordinador: where('createdBy','==',auth.uid).
+  allow get, list: if isAdmin() ||
+    (activeStaff() && resource.data.createdBy == request.auth.uid);
+  allow create: if canEdit() &&
+    financeBaseValid() &&
+    request.resource.data.id == requestId &&
+    request.resource.data.createdBy == request.auth.uid &&
+    request.resource.data.createdByEmail == request.auth.token.email &&
+    request.resource.data.createdAt == request.time &&
+    request.resource.data.status == 'pendiente' &&
+    request.resource.data.approvedAmount == 0 &&
+    request.resource.data.paidAmount == 0 &&
+    request.resource.data.payments.size() == 0 &&
+    request.resource.data.history.size() == 1 &&
+    request.resource.data.history[0].kind == 'solicitud';
+  allow update: if financeBaseValid() &&
+    request.resource.data.id == resource.data.id &&
+    request.resource.data.folio == resource.data.folio &&
+    request.resource.data.createdBy == resource.data.createdBy &&
+    request.resource.data.createdAt == resource.data.createdAt &&
+    ((isAdmin() && (financeDecision() || financePay())) ||
+     (canEdit() && financeCorrection()));
+  allow delete: if false;
+}
+
+
+    // ÁGORA · Centro de Operaciones V4 (aislado de Compras y Finanzas).
+    // Agenda con tarifas sólo para coordinación; el staff recibe una copia
+    // reducida de sus propios turnos. Ningún documento es público.
+    function opsMemberPath(uid) {
+      return /databases/$(database)/documents/agora_ops_members/$(uid);
+    }
+    function opsStaff() {
+      return signedIn() && exists(opsMemberPath(request.auth.uid)) &&
+        get(opsMemberPath(request.auth.uid)).data.active == true &&
+        get(opsMemberPath(request.auth.uid)).data.role == 'staff';
+    }
+    function opsPersonId() {
+      return get(opsMemberPath(request.auth.uid)).data.personId;
+    }
+    function opsDocumentMeta() {
+      return request.resource.data.keys().hasAll(['revision','updatedAt']) &&
+        request.resource.data.revision is int &&
+        request.resource.data.revision > 0 &&
+        request.resource.data.updatedAt == request.time;
+    }
+    function opsValidSchedule() {
+      return request.resource.data.keys().hasOnly(['revision','payload','updatedAt','updatedBy']) &&
+        request.resource.data.keys().hasAll(['revision','payload','updatedAt','updatedBy']) &&
+        opsDocumentMeta() &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        request.resource.data.payload is map &&
+        request.resource.data.payload.keys().hasAll([
+          'people','vehicles','events','blocks','sites','campaigns','settings','audit'
+        ]) &&
+        request.resource.data.payload.people is list &&
+        request.resource.data.payload.vehicles is list &&
+        request.resource.data.payload.events is list &&
+        request.resource.data.payload.blocks is list &&
+        request.resource.data.payload.sites is list &&
+        request.resource.data.payload.campaigns is list &&
+        request.resource.data.payload.settings is map &&
+        request.resource.data.payload.audit is list &&
+        request.resource.data.payload.people.size() <= 200 &&
+        request.resource.data.payload.events.size() <= 1000 &&
+        request.resource.data.payload.audit.size() <= 300;
+    }
+    match /agora_ops_control/{documentId} {
+      allow get: if canEdit() && documentId == 'schedule';
+      allow list: if false;
+      allow create: if canEdit() && documentId == 'schedule' &&
+        opsValidSchedule() && request.resource.data.revision == 1;
+      allow update: if canEdit() && documentId == 'schedule' &&
+        opsValidSchedule() &&
+        request.resource.data.revision == resource.data.revision + 1;
+      allow delete: if false;
+    }
+    match /agora_ops_access_requests/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid || canEdit();
+      allow list: if canEdit();
+      allow create: if signedIn() && request.auth.uid == uid &&
+        request.resource.data.keys().hasOnly(['uid','name','email','status','createdAt']) &&
+        request.resource.data.keys().hasAll(['uid','name','email','status','createdAt']) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.email is string &&
+        request.resource.data.email.size() <= 240 &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() <= 140 &&
+        request.resource.data.status == 'pendiente' &&
+        request.resource.data.createdAt == request.time;
+      allow update: if canEdit() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status','approvedAt','approvedBy'
+        ]) && resource.data.status == 'pendiente' &&
+        request.resource.data.status == 'aprobada' &&
+        request.resource.data.approvedBy == request.auth.uid &&
+        request.resource.data.approvedAt == request.time;
+      allow delete: if false;
+    }
+    match /agora_ops_members/{uid} {
+      allow get: if canEdit() || (signedIn() && request.auth.uid == uid);
+      allow list: if canEdit();
+      allow create, update: if canEdit() &&
+        request.resource.data.keys().hasOnly([
+          'uid','email','role','personId','active','updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'uid','email','role','personId','active','updatedAt'
+        ]) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.role == 'staff' &&
+        request.resource.data.active is bool &&
+        request.resource.data.personId is string &&
+        request.resource.data.personId.size() > 0 &&
+        request.resource.data.email is string &&
+        request.resource.data.email.size() <= 240 &&
+        request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+    match /agora_ops_staff/{uid} {
+      allow get: if canEdit() || (opsStaff() && request.auth.uid == uid);
+      allow list: if canEdit();
+      allow create, update: if canEdit() &&
+        request.resource.data.keys().hasOnly([
+          'uid','personId','person','events','vehicles','sites','campaigns','settings','updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'uid','personId','person','events','vehicles','sites','campaigns','settings','updatedAt'
+        ]) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.personId is string &&
+        request.resource.data.person is map &&
+        request.resource.data.events is list &&
+        request.resource.data.vehicles is list &&
+        request.resource.data.sites is list &&
+        request.resource.data.campaigns is list &&
+        request.resource.data.settings is map &&
+        request.resource.data.updatedAt == request.time;
+      allow delete: if canEdit();
+    }
+    function opsValidReport() {
+      return request.resource.data.keys().hasOnly([
+        'id','personId','ownerUid','eventId','start','end','breakMins',
+        'activity','place','notes','paymentBasis','paymentStatus','requestedRate',
+        'requestedAmount','requestedHours','approvedHours','approvedAmount',
+        'returnNote','paymentDueDate','revision','updatedAt','type','status'
+      ]) &&
+      request.resource.data.keys().hasAll([
+        'id','personId','ownerUid','eventId','revision','updatedAt'
+      ]) &&
+      opsDocumentMeta() &&
+      request.resource.data.id is string &&
+      request.resource.data.id.size() > 0 &&
+      request.resource.data.id.size() <= 100 &&
+      request.resource.data.personId is string &&
+      request.resource.data.personId.size() > 0 &&
+      request.resource.data.ownerUid is string &&
+      request.resource.data.eventId is string &&
+      request.resource.data.eventId.size() <= 100;
+    }
+    function opsOwnReport() {
+      return opsStaff() &&
+        request.resource.data.ownerUid == request.auth.uid &&
+        request.resource.data.personId == opsPersonId();
+    }
+    match /agora_ops_logs/{id} {
+      allow get, list: if canEdit() ||
+        (opsStaff() && resource.data.ownerUid == request.auth.uid);
+      allow create: if opsValidReport() && request.resource.data.id == id &&
+        request.resource.data.revision == 1 && (
+        canEdit() ||
+        (opsOwnReport() &&
+         request.resource.data.paymentStatus == 'capturado' &&
+         !request.resource.data.keys().hasAny([
+           'approvedAmount','approvedHours','requestedAmount','requestedRate','returnNote'
+         ]))
+      );
+      allow update: if opsValidReport() && request.resource.data.id == resource.data.id &&
+        request.resource.data.ownerUid == resource.data.ownerUid &&
+        request.resource.data.personId == resource.data.personId &&
+        request.resource.data.revision == resource.data.revision + 1 && (
+          canEdit() ||
+          (opsOwnReport() &&
+           resource.data.paymentStatus in ['capturado','revision'] &&
+           request.resource.data.paymentStatus in ['capturado','solicitado'] &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+             'start','end','breakMins','activity','place','notes','eventId',
+             'paymentBasis','paymentStatus','requestedHours','requestedRate',
+             'requestedAmount','updatedAt','revision'
+           ]) &&
+           (!request.resource.data.keys().hasAny(['approvedAmount','approvedHours'])) &&
+           (!request.resource.data.keys().hasAny(['requestedRate']) ||
+             request.resource.data.requestedRate == null) &&
+           (!request.resource.data.keys().hasAny(['requestedAmount']) ||
+             request.resource.data.requestedAmount == null))
+        );
+      allow delete: if canEdit() &&
+        resource.data.paymentStatus in ['capturado','revision'];
+    }
+    match /agora_ops_incidents/{id} {
+      allow get, list: if canEdit() ||
+        (opsStaff() && resource.data.ownerUid == request.auth.uid);
+      allow create: if (opsValidReport() && request.resource.data.id == id &&
+        request.resource.data.revision == 1 && (
+          canEdit() ||
+          (opsOwnReport() && request.resource.data.status == 'pendiente')
+        )) &&
+        (canEdit() || request.resource.data.type != 'validacion_asistencia');
+      allow update: if opsValidReport() && request.resource.data.id == resource.data.id &&
+        request.resource.data.ownerUid == resource.data.ownerUid &&
+        request.resource.data.personId == resource.data.personId &&
+        request.resource.data.revision == resource.data.revision + 1 && (
+          canEdit() ||
+          (opsOwnReport() && resource.data.status == 'pendiente' &&
+            request.resource.data.status == 'pendiente' &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'notes','type','updatedAt','revision'
+            ]))
+        );
+      allow delete: if false;
+    }
+
+
+    // ÁGORA · Marcaje verificable y traslados (solo UID autorizado).
+    // Coordenadas puntuales en el inicio, fin y último punto opcional; nunca lectura pública.
+    function shiftAccessPath(uid, eventId) {
+      return /databases/$(database)/documents/agora_ops_shift_access/$(uid + '_' + eventId);
+    }
+    function shiftPermit(uid, eventId) {
+      return opsStaff() && exists(shiftAccessPath(uid, eventId)) &&
+        get(shiftAccessPath(uid, eventId)).data.ownerUid == uid &&
+        get(shiftAccessPath(uid, eventId)).data.personId == opsPersonId() &&
+        get(shiftAccessPath(uid, eventId)).data.eventId == eventId &&
+        get(shiftAccessPath(uid, eventId)).data.enabled == true;
+    }
+    function shiftClockOpen(uid, eventId) {
+      return shiftPermit(uid, eventId) &&
+        request.time >= get(shiftAccessPath(uid, eventId)).data.startsAt &&
+        request.time <= get(shiftAccessPath(uid, eventId)).data.endsAt;
+    }
+    function shiftClockTracking(uid, eventId, startAt) {
+      return shiftClockOpen(uid, eventId) &&
+        (get(shiftAccessPath(uid, eventId)).data.mode == 'horario' ||
+         request.time <= startAt + duration.value(
+           get(shiftAccessPath(uid, eventId)).data.maxMinutes, 'm'));
+    }
+    function shiftGeoValid(g) {
+      return g is map && g.keys().hasOnly(['lat','lng','accuracy']) &&
+        g.keys().hasAll(['lat','lng','accuracy']) &&
+        g.lat is number && g.lat >= -90 && g.lat <= 90 &&
+        g.lng is number && g.lng >= -180 && g.lng <= 180 &&
+        g.accuracy is number && g.accuracy >= 0 && g.accuracy <= 10000;
+    }
+    function shiftSelf(d) {
+      return opsStaff() && d.ownerUid == request.auth.uid &&
+        d.personId == opsPersonId() &&
+        d.eventId is string && d.eventId.size() > 0 && d.eventId.size() <= 100;
+    }
+    match /agora_ops_shift_access/{id} {
+      allow get, list: if canEdit() ||
+        (opsStaff() && resource.data.ownerUid == request.auth.uid);
+      allow create, update: if canEdit() &&
+        request.resource.data.keys().hasOnly([
+          'ownerUid','personId','eventId','enabled','mode','startsAt','endsAt',
+          'maxMinutes','updatedAt','updatedBy'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'ownerUid','personId','eventId','enabled','mode','startsAt','endsAt',
+          'maxMinutes','updatedAt','updatedBy'
+        ]) &&
+        id == request.resource.data.ownerUid + '_' + request.resource.data.eventId &&
+        request.resource.data.ownerUid is string &&
+        request.resource.data.ownerUid.size() > 0 &&
+        request.resource.data.personId is string &&
+        request.resource.data.personId.size() > 0 &&
+        request.resource.data.eventId is string &&
+        request.resource.data.eventId.size() > 0 &&
+        request.resource.data.eventId.size() <= 100 &&
+        request.resource.data.enabled is bool &&
+        request.resource.data.mode in ['horario','horas'] &&
+        request.resource.data.startsAt is timestamp &&
+        request.resource.data.endsAt is timestamp &&
+        request.resource.data.endsAt > request.resource.data.startsAt &&
+        request.resource.data.maxMinutes is int &&
+        request.resource.data.maxMinutes >= 30 &&
+        request.resource.data.maxMinutes <= 1440 &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if canEdit();
+    }
+    match /agora_ops_clock/{id} {
+      allow get, list: if canEdit() ||
+        (opsStaff() && resource.data.ownerUid == request.auth.uid);
+      allow create: if shiftSelf(request.resource.data) &&
+        id == request.auth.uid + '_' + request.resource.data.eventId &&
+        shiftClockOpen(request.auth.uid, request.resource.data.eventId) &&
+        request.resource.data.keys().hasOnly([
+          'ownerUid','personId','eventId','activity','status','startGeo',
+          'startedAt','lastGeo','lastGeoAt','updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'ownerUid','personId','eventId','activity','status','startGeo',
+          'startedAt','lastGeo','lastGeoAt','updatedAt'
+        ]) &&
+        request.resource.data.activity is string &&
+        request.resource.data.activity.size() >= 4 &&
+        request.resource.data.activity.size() <= 240 &&
+        request.resource.data.status == 'en_curso' &&
+        shiftGeoValid(request.resource.data.startGeo) &&
+        shiftGeoValid(request.resource.data.lastGeo) &&
+        request.resource.data.startedAt == request.time &&
+        request.resource.data.lastGeoAt == request.time &&
+        request.resource.data.updatedAt == request.time;
+      allow update: if shiftSelf(resource.data) &&
+        id == request.auth.uid + '_' + resource.data.eventId &&
+        resource.data.status == 'en_curso' &&
+        request.resource.data.ownerUid == resource.data.ownerUid &&
+        request.resource.data.personId == resource.data.personId &&
+        request.resource.data.eventId == resource.data.eventId &&
+        request.resource.data.startedAt == resource.data.startedAt &&
+        request.resource.data.startGeo == resource.data.startGeo &&
+        request.resource.data.activity == resource.data.activity &&
+        request.resource.data.updatedAt == request.time &&
+        (
+          (request.resource.data.status == 'en_curso' &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+             'lastGeo','lastGeoAt','updatedAt'
+           ]) &&
+           shiftClockTracking(request.auth.uid, resource.data.eventId, resource.data.startedAt) &&
+           shiftGeoValid(request.resource.data.lastGeo) &&
+           request.resource.data.lastGeoAt == request.time)
+          ||
+          (request.resource.data.status == 'finalizada' &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+             'status','endGeo','endNote','endedAt','updatedAt'
+           ]) &&
+           request.resource.data.keys().hasAll(['endNote','endedAt']) &&
+           (!request.resource.data.keys().hasAny(['endGeo']) ||
+             shiftGeoValid(request.resource.data.endGeo)) &&
+           request.resource.data.endNote is string &&
+           request.resource.data.endNote.size() >= 4 &&
+           request.resource.data.endNote.size() <= 240 &&
+           request.resource.data.endedAt == request.time)
+        );
+      allow delete: if false;
+    }
+    // Descansos certificados: cada inicio/reanudación usa hora del servidor.
+    // Hasta ocho descansos por persona y evento, sin montos, GPS ni fotos.
+    function shiftClockPath(uid,eventId) {
+      return /databases/$(database)/documents/agora_ops_clock/$(uid + '_' + eventId);
+    }
+    function breakOnOwnActiveClock(d) {
+      return shiftSelf(d) &&
+        exists(shiftClockPath(request.auth.uid,d.eventId)) &&
+        get(shiftClockPath(request.auth.uid,d.eventId)).data.status == 'en_curso' &&
+        get(shiftClockPath(request.auth.uid,d.eventId)).data.ownerUid == request.auth.uid &&
+        get(shiftClockPath(request.auth.uid,d.eventId)).data.personId == d.personId;
+    }
+    match /agora_ops_breaks/{id} {
+      allow get, list: if canEdit() ||
+        (opsStaff() && resource.data.ownerUid == request.auth.uid);
+      allow create: if breakOnOwnActiveClock(request.resource.data) &&
+        request.resource.data.keys().hasOnly([
+          'ownerUid','personId','eventId','slot','status','startedAt','updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'ownerUid','personId','eventId','slot','status','startedAt','updatedAt'
+        ]) &&
+        request.resource.data.slot in ['1','2','3','4','5','6','7','8'] &&
+        id == request.auth.uid + '_' + request.resource.data.eventId + '_' + request.resource.data.slot &&
+        request.resource.data.status == 'en_descanso' &&
+        request.resource.data.startedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.time > get(shiftClockPath(request.auth.uid,request.resource.data.eventId)).data.startedAt;
+      allow update: if breakOnOwnActiveClock(resource.data) &&
+        id == request.auth.uid + '_' + resource.data.eventId + '_' + resource.data.slot &&
+        resource.data.status == 'en_descanso' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status','endedAt','updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'ownerUid','personId','eventId','slot','status','startedAt',
+          'endedAt','updatedAt'
+        ]) &&
+        request.resource.data.ownerUid == resource.data.ownerUid &&
+        request.resource.data.personId == resource.data.personId &&
+        request.resource.data.eventId == resource.data.eventId &&
+        request.resource.data.slot == resource.data.slot &&
+        request.resource.data.startedAt == resource.data.startedAt &&
+        request.resource.data.status == 'reanudado' &&
+        request.resource.data.endedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.time > resource.data.startedAt;
+      allow delete: if false;
+    }
+
+    match /agora_ops_trips/{id} {
+      allow get, list: if canEdit() ||
+        (opsStaff() && resource.data.ownerUid == request.auth.uid);
+      allow create: if shiftSelf(request.resource.data) &&
+        id == request.auth.uid + '_' + request.resource.data.eventId &&
+        shiftPermit(request.auth.uid, request.resource.data.eventId) &&
+        request.time >= get(shiftAccessPath(request.auth.uid, request.resource.data.eventId)).data.startsAt -
+          duration.value(6, 'h') &&
+        request.time <= get(shiftAccessPath(request.auth.uid, request.resource.data.eventId)).data.endsAt &&
+        request.resource.data.keys().hasOnly([
+          'ownerUid','personId','eventId','origin','destination','travelMin',
+          'bufferMin','status','startedAt','updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'ownerUid','personId','eventId','origin','destination','travelMin',
+          'bufferMin','status','startedAt','updatedAt'
+        ]) &&
+        request.resource.data.origin is string &&
+        request.resource.data.origin.size() > 0 &&
+        request.resource.data.origin.size() <= 180 &&
+        request.resource.data.destination is string &&
+        request.resource.data.destination.size() > 0 &&
+        request.resource.data.destination.size() <= 300 &&
+        request.resource.data.travelMin is int &&
+        request.resource.data.travelMin >= 0 &&
+        request.resource.data.travelMin <= 1440 &&
+        request.resource.data.bufferMin is int &&
+        request.resource.data.bufferMin >= 0 &&
+        request.resource.data.bufferMin <= 180 &&
+        request.resource.data.status == 'en_ruta' &&
+        request.resource.data.startedAt == request.time &&
+        request.resource.data.updatedAt == request.time;
+      allow update: if shiftSelf(resource.data) &&
+        id == request.auth.uid + '_' + resource.data.eventId &&
+        resource.data.status == 'en_ruta' &&
+        request.resource.data.ownerUid == resource.data.ownerUid &&
+        request.resource.data.personId == resource.data.personId &&
+        request.resource.data.eventId == resource.data.eventId &&
+        request.resource.data.startedAt == resource.data.startedAt &&
+        request.resource.data.origin == resource.data.origin &&
+        request.resource.data.destination == resource.data.destination &&
+        request.resource.data.travelMin == resource.data.travelMin &&
+        request.resource.data.bufferMin == resource.data.bufferMin &&
+        request.resource.data.status == 'llegue' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status','arrivedAt','arrivalGeo','updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll(['arrivedAt','arrivalGeo']) &&
+        shiftGeoValid(request.resource.data.arrivalGeo) &&
+        request.resource.data.arrivedAt == request.time &&
+        request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    // AGORA - Identidad Unica y RH. Fragmento para insertar dentro de
+    // match /databases/{database}/documents. No reemplaza reglas existentes.
+    function identityRh() {
+      return isAdmin();
+    }
+    function identityCoordinator() {
+      return activeStaff() && role() == 'coordinador';
+    }
+    function identityJob(job) {
+      return job in [
+        'Coordinador','Subcoordinador de cuenta','Supervisor','Staff',
+        'Staff de montaje','Staff de desmontaje','Volanteero','Runner'
+      ];
+    }
+    function identityLinkPath(uid) {
+      return /databases/$(database)/documents/agora_identity_links/$(uid);
+    }
+    function identityRegistryPath(agoraId) {
+      return /databases/$(database)/documents/agora_identity_registry/$(agoraId);
+    }
+    function identityCredentialPath(credentialId) {
+      return /databases/$(database)/documents/agora_identity_credentials/$(credentialId);
+    }
+    function identityAuditPath(auditId) {
+      return /databases/$(database)/documents/agora_identity_audit/$(auditId);
+    }
+    function identityOwnerOf(agoraId) {
+      return signedIn() && exists(identityLinkPath(request.auth.uid)) &&
+        get(identityLinkPath(request.auth.uid)).data.agoraId == agoraId;
+    }
+    function identityAssigned(record) {
+      return identityCoordinator() && record.coordinatorUids is list &&
+        request.auth.uid in record.coordinatorUids;
+    }
+    function validIdentityAuditAfter(auditId,targetUid,agoraId) {
+      return auditId is string && auditId.size() >= 24 && auditId.size() <= 64 &&
+        existsAfter(identityAuditPath(auditId)) &&
+        getAfter(identityAuditPath(auditId)).data.actorUid == request.auth.uid &&
+        getAfter(identityAuditPath(auditId)).data.targetUid == targetUid &&
+        getAfter(identityAuditPath(auditId)).data.agoraId == agoraId;
+    }
+    function validIdentityRegistry() {
+      return request.resource.data.keys().hasOnly([
+          'uid','agoraId','displayName','email','jobTitle','rhStatus',
+          'credentialId','credentialActive','credentialStatus','blockReason',
+          'coordinatorUids','createdAt','updatedAt','createdBy','updatedBy','lastAuditId'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'uid','agoraId','displayName','email','jobTitle','rhStatus',
+          'credentialId','credentialActive','credentialStatus','blockReason',
+          'coordinatorUids','createdAt','updatedAt','createdBy','updatedBy','lastAuditId'
+        ]) &&
+        request.resource.data.uid is string && request.resource.data.uid.size() >= 1 &&
+        request.resource.data.uid.size() <= 128 &&
+        request.resource.data.agoraId is string &&
+        request.resource.data.agoraId.matches('^DJV-[0-9]{4}-[0-9]{3,6}$') &&
+        request.resource.data.displayName is string && request.resource.data.displayName.size() >= 3 &&
+        request.resource.data.displayName.size() <= 140 &&
+        request.resource.data.email is string && request.resource.data.email.size() <= 240 &&
+        identityJob(request.resource.data.jobTitle) &&
+        request.resource.data.rhStatus in ['pending','verified','suspended','inactive'] &&
+        request.resource.data.credentialId is string &&
+        request.resource.data.credentialId.size() >= 24 && request.resource.data.credentialId.size() <= 64 &&
+        request.resource.data.credentialActive is bool &&
+        request.resource.data.credentialStatus in ['vigente','bloqueada','suspendida'] &&
+        request.resource.data.blockReason is string && request.resource.data.blockReason.size() <= 240 &&
+        (request.resource.data.credentialActive == true ||
+          request.resource.data.blockReason.size() >= 5) &&
+        request.resource.data.coordinatorUids is list &&
+        request.resource.data.coordinatorUids.size() <= 50 &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.updatedBy == request.auth.uid;
+    }
+    function validIdentityCredential() {
+      return request.resource.data.keys().hasOnly([
+          'credentialId','agoraId','displayName','jobTitle','active','status',
+          'blockReason','updatedAt','updatedBy','lastAuditId'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'credentialId','agoraId','displayName','jobTitle','active','status',
+          'blockReason','updatedAt','updatedBy','lastAuditId'
+        ]) &&
+        request.resource.data.credentialId is string &&
+        request.resource.data.credentialId.size() >= 24 && request.resource.data.credentialId.size() <= 64 &&
+        request.resource.data.agoraId.matches('^DJV-[0-9]{4}-[0-9]{3,6}$') &&
+        request.resource.data.displayName is string && request.resource.data.displayName.size() >= 3 &&
+        request.resource.data.displayName.size() <= 140 &&
+        identityJob(request.resource.data.jobTitle) &&
+        request.resource.data.active is bool &&
+        request.resource.data.status in ['vigente','bloqueada','suspendida'] &&
+        request.resource.data.blockReason is string && request.resource.data.blockReason.size() <= 240 &&
+        (request.resource.data.active == true || request.resource.data.blockReason.size() >= 5) &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.updatedBy == request.auth.uid;
+    }
+    function identityPublicMatchesRegistry(registry) {
+      return existsAfter(identityCredentialPath(registry.credentialId)) &&
+        getAfter(identityCredentialPath(registry.credentialId)).data.agoraId == registry.agoraId &&
+        getAfter(identityCredentialPath(registry.credentialId)).data.displayName == registry.displayName &&
+        getAfter(identityCredentialPath(registry.credentialId)).data.jobTitle == registry.jobTitle &&
+        getAfter(identityCredentialPath(registry.credentialId)).data.active == registry.credentialActive &&
+        getAfter(identityCredentialPath(registry.credentialId)).data.status == registry.credentialStatus &&
+        getAfter(identityCredentialPath(registry.credentialId)).data.blockReason ==
+          (registry.credentialActive == true ? '' : 'Credencial suspendida') &&
+        getAfter(identityCredentialPath(registry.credentialId)).data.lastAuditId == registry.lastAuditId;
+    }
+
+    match /agora_identity_registrations/{uid} {
+      allow get: if (identitySignedIn() && request.auth.uid == uid) || identityRh();
+      allow list: if identityRh();
+      allow create: if identitySignedIn() && request.auth.uid == uid &&
+        request.resource.data.keys().hasOnly([
+          'uid','email','displayName','telephone','requestedJobTitle','status',
+          'privacyAccepted','privacyVersion','createdAt','updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'uid','email','displayName','telephone','requestedJobTitle','status',
+          'privacyAccepted','privacyVersion','createdAt','updatedAt'
+        ]) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.email == request.auth.token.get('email','') &&
+        request.resource.data.displayName is string && request.resource.data.displayName.size() >= 3 &&
+        request.resource.data.displayName.size() <= 140 &&
+        request.resource.data.telephone is string && request.resource.data.telephone.size() <= 30 &&
+        identityJob(request.resource.data.requestedJobTitle) &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.privacyAccepted == true &&
+        request.resource.data.privacyVersion == 'provisional-2026-11-18' &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time;
+      allow update: if identityRh() && resource.data.status == 'pending' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status','agoraId','approvedAt','approvedBy','updatedAt'
+        ]) &&
+        request.resource.data.status == 'approved' &&
+        request.resource.data.agoraId.matches('^DJV-[0-9]{4}-[0-9]{3,6}$') &&
+        request.resource.data.approvedAt == request.time &&
+        request.resource.data.approvedBy == request.auth.uid &&
+        request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    match /agora_identity_counters/{yearId} {
+      allow get: if identityRh();
+      allow list: if false;
+      allow create: if identityRh() &&
+        request.resource.data.keys().hasOnly(['year','nextSequence','updatedAt','updatedBy']) &&
+        yearId.matches('^[0-9]{4}$') &&
+        request.resource.data.year is int &&
+        request.resource.data.nextSequence is int &&
+        request.resource.data.nextSequence >= 2 && request.resource.data.nextSequence <= 1000000 &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.updatedBy == request.auth.uid;
+      allow update: if identityRh() &&
+        request.resource.data.keys().hasOnly(['year','nextSequence','updatedAt','updatedBy']) &&
+        request.resource.data.year == resource.data.year &&
+        request.resource.data.nextSequence > resource.data.nextSequence &&
+        request.resource.data.nextSequence <= resource.data.nextSequence + 25 &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /agora_identity_links/{uid} {
+      allow get: if (signedIn() && request.auth.uid == uid) || identityRh();
+      allow list: if identityRh();
+      allow create: if identityRh() &&
+        request.resource.data.keys().hasOnly([
+          'uid','agoraId','credentialId','active','createdAt','createdBy'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'uid','agoraId','credentialId','active','createdAt','createdBy'
+        ]) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.agoraId.matches('^DJV-[0-9]{4}-[0-9]{3,6}$') &&
+        request.resource.data.credentialId.size() >= 24 &&
+        request.resource.data.active == true &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /agora_identity_registry/{agoraId} {
+      allow get: if identityRh() || identityOwnerOf(agoraId) || identityAssigned(resource.data);
+      allow list: if identityRh() || identityAssigned(resource.data);
+      allow create: if identityRh() && request.resource.data.agoraId == agoraId &&
+        validIdentityRegistry() && request.resource.data.createdAt == request.time &&
+        request.resource.data.createdBy == request.auth.uid &&
+        validIdentityAuditAfter(request.resource.data.lastAuditId,request.resource.data.uid,agoraId) &&
+        identityPublicMatchesRegistry(request.resource.data) &&
+        existsAfter(identityLinkPath(request.resource.data.uid)) &&
+        getAfter(identityLinkPath(request.resource.data.uid)).data.agoraId == agoraId;
+      allow update: if validIdentityRegistry() &&
+        request.resource.data.uid == resource.data.uid &&
+        request.resource.data.agoraId == resource.data.agoraId &&
+        request.resource.data.email == resource.data.email &&
+        request.resource.data.credentialId == resource.data.credentialId &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.lastAuditId != resource.data.lastAuditId &&
+        validIdentityAuditAfter(request.resource.data.lastAuditId,resource.data.uid,agoraId) &&
+        identityPublicMatchesRegistry(request.resource.data) && (
+          identityRh() ||
+          (identityAssigned(resource.data) &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'jobTitle','credentialActive','credentialStatus','blockReason',
+              'updatedAt','updatedBy','lastAuditId'
+            ]))
+        );
+      allow delete: if false;
+      allow list: if identityCoordinator() && request.auth.uid in resource.data.coordinatorUids;
+    }
+
+    match /agora_identity_profiles/{uid} {
+      allow get: if identityRh() || (signedIn() && request.auth.uid == uid);
+      allow list: if identityRh();
+      allow create, update: if (identityRh() || (signedIn() && request.auth.uid == uid)) &&
+        request.resource.data.keys().hasOnly([
+          'uid','telephone','address','shirtSize','pantSize','shoeSize',
+          'emergencyName','emergencyRelation','emergencyPhone','medicalNotes','updatedAt'
+        ]) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.telephone is string && request.resource.data.telephone.size() <= 30 &&
+        request.resource.data.address is string && request.resource.data.address.size() <= 300 &&
+        request.resource.data.medicalNotes is string && request.resource.data.medicalNotes.size() <= 300 &&
+        request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    match /agora_identity_financial/{uid} {
+      allow get: if identityRh() || (signedIn() && request.auth.uid == uid);
+      allow list: if identityRh();
+      allow create: if (identityRh() || (signedIn() && request.auth.uid == uid)) &&
+        request.resource.data.keys().hasOnly([
+          'uid','rfc','curp','nss','bank','clabe','taxRegime','lockedByRH','updatedAt'
+        ]) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.lockedByRH == false &&
+        request.resource.data.updatedAt == request.time;
+      allow update: if request.resource.data.uid == uid &&
+        request.resource.data.keys().hasOnly([
+          'uid','rfc','curp','nss','bank','clabe','taxRegime','lockedByRH','updatedAt'
+        ]) &&
+        request.resource.data.updatedAt == request.time && (
+          identityRh() ||
+          (signedIn() && request.auth.uid == uid &&
+            resource.data.lockedByRH == false &&
+            request.resource.data.lockedByRH == false)
+        );
+      allow delete: if false;
+    }
+
+    match /agora_identity_credentials/{credentialId} {
+      allow get: if credentialId.size() >= 24 && credentialId.size() <= 64;
+      allow list: if false;
+      allow create: if identityRh() &&
+        request.resource.data.credentialId == credentialId &&
+        validIdentityCredential() &&
+        existsAfter(identityRegistryPath(request.resource.data.agoraId)) &&
+        getAfter(identityRegistryPath(request.resource.data.agoraId)).data.credentialId == credentialId &&
+        validIdentityAuditAfter(
+          request.resource.data.lastAuditId,
+          getAfter(identityRegistryPath(request.resource.data.agoraId)).data.uid,
+          request.resource.data.agoraId
+        );
+      allow update: if validIdentityCredential() &&
+        request.resource.data.credentialId == resource.data.credentialId &&
+        request.resource.data.agoraId == resource.data.agoraId &&
+        request.resource.data.displayName == resource.data.displayName &&
+        request.resource.data.lastAuditId != resource.data.lastAuditId &&
+        existsAfter(identityRegistryPath(resource.data.agoraId)) &&
+        getAfter(identityRegistryPath(resource.data.agoraId)).data.credentialId == credentialId &&
+        getAfter(identityRegistryPath(resource.data.agoraId)).data.lastAuditId == request.resource.data.lastAuditId &&
+        validIdentityAuditAfter(
+          request.resource.data.lastAuditId,
+          getAfter(identityRegistryPath(resource.data.agoraId)).data.uid,
+          resource.data.agoraId
+        ) && (
+          identityRh() ||
+          identityAssigned(get(identityRegistryPath(resource.data.agoraId)).data)
+        );
+      allow delete: if false;
+    }
+
+    match /agora_identity_audit/{auditId} {
+      allow get, list: if identityRh();
+      allow create: if (identityRh() || identityCoordinator()) &&
+        auditId.size() >= 24 && auditId.size() <= 64 &&
+        request.resource.data.keys().hasOnly([
+          'actorUid','targetUid','agoraId','action','createdAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'actorUid','targetUid','agoraId','action','createdAt'
+        ]) &&
+        request.resource.data.actorUid == request.auth.uid &&
+        request.resource.data.targetUid is string &&
+        request.resource.data.agoraId.matches('^DJV-[0-9]{4}-[0-9]{3,6}$') &&
+        request.resource.data.action in [
+          'identity_approved','credential_activated','credential_blocked',
+          'coordinator_assigned','job_changed','rh_status_changed'
+        ] &&
+        request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+
+    // ÁGORA · Inventario, mantenimiento y reparaciones.
+    // Colecciones nuevas: no migran ni modifican los datos de otros módulos.
+    function repairUser() { return canEdit() || opsStaff(); }
+    function repairRequestPath(id) {
+      return /databases/$(database)/documents/agora_repair_requests/$(id);
+    }
+    function repairAllowedFields() {
+      return [
+        'id','assetId','project','asset','scope','area','cause','problem','solutionMode',
+        'instructions','materialLink','dueDate','priority','createdBy',
+        'createdByEmail','createdByName','createdAt','updatedAt','status',
+        'repairRoute','assignedTo','assignedUid','decisionBy','decisionNote','estimatedCost',
+        'quotes','selectedQuoteId','photos','revision'
+      ];
+    }
+    function repairDocumentValid(id) {
+      return request.resource.data.keys().hasOnly(repairAllowedFields()) &&
+        request.resource.data.keys().hasAll(repairAllowedFields()) &&
+        request.resource.data.id == id &&
+        request.resource.data.assetId is string &&
+        request.resource.data.assetId.size() <= 36 &&
+        request.resource.data.project is string &&
+        request.resource.data.project.size() > 0 &&
+        request.resource.data.project.size() <= 120 &&
+        request.resource.data.asset is string &&
+        request.resource.data.asset.size() > 0 &&
+        request.resource.data.asset.size() <= 120 &&
+        request.resource.data.area is string &&
+        request.resource.data.area.size() > 0 &&
+        request.resource.data.area.size() <= 120 &&
+        request.resource.data.problem is string &&
+        request.resource.data.problem.size() > 0 &&
+        request.resource.data.problem.size() <= 2000 &&
+        request.resource.data.scope in [
+          'Área del stand','Elemento específico','Stand completo','Mueble suelto'
+        ] &&
+        request.resource.data.cause is string &&
+        request.resource.data.cause.size() <= 250 &&
+        request.resource.data.instructions is string &&
+        request.resource.data.instructions.size() <= 2000 &&
+        request.resource.data.materialLink is string &&
+        request.resource.data.materialLink.size() <= 1000 &&
+        request.resource.data.dueDate is string &&
+        request.resource.data.dueDate.size() <= 10 &&
+        request.resource.data.priority in ['Normal','Alta','Urgente'] &&
+        request.resource.data.solutionMode in ['propuesta','instrucciones'] &&
+        request.resource.data.createdBy is string &&
+        request.resource.data.createdByEmail is string &&
+        request.resource.data.createdByEmail.size() <= 240 &&
+        request.resource.data.createdByName is string &&
+        request.resource.data.createdByName.size() <= 120 &&
+        request.resource.data.status in [
+          'pendiente','revision','cotizando','autorizado',
+          'reparacion','terminado','entregado'
+        ] &&
+        request.resource.data.repairRoute in [
+          'pendiente','staff','agencia','proveedor','nuevo','cotizar','comparar'
+        ] &&
+        request.resource.data.assignedTo is string &&
+        request.resource.data.assignedTo.size() <= 160 &&
+        request.resource.data.assignedUid is string &&
+        request.resource.data.assignedUid.size() <= 128 &&
+        request.resource.data.decisionBy is string &&
+        request.resource.data.decisionBy.size() <= 120 &&
+        request.resource.data.decisionNote is string &&
+        request.resource.data.decisionNote.size() <= 2000 &&
+        request.resource.data.estimatedCost is number &&
+        request.resource.data.estimatedCost >= 0 &&
+        request.resource.data.estimatedCost <= 99999999 &&
+        request.resource.data.quotes is list &&
+        request.resource.data.quotes.size() <= 8 &&
+        request.resource.data.selectedQuoteId is string &&
+        request.resource.data.selectedQuoteId.size() <= 36 &&
+        request.resource.data.photos is list &&
+        request.resource.data.photos.size() <= 12 &&
+        request.resource.data.revision is int &&
+        request.resource.data.revision >= 1;
+    }
+    // Inventario de piezas reutilizables, accesible solo a ÁGORA autorizado.
+    function repairAssetValid(id) {
+      return request.resource.data.keys().hasOnly([
+        'id','project','stand','piece','description','materialLink','condition',
+        'photoPaths','createdBy','createdAt','updatedAt','revision'
+      ]) &&
+      request.resource.data.keys().hasAll([
+        'id','project','stand','piece','description','materialLink','condition',
+        'photoPaths','createdBy','createdAt','updatedAt','revision'
+      ]) &&
+      request.resource.data.id == id &&
+      request.resource.data.project is string &&
+      request.resource.data.project.size() > 0 &&
+      request.resource.data.project.size() <= 120 &&
+      request.resource.data.stand is string &&
+      request.resource.data.stand.size() > 0 &&
+      request.resource.data.stand.size() <= 120 &&
+      request.resource.data.piece is string &&
+      request.resource.data.piece.size() > 0 &&
+      request.resource.data.piece.size() <= 120 &&
+      request.resource.data.description is string &&
+      request.resource.data.description.size() <= 800 &&
+      request.resource.data.materialLink is string &&
+      request.resource.data.materialLink.size() <= 1000 &&
+      request.resource.data.condition in [
+        'Por revisar','Disponible','Requiere reparación','En reparación'
+      ] &&
+      request.resource.data.photoPaths is list &&
+      request.resource.data.photoPaths.size() <= 20 &&
+      request.resource.data.createdBy is string &&
+      request.resource.data.revision is int &&
+      request.resource.data.revision > 0;
+    }
+    match /agora_repair_assets/{id} {
+      allow get, list: if repairUser();
+      allow create: if canEdit() &&
+        id.matches('^[a-f0-9-]{36}$') &&
+        repairAssetValid(id) &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.revision == 1 &&
+        request.resource.data.photoPaths.size() == 0;
+      allow update: if canEdit() &&
+        repairAssetValid(id) &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.revision == resource.data.revision + 1 &&
+        request.resource.data.photoPaths.size() >= resource.data.photoPaths.size() &&
+        request.resource.data.photoPaths.hasAll(resource.data.photoPaths);
+      allow delete: if false;
+    }
+    match /agora_repair_requests/{id} {
+      allow get, list: if canEdit() || (opsStaff() && (
+        resource.data.createdBy == request.auth.uid ||
+        resource.data.assignedUid == request.auth.uid));
+      allow create: if repairUser() &&
+        id.matches('^[a-f0-9-]{36}$') &&
+        repairDocumentValid(id) &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.createdByEmail == request.auth.token.email &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.revision == 1 &&
+        request.resource.data.status == 'pendiente' &&
+        request.resource.data.repairRoute == 'pendiente' &&
+        request.resource.data.assignedTo == '' &&
+        request.resource.data.assignedUid == '' &&
+        request.resource.data.decisionBy == '' &&
+        request.resource.data.decisionNote == '' &&
+        request.resource.data.estimatedCost == 0 &&
+        request.resource.data.quotes.size() == 0 &&
+        request.resource.data.photos.size() == 0 &&
+        request.resource.data.selectedQuoteId == '';
+      allow update: if repairUser() &&
+        repairDocumentValid(id) &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.revision == resource.data.revision + 1 &&
+        (
+          canEdit() ||
+          (opsStaff() && (resource.data.createdBy == request.auth.uid ||
+              resource.data.assignedUid == request.auth.uid) &&
+            request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['photos','revision','updatedAt']) &&
+            request.resource.data.photos.size() == resource.data.photos.size() + 1 &&
+            request.resource.data.photos.hasAll(resource.data.photos) &&
+            request.resource.data.photos[request.resource.data.photos.size() - 1].path
+              .matches('firestore:[a-f0-9-]{36}'))
+        );
+      allow delete: if false;
+    }
+
+    // Plan Spark: fotografía de trabajo como miniatura Firestore protegida.
+    function repairPhotoAsset(id) {
+      return /databases/$(database)/documents/agora_repair_assets/$(id);
+    }
+    function repairPhotoValid(id) {
+      return request.resource.data.keys().hasOnly([
+        'id','kind','ownerId','uploadedBy','dataUrl','label','stage','createdAt'
+      ]) &&
+      request.resource.data.keys().hasAll([
+        'id','kind','ownerId','uploadedBy','dataUrl','label','stage','createdAt'
+      ]) &&
+      request.resource.data.id == id &&
+      id.size() == 36 && id.matches('[a-f0-9-]+') &&
+      request.resource.data.kind in ['request','asset'] &&
+      request.resource.data.ownerId is string &&
+      request.resource.data.ownerId.size() == 36 &&
+      request.resource.data.ownerId.matches('[a-f0-9-]+') &&
+      request.resource.data.uploadedBy == request.auth.uid &&
+      request.resource.data.createdAt == request.time &&
+      request.resource.data.dataUrl is string &&
+      request.resource.data.dataUrl.size() <= 90000 &&
+      request.resource.data.dataUrl.size() > 30 &&
+      request.resource.data.dataUrl.matches('data:image/jpeg;base64,[A-Za-z0-9+/=]+') &&
+      request.resource.data.label is string &&
+      request.resource.data.label.size() <= 120 &&
+      request.resource.data.stage in ['antes','avance','despues','inventario'];
+    }
+    match /agora_repair_photos/{id} {
+      allow get: if canEdit() || (opsStaff() &&
+        (resource.data.kind == 'asset' ||
+          (resource.data.kind == 'request' &&
+           exists(repairRequestPath(resource.data.ownerId)) &&
+           (get(repairRequestPath(resource.data.ownerId)).data.createdBy == request.auth.uid ||
+            get(repairRequestPath(resource.data.ownerId)).data.assignedUid == request.auth.uid))));
+      allow list: if false;
+      allow create: if repairUser() && repairPhotoValid(id) && (
+        (request.resource.data.kind == 'asset' && canEdit() &&
+          existsAfter(repairPhotoAsset(request.resource.data.ownerId)) &&
+          getAfter(repairPhotoAsset(request.resource.data.ownerId)).data.photoPaths
+            .hasAny(['firestore:' + id])) ||
+        (request.resource.data.kind == 'request' &&
+          exists(repairRequestPath(request.resource.data.ownerId)) &&
+          existsAfter(repairRequestPath(request.resource.data.ownerId)) &&
+          (canEdit() || (opsStaff() &&
+            (get(repairRequestPath(request.resource.data.ownerId)).data.createdBy == request.auth.uid ||
+             get(repairRequestPath(request.resource.data.ownerId)).data.assignedUid == request.auth.uid))) &&
+          getAfter(repairRequestPath(request.resource.data.ownerId)).data.photos[
+            getAfter(repairRequestPath(request.resource.data.ownerId)).data.photos.size()-1
+          ].path == 'firestore:' + id)
+      );
+      allow update, delete: if false;
+    }
+
+    // Invitación externa por token de 256 bits: única, con caducidad y sin listados.
+    function repairInviteCreate(token) {
+      return canEdit() && token.size() == 43 &&
+        token.matches('[A-Za-z0-9_-]+') &&
+        request.resource.data.keys().hasOnly([
+          'requestId','snapshot','supplierHint','createdBy','createdAt',
+          'updatedAt','expiresAt','status','response','submittedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'requestId','snapshot','supplierHint','createdBy','createdAt',
+          'updatedAt','expiresAt','status','response','submittedAt'
+        ]) &&
+        request.resource.data.requestId is string &&
+        request.resource.data.requestId.size() == 36 &&
+        exists(repairRequestPath(request.resource.data.requestId)) &&
+        request.resource.data.snapshot is map &&
+        request.resource.data.snapshot.keys().hasOnly([
+          'project','asset','area','problem','scope','priority','dueDate','materialLink','photoPreview'
+        ]) &&
+        request.resource.data.snapshot.keys().hasAll([
+          'project','asset','area','problem','scope','priority','dueDate','materialLink','photoPreview'
+        ]) &&
+        request.resource.data.snapshot.project is string &&
+        request.resource.data.snapshot.project.size() <= 120 &&
+        request.resource.data.snapshot.asset is string &&
+        request.resource.data.snapshot.asset.size() <= 120 &&
+        request.resource.data.snapshot.area is string &&
+        request.resource.data.snapshot.area.size() <= 120 &&
+        request.resource.data.snapshot.problem is string &&
+        request.resource.data.snapshot.problem.size() <= 2000 &&
+        request.resource.data.snapshot.scope is string &&
+        request.resource.data.snapshot.scope.size() <= 60 &&
+        request.resource.data.snapshot.priority is string &&
+        request.resource.data.snapshot.priority.size() <= 10 &&
+        request.resource.data.snapshot.dueDate is string &&
+        request.resource.data.snapshot.dueDate.size() <= 10 &&
+        request.resource.data.snapshot.materialLink is string &&
+        request.resource.data.snapshot.materialLink.size() <= 1000 &&
+        request.resource.data.snapshot.photoPreview is string &&
+        request.resource.data.snapshot.photoPreview.size() <= 150000 &&
+        (request.resource.data.snapshot.photoPreview == '' ||
+          request.resource.data.snapshot.photoPreview.matches('data:image/jpeg;base64,[A-Za-z0-9+/=]+')) &&
+        request.resource.data.supplierHint is string &&
+        request.resource.data.supplierHint.size() <= 160 &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.expiresAt is timestamp &&
+        request.resource.data.expiresAt > request.time &&
+        request.resource.data.expiresAt <= request.time + duration.value(21,'d') &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.response == null &&
+        request.resource.data.submittedAt == null;
+    }
+    function repairInviteSubmit(token) {
+      return token.size() == 43 &&
+        token.matches('[A-Za-z0-9_-]+') &&
+        resource.data.status == 'pending' &&
+        resource.data.expiresAt > request.time &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status','response','submittedAt','updatedAt']) &&
+        request.resource.data.status == 'submitted' &&
+        request.resource.data.submittedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.response is map &&
+        request.resource.data.response.keys().hasOnly([
+          'provider','email','amount','scope','note','link'
+        ]) &&
+        request.resource.data.response.keys().hasAll([
+          'provider','email','amount','scope','note','link'
+        ]) &&
+        request.resource.data.response.provider is string &&
+        request.resource.data.response.provider.size() > 1 &&
+        request.resource.data.response.provider.size() <= 160 &&
+        request.resource.data.response.email is string &&
+        request.resource.data.response.email.size() <= 240 &&
+        request.resource.data.response.amount is number &&
+        request.resource.data.response.amount >= 0 &&
+        request.resource.data.response.amount <= 99999999 &&
+        request.resource.data.response.scope is string &&
+        request.resource.data.response.scope.size() > 0 &&
+        request.resource.data.response.scope.size() <= 500 &&
+        request.resource.data.response.note is string &&
+        request.resource.data.response.note.size() <= 500 &&
+        request.resource.data.response.link is string &&
+        request.resource.data.response.link.size() <= 1000;
+    }
+    match /agora_repair_invites/{token} {
+      allow get: if canEdit() ||
+        (token.size() == 43 && token.matches('[A-Za-z0-9_-]+') &&
+         resource.data.expiresAt > request.time &&
+         resource.data.status in ['pending','submitted']);
+      allow list: if canEdit();
+      allow create: if repairInviteCreate(token);
+      allow update: if repairInviteSubmit(token) ||
+        (canEdit() && resource.data.status in ['pending','submitted'] &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['status','updatedAt']) &&
+         request.resource.data.status == 'revoked' &&
+         request.resource.data.updatedAt == request.time);
+      allow delete: if false;
+    }
+    match /agora_repair_events/{eventId} {
+      allow get, list: if canEdit() || (opsStaff() && resource.data.actorUid == request.auth.uid);
+      allow create: if repairUser() &&
+        request.resource.data.keys().hasOnly([
+          'requestId','actorUid','actorEmail','action','detail','createdAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'requestId','actorUid','actorEmail','action','detail','createdAt'
+        ]) &&
+        request.resource.data.actorUid == request.auth.uid &&
+        request.resource.data.actorEmail == request.auth.token.email &&
+        request.resource.data.requestId is string &&
+        request.resource.data.action in [
+          'creada','decisión','cotización','selección de cotización','evidencia',
+          'invitación','cotización externa','avance'
+        ] &&
+        request.resource.data.detail is string &&
+        request.resource.data.detail.size() <= 500 &&
+        request.resource.data.createdAt == request.time &&
+        existsAfter(repairRequestPath(request.resource.data.requestId)) &&
+        (canEdit() || (opsStaff() &&
+           request.resource.data.action in ['creada','evidencia','avance'] &&
+           (getAfter(repairRequestPath(request.resource.data.requestId)).data.createdBy == request.auth.uid ||
+            getAfter(repairRequestPath(request.resource.data.requestId)).data.assignedUid == request.auth.uid) &&
+           (request.resource.data.action != 'creada' ||
+             (!exists(repairRequestPath(request.resource.data.requestId)) &&
+               getAfter(repairRequestPath(request.resource.data.requestId)).data.createdAt == request.time)) &&
+           (request.resource.data.action != 'evidencia' ||
+             (exists(repairRequestPath(request.resource.data.requestId)) &&
+               getAfter(repairRequestPath(request.resource.data.requestId)).data.photos.size() ==
+                 get(repairRequestPath(request.resource.data.requestId)).data.photos.size() + 1))));
+      allow update, delete: if false;
+    }
+
+    // ÁGORA ASISTENCIA · Registro mínimo delegado por jornada.
+    // No otorga acceso de Supervisor al cronograma, finanzas o expedientes.
+    function attendanceSheetPath(eventId) {
+      return /databases/$(database)/documents/agora_ops_attendance_sheets/$(eventId);
+    }
+    function attendanceRosterPath(eventId,personId) {
+      return /databases/$(database)/documents/agora_ops_attendance_sheets/$(eventId)/roster/$(personId);
+    }
+    function attendanceEntryPath(eventId,entryId) {
+      return /databases/$(database)/documents/agora_ops_attendance_sheets/$(eventId)/entries/$(entryId);
+    }
+    function attendanceSupervisor(eventId) {
+      return signedIn() &&
+        exists(attendanceSheetPath(eventId)) &&
+        get(attendanceSheetPath(eventId)).data.active == true &&
+        request.auth.uid in get(attendanceSheetPath(eventId)).data.supervisorUids &&
+        exists(identityLinkPath(request.auth.uid)) &&
+        get(identityLinkPath(request.auth.uid)).data.active == true;
+    }
+    function attendanceExistingPerson(eventId,d) {
+      return d.source in ['qr','manual'] &&
+        d.ownerUid is string &&
+        ((d.source == 'qr' && d.ownerUid.size() > 0) ||
+         (d.source == 'manual' && (d.ownerUid.size() > 0 || d.reason.size() >= 10))) &&
+        exists(attendanceRosterPath(eventId,d.personId)) &&
+        get(attendanceRosterPath(eventId,d.personId)).data.uid == d.ownerUid &&
+        get(attendanceRosterPath(eventId,d.personId)).data.name == d.personName &&
+        d.actorUid != d.ownerUid;
+    }
+    function attendanceProvisional(d) {
+      return d.source == 'provisional' &&
+        d.ownerUid == '' &&
+        d.personId.matches('^prov_[a-f0-9]{20}$') &&
+        d.reason.size() >= 10;
+    }
+    function attendanceEntryCreate(eventId,id) {
+      let d=request.resource.data;
+      return attendanceSupervisor(eventId) &&
+        d.keys().hasOnly([
+          'id','eventId','personId','ownerUid','personName','source','action',
+          'activityKey','reason','notes','actorUid','createdAt','status'
+        ]) &&
+        d.keys().hasAll([
+          'id','eventId','personId','ownerUid','personName','source','action',
+          'activityKey','reason','notes','actorUid','createdAt','status'
+        ]) &&
+        d.id == id && d.eventId == eventId &&
+        d.personId is string &&
+        d.personId.matches('^[A-Za-z0-9_-]{1,90}$') &&
+        d.personName is string && d.personName.size() >= 2 && d.personName.size() <= 140 &&
+        d.action in ['entrada','salida','actividad'] &&
+        d.activityKey is string &&
+        d.activityKey.matches('^[A-Za-z0-9_-]{1,80}$') &&
+        ((d.action in ['entrada','salida'] && d.activityKey == 'jornada') ||
+         (d.action == 'actividad' && d.activityKey != 'jornada')) &&
+        id == d.personId + '__' + d.action + '__' + d.activityKey &&
+        d.source in ['qr','manual','provisional'] &&
+        d.reason is string && d.reason.size() <= 400 &&
+        d.notes is string && d.notes.size() <= 400 &&
+        (attendanceExistingPerson(eventId,d) || attendanceProvisional(d)) &&
+        d.actorUid == request.auth.uid &&
+        d.status == 'pendiente' && d.createdAt == request.time &&
+        request.time >= get(attendanceSheetPath(eventId)).data.startsAt -
+          duration.value(30,'m') &&
+        request.time <= get(attendanceSheetPath(eventId)).data.endsAt +
+          duration.value(30,'m');
+    }
+    function attendanceValidated(eventId,personId,action) {
+      let id=personId + '__' + action + '__jornada';
+      return exists(attendanceEntryPath(eventId,id)) &&
+        get(attendanceEntryPath(eventId,id)).data.status == 'validado';
+    }
+    function attendanceClockCompleted(eventId,personId) {
+      return exists(attendanceRosterPath(eventId,personId)) &&
+        get(attendanceRosterPath(eventId,personId)).data.uid != '' &&
+        exists(shiftClockPath(get(attendanceRosterPath(eventId,personId)).data.uid,eventId)) &&
+        get(shiftClockPath(get(attendanceRosterPath(eventId,personId)).data.uid,eventId)).data.status == 'finalizada';
+    }
+    // Solicitudes de jornadas de Coordinación. Se guarda una captura pequeña
+    // de evidencia como JPEG privada en Firestore, sin URLs ni buckets públicos.
+    match /agora_ops_assignment_requests/{requestId} {
+      allow get, list: if canEdit();
+      allow create: if canEdit() &&
+        requestId.matches('^[a-f0-9-]{36}$') &&
+        request.resource.data.keys().hasOnly([
+          'id','requester','channel','contact','requestedAt','project','site',
+          'date','start','end','headcount','description','activities',
+          'evidenceNote','evidenceImage','capturedBy','createdAt',
+          'status','linkedEventId','updatedAt','updatedBy'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'id','requester','channel','contact','requestedAt','project','site',
+          'date','start','end','headcount','description','activities',
+          'evidenceNote','evidenceImage','capturedBy','createdAt',
+          'status','linkedEventId','updatedAt','updatedBy'
+        ]) &&
+        request.resource.data.id == requestId &&
+        request.resource.data.requester is string &&
+        request.resource.data.requester.size() >= 2 &&
+        request.resource.data.requester.size() <= 140 &&
+        request.resource.data.channel in [
+          'WhatsApp','Llamada','Correo','Presencial','Otro'
+        ] &&
+        request.resource.data.contact is string &&
+        request.resource.data.contact.size() <= 120 &&
+        request.resource.data.requestedAt is string &&
+        request.resource.data.requestedAt.size() <= 40 &&
+        request.resource.data.project is string &&
+        request.resource.data.project.size() >= 2 &&
+        request.resource.data.project.size() <= 150 &&
+        request.resource.data.site is string &&
+        request.resource.data.site.size() >= 2 &&
+        request.resource.data.site.size() <= 150 &&
+        request.resource.data.date is string &&
+        request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        request.resource.data.start is string &&
+        request.resource.data.start.matches('^[0-9]{2}:[0-9]{2}$') &&
+        request.resource.data.end is string &&
+        request.resource.data.end.matches('^[0-9]{2}:[0-9]{2}$') &&
+        request.resource.data.headcount is int &&
+        request.resource.data.headcount >= 1 &&
+        request.resource.data.headcount <= 999 &&
+        request.resource.data.description is string &&
+        request.resource.data.description.size() <= 600 &&
+        request.resource.data.activities is list &&
+        request.resource.data.activities.size() <= 500 &&
+        request.resource.data.evidenceNote is string &&
+        request.resource.data.evidenceNote.size() <= 400 &&
+        request.resource.data.evidenceImage is string &&
+        request.resource.data.evidenceImage.size() <= 185000 &&
+        (request.resource.data.evidenceImage == '' ||
+         request.resource.data.evidenceImage.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')) &&
+        request.resource.data.capturedBy == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        request.resource.data.status == 'pendiente' &&
+        request.resource.data.linkedEventId == '';
+      allow update: if canEdit() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status','linkedEventId','updatedAt','updatedBy'
+        ]) &&
+        request.resource.data.status in [
+          'pendiente','confirmada','cancelada'
+        ] &&
+        request.resource.data.linkedEventId is string &&
+        request.resource.data.linkedEventId.size() <= 100 &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if false;
+    }
+    match /agora_ops_attendance_sheets/{eventId} {
+      // La lista revela solo metadatos mínimos ya delegados. Una jornada
+      // cerrada no permite leer roster/entradas ni crear nuevos registros.
+      allow get, list: if canEdit() ||
+        (signedIn() &&
+         request.auth.uid in resource.data.supervisorUids &&
+         exists(identityLinkPath(request.auth.uid)) &&
+         get(identityLinkPath(request.auth.uid)).data.active == true);
+      allow create: if canEdit() && eventId.matches('^[A-Za-z0-9_-]{1,100}$') &&
+        request.resource.data.keys().hasOnly([
+          'eventId','title','site','startsAt','endsAt','active',
+          'supervisorUids','createdBy','createdAt','updatedBy','updatedAt','revision'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'eventId','title','site','startsAt','endsAt','active',
+          'supervisorUids','createdBy','createdAt','updatedBy','updatedAt','revision'
+        ]) &&
+        request.resource.data.eventId == eventId &&
+        request.resource.data.title is string &&
+        request.resource.data.title.size() >= 2 &&
+        request.resource.data.title.size() <= 180 &&
+        request.resource.data.site is string &&
+        request.resource.data.site.size() <= 180 &&
+        request.resource.data.startsAt is timestamp &&
+        request.resource.data.endsAt is timestamp &&
+        request.resource.data.endsAt > request.resource.data.startsAt &&
+        request.resource.data.endsAt <= request.resource.data.startsAt +
+          duration.value(48,'h') &&
+        request.resource.data.supervisorUids is list &&
+        request.resource.data.supervisorUids.size() <= 20 &&
+        request.resource.data.active == true &&
+        request.resource.data.revision == 1 &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time;
+      allow update: if canEdit() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'supervisorUids','active','updatedAt','updatedBy','revision'
+        ]) &&
+        request.resource.data.supervisorUids is list &&
+        request.resource.data.supervisorUids.size() <= 20 &&
+        request.resource.data.active is bool &&
+        request.resource.data.revision == resource.data.revision + 1 &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+
+      match /roster/{personId} {
+        allow get, list: if canEdit() || attendanceSupervisor(eventId);
+        allow create: if canEdit() &&
+          existsAfter(attendanceSheetPath(eventId)) &&
+          personId.matches('^[A-Za-z0-9_-]{1,90}$') &&
+          request.resource.data.keys().hasOnly([
+            'eventId','personId','uid','name','activityKeys','createdBy','createdAt'
+          ]) &&
+          request.resource.data.keys().hasAll([
+            'eventId','personId','uid','name','activityKeys','createdBy','createdAt'
+          ]) &&
+          request.resource.data.eventId == eventId &&
+          request.resource.data.personId == personId &&
+          request.resource.data.uid is string &&
+          request.resource.data.uid.size() <= 128 &&
+          request.resource.data.name is string &&
+          request.resource.data.name.size() >= 2 &&
+          request.resource.data.name.size() <= 140 &&
+          request.resource.data.activityKeys is list &&
+          request.resource.data.activityKeys.size() <= 100 &&
+          request.resource.data.createdBy == request.auth.uid &&
+          request.resource.data.createdAt == request.time;
+        allow update, delete: if false;
+      }
+      match /entries/{id} {
+        allow get, list: if canEdit() || attendanceSupervisor(eventId);
+        allow create: if attendanceEntryCreate(eventId,id);
+        allow update: if canEdit() && resource.data.status == 'pendiente' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status','validatedBy','validatedAt','validationNote'
+          ]) &&
+          request.resource.data.status in ['validado','rechazado'] &&
+          request.resource.data.validatedBy == request.auth.uid &&
+          request.resource.data.validatedAt == request.time &&
+          request.resource.data.validationNote is string &&
+          request.resource.data.validationNote.size() <= 600;
+        allow delete: if false;
+      }
+      match /activities/{activityId} {
+        allow get, list: if canEdit() || attendanceSupervisor(eventId) ||
+          (opsStaff() && resource.data.uid == request.auth.uid);
+        allow create: if
+          activityId.matches('^[A-Za-z0-9_-]{10,70}$') &&
+          request.resource.data.keys().hasOnly([
+            'id','eventId','personId','uid','name','status','createdAt','createdBy',
+            'updatedAt','updatedBy'
+          ]) &&
+          request.resource.data.keys().hasAll([
+            'id','eventId','personId','uid','name','status','createdAt','createdBy',
+            'updatedAt','updatedBy'
+          ]) &&
+          request.resource.data.id == activityId &&
+          request.resource.data.eventId == eventId &&
+          request.resource.data.personId.matches('^[A-Za-z0-9_-]{1,90}$') &&
+          request.resource.data.uid is string &&
+          request.resource.data.uid.size() > 0 &&
+          exists(attendanceRosterPath(eventId,request.resource.data.personId)) &&
+          get(attendanceRosterPath(eventId,request.resource.data.personId)).data.uid ==
+            request.resource.data.uid &&
+          (attendanceSupervisor(eventId) ||
+           (opsStaff() && request.resource.data.uid == request.auth.uid)) &&
+          request.resource.data.name is string &&
+          request.resource.data.name.size() >= 3 &&
+          request.resource.data.name.size() <= 200 &&
+          request.resource.data.status == 'pendiente' &&
+          request.resource.data.createdAt == request.time &&
+          request.resource.data.updatedAt == request.time &&
+          request.resource.data.createdBy == request.auth.uid &&
+          request.resource.data.updatedBy == request.auth.uid;
+        allow update: if
+          (canEdit() || attendanceSupervisor(eventId) ||
+           (opsStaff() && resource.data.uid == request.auth.uid)) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status','updatedAt','updatedBy'
+          ]) &&
+          request.resource.data.status in [
+            'pendiente','en_curso','terminada','no_realizada'
+          ] &&
+          request.resource.data.updatedAt == request.time &&
+          request.resource.data.updatedBy == request.auth.uid;
+        allow delete: if false;
+      }
+      match /approvals/{personId} {
+        allow get, list: if canEdit();
+        allow create: if canEdit() &&
+          personId.matches('^[A-Za-z0-9_-]{1,90}$') &&
+          request.resource.data.keys().hasOnly([
+            'eventId','personId','personName','startAt','endAt',
+            'breakMinutes','approvedMinutes','notes','status',
+            'approvedBy','approvedAt','source'
+          ]) &&
+          request.resource.data.keys().hasAll([
+            'eventId','personId','personName','startAt','endAt',
+            'breakMinutes','approvedMinutes','notes','status',
+            'approvedBy','approvedAt','source'
+          ]) &&
+          request.resource.data.eventId == eventId &&
+          request.resource.data.personId == personId &&
+          request.resource.data.personName is string &&
+          request.resource.data.personName.size() >= 2 &&
+          request.resource.data.personName.size() <= 140 &&
+          request.resource.data.startAt is timestamp &&
+          request.resource.data.endAt is timestamp &&
+          request.resource.data.endAt > request.resource.data.startAt &&
+          request.resource.data.endAt <= request.resource.data.startAt +
+            duration.value(36,'h') &&
+          request.resource.data.breakMinutes is int &&
+          request.resource.data.breakMinutes >= 0 &&
+          request.resource.data.breakMinutes <= 600 &&
+          request.resource.data.approvedMinutes is int &&
+          request.resource.data.approvedMinutes > 0 &&
+          request.resource.data.approvedMinutes <= 1440 &&
+          request.resource.data.notes is string &&
+          request.resource.data.notes.size() <= 600 &&
+          request.resource.data.status == 'horas_validadas' &&
+          request.resource.data.source in ['qr','manual','provisional','reloj'] &&
+          request.resource.data.approvedBy == request.auth.uid &&
+          request.resource.data.approvedAt == request.time &&
+          ((attendanceValidated(eventId,personId,'entrada') &&
+            attendanceValidated(eventId,personId,'salida')) ||
+           attendanceClockCompleted(eventId,personId));
+        allow update, delete: if false;
+      }
+    }
+
+    // Autorregistros laborales privados. Lo declarado por Staff/Supervisor
+    // queda separado de asistencia verificada y sólo coordinación/administración
+    // puede validar horas o importes.
+    function workClaimPath(claimId) {
+      return /databases/$(database)/documents/agora_ops_work_claims/$(claimId);
+    }
+    function workClaimHistoryPath(claimId,entryId) {
+      return /databases/$(database)/documents/agora_ops_work_claims/$(claimId)/history/$(entryId);
+    }
+    function workClaimHistoryValid(claimId,entryId,action,owner) {
+      return existsAfter(workClaimHistoryPath(claimId,entryId)) &&
+        getAfter(workClaimHistoryPath(claimId,entryId)).data.claimId == claimId &&
+        getAfter(workClaimHistoryPath(claimId,entryId)).data.action == action &&
+        getAfter(workClaimHistoryPath(claimId,entryId)).data.actorUid == request.auth.uid &&
+        getAfter(workClaimHistoryPath(claimId,entryId)).data.at == request.time &&
+        getAfter(workClaimHistoryPath(claimId,entryId)).data.ownerUid == owner;
+    }
+    match /agora_ops_work_claims/{claimId} {
+      allow get, list: if canEdit() ||
+        (opsStaff() && resource.data.ownerUid == request.auth.uid);
+      allow create: if opsStaff() &&
+        claimId.matches('^[A-Za-z0-9_-]{20,70}$') &&
+        request.resource.data.keys().hasOnly([
+          'id','ownerUid','personId','personName','recordType','project','client','site','date','activityType',
+          'plannedStart','plannedEnd','actualStart','actualEnd','description','requester','supervisor','channel',
+          'declaredRate','overtimeHours','expenses','notes','evidenceImage','status','validationNote',
+          'declaredHours','approvedHours','approvedRate','approvedAmount','createdBy','createdAt','updatedBy',
+          'updatedAt','lastHistoryId'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'id','ownerUid','personId','personName','recordType','project','client','site','date','activityType',
+          'plannedStart','plannedEnd','actualStart','actualEnd','description','requester','supervisor','channel',
+          'declaredRate','overtimeHours','expenses','notes','evidenceImage','status','validationNote',
+          'declaredHours','approvedHours','approvedRate','approvedAmount','createdBy','createdAt','updatedBy',
+          'updatedAt','lastHistoryId'
+        ]) &&
+        request.resource.data.id == claimId &&
+        request.resource.data.ownerUid == request.auth.uid &&
+        request.resource.data.personId == opsPersonId() &&
+        request.resource.data.personName is string &&
+        request.resource.data.personName.size() >= 2 && request.resource.data.personName.size() <= 140 &&
+        request.resource.data.recordType in ['proximo','en_curso','realizado'] &&
+        request.resource.data.project is string && request.resource.data.project.size() >= 2 && request.resource.data.project.size() <= 150 &&
+        request.resource.data.client is string && request.resource.data.client.size() <= 120 &&
+        request.resource.data.site is string && request.resource.data.site.size() >= 2 && request.resource.data.site.size() <= 150 &&
+        request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        request.resource.data.activityType is string && request.resource.data.activityType.size() <= 100 &&
+        request.resource.data.plannedStart is string &&
+          (request.resource.data.plannedStart == '' || request.resource.data.plannedStart.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')) &&
+        request.resource.data.plannedEnd is string &&
+          (request.resource.data.plannedEnd == '' || request.resource.data.plannedEnd.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')) &&
+        request.resource.data.actualStart is string &&
+          (request.resource.data.actualStart == '' || request.resource.data.actualStart.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')) &&
+        request.resource.data.actualEnd is string &&
+          (request.resource.data.actualEnd == '' || request.resource.data.actualEnd.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')) &&
+        (request.resource.data.recordType != 'proximo' ||
+          (request.resource.data.plannedStart != '' && request.resource.data.plannedEnd != '')) &&
+        (request.resource.data.recordType != 'realizado' ||
+          (request.resource.data.actualStart != '' && request.resource.data.actualEnd != '' && request.resource.data.declaredHours is number)) &&
+        (request.resource.data.recordType != 'en_curso' || request.resource.data.actualStart != '') &&
+        request.resource.data.description is string && request.resource.data.description.size() >= 3 && request.resource.data.description.size() <= 600 &&
+        request.resource.data.requester is string && request.resource.data.requester.size() >= 2 && request.resource.data.requester.size() <= 140 &&
+        request.resource.data.supervisor is string && request.resource.data.supervisor.size() <= 140 &&
+        request.resource.data.channel in ['WhatsApp','Llamada','Verbal','Correo','Asignación interna','Otro'] &&
+        (request.resource.data.declaredRate == null ||
+          (request.resource.data.declaredRate is number && request.resource.data.declaredRate > 0 && request.resource.data.declaredRate <= 100000)) &&
+        request.resource.data.overtimeHours is number && request.resource.data.overtimeHours >= 0 && request.resource.data.overtimeHours <= 24 &&
+        request.resource.data.expenses is number && request.resource.data.expenses >= 0 && request.resource.data.expenses <= 50000 &&
+        request.resource.data.notes is string && request.resource.data.notes.size() <= 500 &&
+        request.resource.data.evidenceImage is string && request.resource.data.evidenceImage.size() <= 185000 &&
+        (request.resource.data.evidenceImage == '' || request.resource.data.evidenceImage.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')) &&
+        request.resource.data.status == 'pendiente' && request.resource.data.validationNote == '' &&
+        (request.resource.data.declaredHours == null ||
+          (request.resource.data.declaredHours is number && request.resource.data.declaredHours > 0 && request.resource.data.declaredHours <= 36)) &&
+        request.resource.data.approvedHours == null && request.resource.data.approvedRate == null && request.resource.data.approvedAmount == null &&
+        request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time &&
+        request.resource.data.lastHistoryId == 'created' &&
+        workClaimHistoryValid(claimId,'created','creado',request.auth.uid);
+      allow update: if
+        (canEdit() && resource.data.ownerUid != request.auth.uid &&
+          resource.data.status in ['pendiente','aclaracion'] &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status','validationNote','approvedHours','approvedRate','approvedAmount',
+            'updatedBy','updatedAt','lastHistoryId'
+          ]) &&
+          request.resource.data.status in ['validado','aclaracion','rechazado'] &&
+          request.resource.data.validationNote is string && request.resource.data.validationNote.size() <= 400 &&
+          (request.resource.data.status == 'validado' ?
+            (request.resource.data.approvedHours is number && request.resource.data.approvedHours > 0 && request.resource.data.approvedHours <= 36 &&
+             (request.resource.data.approvedRate == null ||
+               (request.resource.data.approvedRate is number && request.resource.data.approvedRate > 0 && request.resource.data.approvedRate <= 100000)) &&
+             (request.resource.data.approvedAmount == null ||
+               (request.resource.data.approvedAmount is number && request.resource.data.approvedAmount >= 0 && request.resource.data.approvedAmount <= 1000000))) :
+            (request.resource.data.approvedHours == null && request.resource.data.approvedRate == null && request.resource.data.approvedAmount == null)) &&
+          request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time &&
+          request.resource.data.lastHistoryId is string &&
+          workClaimHistoryValid(claimId,request.resource.data.lastHistoryId,request.resource.data.status,resource.data.ownerUid))
+        ||
+        (opsStaff() && resource.data.ownerUid == request.auth.uid &&
+          resource.data.recordType == 'en_curso' && resource.data.status == 'pendiente' &&
+          resource.data.actualEnd == '' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'actualEnd','declaredHours','updatedBy','updatedAt','lastHistoryId'
+          ]) &&
+          request.resource.data.actualEnd.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$') &&
+          request.resource.data.declaredHours is number &&
+          request.resource.data.declaredHours > 0 && request.resource.data.declaredHours <= 24 &&
+          request.resource.data.updatedBy == request.auth.uid &&
+          request.resource.data.updatedAt == request.time &&
+          workClaimHistoryValid(claimId,request.resource.data.lastHistoryId,'finalizada',resource.data.ownerUid));
+      allow delete: if false;
+      match /history/{entryId} {
+        allow get, list: if canEdit() ||
+          (opsStaff() && get(workClaimPath(claimId)).data.ownerUid == request.auth.uid);
+        allow create: if request.resource.data.keys().hasOnly(['claimId','action','actorUid','actorName','at','note','ownerUid','eventTime']) &&
+          request.resource.data.keys().hasAll(['claimId','action','actorUid','actorName','at','note','ownerUid']) &&
+          request.resource.data.claimId == claimId &&
+          request.resource.data.actorUid == request.auth.uid &&
+          request.resource.data.actorName is string && request.resource.data.actorName.size() <= 140 &&
+          request.resource.data.at == request.time &&
+          request.resource.data.note is string && request.resource.data.note.size() <= 400 &&
+          (request.resource.data.action == 'creado' ?
+            (opsStaff() && request.resource.data.ownerUid == request.auth.uid &&
+             existsAfter(workClaimPath(claimId)) &&
+             getAfter(workClaimPath(claimId)).data.lastHistoryId == entryId) :
+            ((canEdit() || opsStaff()) && existsAfter(workClaimPath(claimId)) &&
+             getAfter(workClaimPath(claimId)).data.lastHistoryId == entryId &&
+             (request.resource.data.action == 'finalizada' ?
+               (opsStaff() && request.resource.data.ownerUid == request.auth.uid &&
+                getAfter(workClaimPath(claimId)).data.ownerUid == request.auth.uid &&
+                request.resource.data.eventTime is string &&
+                getAfter(workClaimPath(claimId)).data.actualEnd == request.resource.data.eventTime) :
+               (canEdit() && request.resource.data.action == getAfter(workClaimPath(claimId)).data.status &&
+                getAfter(workClaimPath(claimId)).data.ownerUid == request.resource.data.ownerUid))));
+        allow update, delete: if false;
+      }
+    }
+
+
+
+    // Todas las demás colecciones permanecen cerradas.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
