@@ -10,6 +10,7 @@ import {ownJornadas,coordinationJornadas,operationTotals,validateAssignmentDraft
 import {showShiftQr} from "./staff-shift-qr.js";
 import {renderStaffTasks,readStaffTasks} from "./staff-activities.js";
 import {mountRoster} from "./attendance-roster.js";
+import {requestRemoteAttendance,loadOwnRemoteRequests} from "./remote-attendance.js";
 
 // Una sola identidad Firebase para todas las vistas. Sin módulos operativos.
 const ROOT=new URL("./",import.meta.url);
@@ -548,6 +549,8 @@ function staffJornadaCard(item){
       (item.instructions?'<p class="role-instructions">'+esc(item.instructions)+'</p>':"")+
     '</div>'+
     '<button type="button" class="profile-button profile-button-primary" data-action="show-shift-qr" data-event-id="'+esc(item.key)+'">Mostrar QR para asistencia</button>'+
+    '<div class="remote-request-buttons"><button type="button" class="profile-button profile-button-outline" data-action="remote-attendance-request" data-attendance-action="entrada" data-event-id="'+esc(item.key)+'">Pedir entrada remota</button>'+
+    '<button type="button" class="profile-button profile-button-outline" data-action="remote-attendance-request" data-attendance-action="salida" data-event-id="'+esc(item.key)+'">Pedir salida remota</button></div>'+
     '</article>';
 }
 function staffOperationsSpace(){
@@ -568,6 +571,7 @@ function staffOperationsSpace(){
       (assigned.length>3?'<details class="role-more-jornadas"><summary>Ver otras jornadas ('+(assigned.length-3)+')</summary><div class="role-jornada-list">'+assigned.slice(3).map(staffJornadaCard).join("")+'</div></details>':""):
       '<p class="role-empty">No hay jornadas vigentes o próximas en tu ficha personal.</p>':
       '<p class="role-empty">Todavía no encontramos una ficha de Operaciones vinculada a tu cuenta. Coordinación debe vincular tu UID al personal asignado.</p>')+
+    '<section class="work-claims"><h3>Mis pases remotos</h3><p>La ubicación se comparte una sola vez al pedir el pase. El responsable puede validar aunque esté en otro lugar; hasta entonces queda pendiente.</p><div id="my-remote-attendance-requests" aria-live="polite">Cargando solicitudes…</div></section>'+
     '<section class="work-claims"><h3>Mis trabajos registrados</h3><p>Los trabajos que declares quedan pendientes de revisión. Las horas escritas manualmente no se muestran como asistencia verificada.</p><div id="my-work-claims" aria-live="polite">Cargando tus registros…</div></section>'+
     workClaimDialog(false)+
     '<dialog id="staff-shift-qr-dialog" class="role-dialog" aria-labelledby="staff-shift-qr-title">'+
@@ -796,6 +800,7 @@ function emptySpace(){
       '<div><div class="profile-kicker">ÁGORA · Operaciones</div><h1>'+esc(meta.title)+'</h1></div></div>'+
     body+'</section>';
   loadWorkClaims().catch(e=>{console.error(e);notice(errorText(e),"error")});
+  if(routeSpace==="staff"&&state.user)loadOwnRemoteRequests(db,state.user.uid,document.getElementById("my-remote-attendance-requests"));
 }
 
 function render(){
@@ -857,6 +862,20 @@ app.addEventListener("click",event=>{
     const dlg=document.getElementById("work-claim-dialog");
     if(dlg?.showModal)dlg.showModal();else dlg?.setAttribute("open","");
     return;
+  }
+  if(task==="remote-attendance-request"){
+    if(!allowed("staff")||!state.user||!state.roleData?.staff?.personId)return notice("Esta acción requiere una ficha Staff vinculada.","error");
+    const eventId=clean(target.dataset.eventId),shift=ownJornadas(state.roleData.staff,new Date(),100).find(x=>x.key===eventId);
+    if(!shift)return notice("No se encontró tu jornada asignada.","error");
+    const action=target.dataset.attendanceAction;
+    if(!["entrada","salida"].includes(action))return notice("Selecciona entrada o salida.","error");
+    if(!confirm("Se compartirá tu ubicación GPS una sola vez con el supervisor y coordinación de esta jornada para solicitar la "+action+". La ubicación no valida automáticamente tu asistencia. ¿Continuar?"))return;
+    return run(async()=>{
+      const result=await requestRemoteAttendance({db,uid:state.user.uid,personId:state.roleData.staff.personId,
+        personName:name(),eventId,eventTitle:shift.title,site:shift.site,action});
+      if(result)await loadOwnRemoteRequests(db,state.user.uid,document.getElementById("my-remote-attendance-requests"));
+      return result;
+    },result=>result?"Solicitud enviada; espera la validación del responsable.":"");
   }
   if(task==="close-work-claim"){
     const dlg=document.getElementById("work-claim-dialog");

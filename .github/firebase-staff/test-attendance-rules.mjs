@@ -7,7 +7,7 @@ import {
  initializeTestEnvironment,assertSucceeds,assertFails
 } from "@firebase/rules-unit-testing";
 import {
- doc,collection,query,where,getDoc,getDocs,setDoc,updateDoc,
+ doc,collection,collectionGroup,query,where,getDoc,getDocs,setDoc,updateDoc,writeBatch,
  serverTimestamp,Timestamp
 } from "firebase/firestore";
 const env=await initializeTestEnvironment({
@@ -31,9 +31,10 @@ const approval=db=>doc(db,"agora_ops_attendance_sheets",eventId,"approvals","p01
 const activity=(db,id="tarea_1234567890")=>doc(db,"agora_ops_attendance_sheets",eventId,"activities",id);
 const start=Timestamp.fromMillis(Date.now()-3600000);
 const end=Timestamp.fromMillis(Date.now()+7*3600000);
+const point={lat:19.4326,lng:-99.1332,accuracy:25};
 const sheetData=()=>({
  eventId,title:"Jornada demostración",site:"Oficina",startsAt:start,endsAt:end,
- active:true,supervisorUids:["supAs"],
+ active:true,supervisorUids:["supAs"],validationMode:"presencial",remoteWindowMinutes:10,
  createdBy:"coordAs",createdAt:serverTimestamp(),
  updatedBy:"coordAs",updatedAt:serverTimestamp(),revision:1
 });
@@ -46,14 +47,16 @@ const attendance=(action="entrada",extra={})=>({
  personId:"p01",ownerUid:"staffAs",personName:"Persona Ejemplo",
  source:"manual",action,activityKey:"jornada",
  reason:"No tenía teléfono con QR",notes:"",
- actorUid:"supAs",createdAt:serverTimestamp(),status:"pendiente",...extra
+ actorUid:"supAs",actorName:"Supervisor QA",location:point,capturedAt:serverTimestamp(),
+ createdAt:serverTimestamp(),status:"pendiente",...extra
 });
 const provisional=()=>({
  id:"prov_1234567890abcdef1234__entrada__jornada",eventId,
  personId:"prov_1234567890abcdef1234",ownerUid:"",
  personName:"Visitante asignado",source:"provisional",action:"entrada",
  activityKey:"jornada",reason:"Solicitado por llamada sin ficha previa",
- notes:"",actorUid:"supAs",createdAt:serverTimestamp(),status:"pendiente"
+ notes:"",actorUid:"supAs",actorName:"Supervisor QA",location:point,
+ capturedAt:Timestamp.now(),createdAt:serverTimestamp(),status:"pendiente"
 });
 try{
  await env.withSecurityRulesDisabled(async ctx=>{
@@ -64,6 +67,10 @@ try{
   });
   await setDoc(doc(db,"agora_identity_links","supAs"),{
    uid:"supAs",agoraId:"DJV-2026-555",credentialId:"111122223333444455556666",
+   active:true,createdAt:Timestamp.now(),createdBy:"coordAs"
+  });
+  await setDoc(doc(db,"agora_identity_links","staffAs"),{
+   uid:"staffAs",agoraId:"DJV-2026-556",credentialId:"111122223333444455556667",
    active:true,createdAt:Timestamp.now(),createdBy:"coordAs"
   });
   await setDoc(doc(db,"agora_ops_members","staffAs"),{
@@ -154,6 +161,43 @@ try{
  }));
  await no("otro personal no ve actividades ajenas",getDoc(activity(other)));
  await yes("coordinador consulta actividades",getDoc(activity(coord)));
+
+ const remoteEvent="jornadaRemota";
+ const remoteSheet=db=>doc(db,"agora_ops_attendance_sheets",remoteEvent);
+ const remoteRoster=db=>doc(db,"agora_ops_attendance_sheets",remoteEvent,"roster","p01");
+ const remoteReqId="req_0123456789abcdef0123456789abcdef";
+ const remoteReq=db=>doc(db,"agora_ops_attendance_sheets",remoteEvent,"remote_requests",remoteReqId);
+ const remoteEntry=db=>doc(db,"agora_ops_attendance_sheets",remoteEvent,"entries","p01__entrada__jornada");
+ const remoteStart=Timestamp.fromMillis(Date.now()-120000),remoteEnd=Timestamp.fromMillis(Date.now()+3600000);
+ await yes("coordinación habilita pase remoto con margen definido",setDoc(remoteSheet(coord),{
+  ...sheetData(),eventId:remoteEvent,startsAt:remoteStart,endsAt:remoteEnd,
+  validationMode:"remoto",remoteWindowMinutes:10
+ }));
+ await yes("coordinación publica roster para pase remoto",setDoc(remoteRoster(coord),{...rosterData(),eventId:remoteEvent}));
+ const remoteRequestData={id:remoteReqId,eventId:remoteEvent,eventTitle:"Jornada remota",site:"Sucursal prueba",personId:"p01",ownerUid:"staffAs",
+  personName:"Persona Ejemplo",action:"entrada",activityKey:"jornada",location:point,
+ capturedAt:serverTimestamp(),createdAt:serverTimestamp(),status:"pendiente",requestedBy:"staffAs",
+  reviewedBy:"",reviewerName:"",reviewedAt:null,validationNote:"",notes:""};
+ await yes("Staff solicita pase remoto con GPS",setDoc(remoteReq(staff),remoteRequestData));
+ await yes("Staff consulta sus propios pases remotos",getDocs(query(
+  collectionGroup(staff,"remote_requests"),where("ownerUid","==","staffAs")
+ )));
+ await no("otro usuario no consulta solicitud remota privada",getDoc(remoteReq(other)));
+ await yes("supervisor delegado consulta solicitud remota",getDoc(remoteReq(sup)));
+ await no("Staff no valida su propio pase remoto",updateDoc(remoteReq(staff),{
+  status:"validado",reviewedBy:"staffAs",reviewerName:"Persona Ejemplo",
+  reviewedAt:serverTimestamp(),validationNote:""
+ }));
+ const remoteBatch=writeBatch(sup),remoteStamp=serverTimestamp();
+ remoteBatch.update(remoteReq(sup),{status:"validado",reviewedBy:"supAs",
+  reviewerName:"Supervisor QA",reviewedAt:remoteStamp,validationNote:"Ubicación revisada"});
+ remoteBatch.set(remoteEntry(sup),{id:"p01__entrada__jornada",eventId:remoteEvent,
+  personId:"p01",ownerUid:"staffAs",personName:"Persona Ejemplo",source:"remoto",
+  action:"entrada",activityKey:"jornada",reason:"",notes:"",actorUid:"supAs",
+  actorName:"Supervisor QA",createdAt:remoteStamp,status:"validado",location:point,
+  capturedAt:(await getDoc(remoteReq(sup))).data().capturedAt,validatedBy:"supAs",validatedAt:remoteStamp,
+  remoteRequestId:remoteReqId});
+ await yes("supervisor confirma pase y registra entrada auditada en un lote",remoteBatch.commit());
 
  const requestId="12345678-1234-4234-9234-1234567890ab";
  const reqRef=db=>doc(db,"agora_ops_assignment_requests",requestId);

@@ -20,10 +20,29 @@ function replaceActions(source,sectionStart,sectionEnd,replacement){
 }
 const clockDeny='      // La asistencia nueva la registra coordinación mediante hojas delegadas de asistencia.\n      // Los marcajes legados siguen siendo consultables, pero ya no se escriben desde la cuenta Staff.\n      allow create, update: if false;\n';
 const breakDeny='      // Descansos oficiales también se registran por el responsable en el flujo delegado.\n      allow create, update: if false;\n';
+function replaceRegion(source,startMarker,endMarker,replacement){
+ const start=source.indexOf(startMarker),end=source.indexOf(endMarker,start);
+ if(start<0||end<=start||source.indexOf(startMarker,start+1)!==-1)throw Error("No se identifica la sección protegida; despliegue cancelado.");
+ return source.slice(0,start)+replacement+source.slice(end);
+}
+function copyRegion(source,startMarker,endMarker){
+ const start=source.indexOf(startMarker),end=source.indexOf(endMarker,start);
+ if(start<0||end<=start||source.indexOf(startMarker,start+1)!==-1)throw Error("No se identifica la fuente de asistencia; despliegue cancelado.");
+ return source.slice(start,end);
+}
+function includeAttendanceChanges(expected,source){
+ const helperStart="    function attendanceSheetPath(eventId) {";
+ const assignmentStart="    // Solicitudes de jornadas de Coordinación";
+ expected=replaceRegion(expected,helperStart,assignmentStart,copyRegion(source,helperStart,assignmentStart));
+ const sheetsStart="    match /agora_ops_attendance_sheets/{eventId} {";
+ const claimsStart="    // Autorregistros laborales privados";
+ return replaceRegion(expected,sheetsStart,claimsStart,copyRegion(source,sheetsStart,claimsStart));
+}
 let expected=replaceActions(baseline,'    match /agora_ops_clock/{id} {','    // Descansos certificados:',clockDeny);
 expected=replaceActions(expected,'    match /agora_ops_breaks/{id} {','    match /agora_ops_trips/{id} {',breakDeny);
+expected=includeAttendanceChanges(expected,candidate);
 function normalize(s){return String(s).replace(/\r\n?/g,'\n').trim()}
-if(normalize(candidate)!==normalize(expected))throw Error('El cambio de permisos excede el bloqueo de marcaje propio aprobado; despliegue cancelado.');
+if(normalize(candidate)!==normalize(expected))throw Error('El candidato cambia reglas fuera del pase de lista autorizado; despliegue cancelado.');
 const headers={Authorization:'Bearer '+token,Accept:'application/json'};
 async function getJson(path){
   const response=await fetch('https://firebaserules.googleapis.com/v1/'+path,{headers});

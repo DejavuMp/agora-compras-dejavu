@@ -115,7 +115,16 @@ test("interfaz admite QR manual y delegación mínima por jornada",async()=>{
  assert.doesNotMatch(scanner,/scan-activity-options|scan-manual-reason/);
  assert.doesNotMatch(identity,/Registrar mi propia entrada o salida/);
  assert.doesNotMatch(app,/mountOwnAttendance|credential-attendance-panel/);
- assert.match(roster,/QR presencial/);
+ assert.match(roster,/Pase de lista/);
+ assert.match(roster,/Pase remoto/);
+ assert.match(app,/requestRemoteAttendance/);
+ assert.match(app,/Pedir entrada remota/);
+ assert.match(app,/Pedir salida remota/);
+ assert.match(scanner,/validationMode===\"remoto\"/);
+ assert.match(scanner,/renderRemoteRequests/);
+ assert.match(rules,/attendanceRemoteRequestCreate/);
+ assert.match(rules,/attendanceRemoteEntryCreate/);
+ assert.match(rules,/remoteWindowMinutes/);
  assert.match(roster,/Reloj entrada/);
  assert.match(html,/Pase de lista manual/);
  assert.match(rules,/match \/agora_ops_attendance_sheets\/\{eventId\}/);

@@ -14,9 +14,28 @@ function replaceActions(source,sectionStart,sectionEnd,replacement){
   assert.ok(begin>=0&&finish>=begin&&finish<b,'acciones limitadas a la regla');
   return source.slice(0,begin)+replacement+source.slice(finish);
 }
+function replaceRegion(source,startMarker,endMarker,replacement){
+ const start=source.indexOf(startMarker),end=source.indexOf(endMarker,start);
+ assert.ok(start>=0&&end>start&&source.indexOf(startMarker,start+1)<0,"sección única "+startMarker);
+ return source.slice(0,start)+replacement+source.slice(end);
+}
+function copyRegion(source,startMarker,endMarker){
+ const start=source.indexOf(startMarker),end=source.indexOf(endMarker,start);
+ assert.ok(start>=0&&end>start&&source.indexOf(startMarker,start+1)<0,"sección fuente única "+startMarker);
+ return source.slice(start,end);
+}
+function includeAttendanceChanges(expected,source){
+ const helperStart="    function attendanceSheetPath(eventId) {";
+ const assignmentStart="    // Solicitudes de jornadas de Coordinación";
+ expected=replaceRegion(expected,helperStart,assignmentStart,copyRegion(source,helperStart,assignmentStart));
+ const sheetsStart="    match /agora_ops_attendance_sheets/{eventId} {";
+ const claimsStart="    // Autorregistros laborales privados";
+ return replaceRegion(expected,sheetsStart,claimsStart,copyRegion(source,sheetsStart,claimsStart));
+}
 let expected=replaceActions(baseline,'    match /agora_ops_clock/{id} {','    // Descansos certificados:',clockDeny);
 expected=replaceActions(expected,'    match /agora_ops_breaks/{id} {','    match /agora_ops_trips/{id} {',breakDeny);
-assert.equal(candidate.trim(),expected.trim(),'candidato contiene únicamente el cambio de asistencia aprobado');
+expected=includeAttendanceChanges(expected,candidate);
+assert.equal(candidate.trim(),expected.trim(),'candidato sólo cambia las reglas de pase de lista remota y marcaje delegado');
 const drift=baseline.replace('allow read, write: if false;','allow read, write: if true;');
 const dir='.github/firebase-staff/.preflight',rulesBackup=dir+'/antes-dejavu.rules',refBackup=dir+'/ruleset-name.txt';
 process.env.FIREBASE_PROJECT_ID='agora-dejavu-38b8c';process.env.FIREBASE_ACCESS_TOKEN='qa-token-not-real';

@@ -109,7 +109,8 @@ test("credencial personal únicamente acredita identidad; las jornadas usan QR s
  assert.match(roster,/agora_ops_clock/);
  assert.match(roster,/agora_ops_incidents/);
  assert.match(roster,/Reloj entrada/);
- assert.match(roster,/QR presencial/);
+ assert.match(roster,/Pase de lista/);
+ assert.match(roster,/Pase remoto/);
  assert.match(rules,/match \/agora_ops_clock\/\{id\}/);
  assert.match(rules,/La asistencia nueva la registra coordinación mediante hojas delegadas/);
  assert.match(rules,/match \/agora_ops_breaks\/\{id\}[\s\S]*?allow create, update: if false;/);

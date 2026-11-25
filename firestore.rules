@@ -1564,6 +1564,18 @@ match /agora_finance_requests/{requestId} {
     function attendanceEntryPath(eventId,entryId) {
       return /databases/$(database)/documents/agora_ops_attendance_sheets/$(eventId)/entries/$(entryId);
     }
+    function attendanceRemoteRequestPath(eventId,requestId) {
+      return /databases/$(database)/documents/agora_ops_attendance_sheets/$(eventId)/remote_requests/$(requestId);
+    }
+    function validAttendanceLocation(location) {
+      return location is map &&
+        location.keys().hasOnly(['lat','lng','accuracy']) &&
+        location.keys().hasAll(['lat','lng','accuracy']) &&
+        location.lat is number && location.lat >= -90 && location.lat <= 90 &&
+        location.lng is number && location.lng >= -180 && location.lng <= 180 &&
+        location.accuracy is number && location.accuracy >= 0 &&
+        location.accuracy <= 150;
+    }
     function attendanceSupervisor(eventId) {
       return signedIn() &&
         exists(attendanceSheetPath(eventId)) &&
@@ -1571,6 +1583,11 @@ match /agora_finance_requests/{requestId} {
         request.auth.uid in get(attendanceSheetPath(eventId)).data.supervisorUids &&
         exists(identityLinkPath(request.auth.uid)) &&
         get(identityLinkPath(request.auth.uid)).data.active == true;
+    }
+    function attendanceLocalEnabled(eventId) {
+      return exists(attendanceSheetPath(eventId)) &&
+        (!('validationMode' in get(attendanceSheetPath(eventId)).data) ||
+         get(attendanceSheetPath(eventId)).data.validationMode == 'presencial');
     }
     function attendanceExistingPerson(eventId,d) {
       return d.source in ['qr','manual'] &&
@@ -1593,11 +1610,13 @@ match /agora_finance_requests/{requestId} {
       return attendanceSupervisor(eventId) &&
         d.keys().hasOnly([
           'id','eventId','personId','ownerUid','personName','source','action',
-          'activityKey','reason','notes','actorUid','createdAt','status'
+          'activityKey','reason','notes','actorUid','actorName','createdAt','status',
+          'location','capturedAt'
         ]) &&
         d.keys().hasAll([
           'id','eventId','personId','ownerUid','personName','source','action',
-          'activityKey','reason','notes','actorUid','createdAt','status'
+          'activityKey','reason','notes','actorUid','actorName','createdAt','status',
+          'location','capturedAt'
         ]) &&
         d.id == id && d.eventId == eventId &&
         d.personId is string &&
@@ -1610,6 +1629,11 @@ match /agora_finance_requests/{requestId} {
          (d.action == 'actividad' && d.activityKey != 'jornada')) &&
         id == d.personId + '__' + d.action + '__' + d.activityKey &&
         d.source in ['qr','manual','provisional'] &&
+        attendanceLocalEnabled(eventId) &&
+        d.actorName is string && d.actorName.size() >= 2 && d.actorName.size() <= 140 &&
+        validAttendanceLocation(d.location) && d.capturedAt is timestamp &&
+        d.capturedAt >= request.time - duration.value(3,'m') &&
+        d.capturedAt <= request.time + duration.value(15,'s') &&
         d.reason is string && d.reason.size() <= 400 &&
         d.notes is string && d.notes.size() <= 400 &&
         (attendanceExistingPerson(eventId,d) || attendanceProvisional(d)) &&
@@ -1619,6 +1643,95 @@ match /agora_finance_requests/{requestId} {
           duration.value(30,'m') &&
         request.time <= get(attendanceSheetPath(eventId)).data.endsAt +
           duration.value(30,'m');
+    }
+    function attendanceRemoteRequestCreate(eventId,id) {
+      let d=request.resource.data;
+      let sheet=get(attendanceSheetPath(eventId)).data;
+      let anchor=d.action == 'entrada' ? sheet.startsAt : sheet.endsAt;
+      let grace=duration.value(sheet.remoteWindowMinutes,'m');
+      return signedIn() && exists(attendanceSheetPath(eventId)) &&
+        sheet.active == true && sheet.validationMode == 'remoto' &&
+        sheet.remoteWindowMinutes in [5,10,15,30] &&
+        id.matches('^req_[a-f0-9]{32}$') &&
+        d.keys().hasOnly([
+          'id','eventId','eventTitle','site','personId','ownerUid','personName','action','activityKey',
+          'location','capturedAt','createdAt','status','requestedBy','reviewedBy',
+          'reviewerName','reviewedAt','validationNote','notes'
+        ]) &&
+        d.keys().hasAll([
+          'id','eventId','eventTitle','site','personId','ownerUid','personName','action','activityKey',
+          'location','capturedAt','createdAt','status','requestedBy','reviewedBy',
+          'reviewerName','reviewedAt','validationNote','notes'
+        ]) &&
+        d.id == id && d.eventId == eventId &&
+        d.eventTitle is string && d.eventTitle.size() >= 1 && d.eventTitle.size() <= 160 &&
+        d.site is string && d.site.size() <= 160 &&
+        d.personId.matches('^[A-Za-z0-9_-]{1,90}$') &&
+        d.ownerUid == request.auth.uid && d.requestedBy == request.auth.uid &&
+        d.personName is string && d.personName.size() >= 2 && d.personName.size() <= 140 &&
+        d.action in ['entrada','salida'] && d.activityKey == 'jornada' &&
+        exists(attendanceRosterPath(eventId,d.personId)) &&
+        get(attendanceRosterPath(eventId,d.personId)).data.uid == request.auth.uid &&
+        exists(identityLinkPath(request.auth.uid)) &&
+        get(identityLinkPath(request.auth.uid)).data.active == true &&
+        validAttendanceLocation(d.location) &&
+        d.capturedAt is timestamp &&
+        d.capturedAt >= request.time - duration.value(3,'m') &&
+        d.capturedAt <= request.time + duration.value(15,'s') &&
+        d.createdAt == request.time && d.status == 'pendiente' &&
+        d.reviewedBy == '' && d.reviewerName == '' && d.reviewedAt == null &&
+        d.validationNote == '' && d.notes is string && d.notes.size() <= 400 &&
+        !exists(attendanceEntryPath(eventId,d.personId+'__'+d.action+'__jornada')) &&
+        request.time >= anchor - grace && request.time <= anchor + grace;
+    }
+    function attendanceRemoteRequestReview(eventId,id) {
+      let d=request.resource.data;
+      let entryId=resource.data.personId+'__'+resource.data.action+'__jornada';
+      return (canEdit() || attendanceSupervisor(eventId)) &&
+        resource.data.status == 'pendiente' &&
+        resource.data.ownerUid != request.auth.uid &&
+        d.diff(resource.data).affectedKeys().hasOnly([
+          'status','reviewedBy','reviewerName','reviewedAt','validationNote'
+        ]) && d.status in ['validado','rechazado'] &&
+        d.reviewedBy == request.auth.uid &&
+        d.reviewerName is string && d.reviewerName.size() >= 2 &&
+        d.reviewerName.size() <= 140 && d.reviewedAt == request.time &&
+        d.validationNote is string && d.validationNote.size() <= 600 &&
+        (d.status != 'validado' ||
+          (existsAfter(attendanceEntryPath(eventId,entryId)) &&
+           getAfter(attendanceEntryPath(eventId,entryId)).data.remoteRequestId == id));
+    }
+    function attendanceRemoteEntryCreate(eventId,id) {
+      let d=request.resource.data;
+      let remote= getAfter(attendanceRemoteRequestPath(eventId,d.remoteRequestId)).data;
+      return attendanceSupervisor(eventId) &&
+        d.remoteRequestId.matches('^req_[a-f0-9]{32}$') &&
+        existsAfter(attendanceRemoteRequestPath(eventId,d.remoteRequestId)) &&
+        remote.status == 'validado' && remote.eventId == eventId &&
+        remote.personId == d.personId && remote.ownerUid == d.ownerUid &&
+        remote.action == d.action && remote.location == d.location &&
+        remote.capturedAt == d.capturedAt && remote.reviewedBy == request.auth.uid &&
+        d.keys().hasOnly([
+          'id','eventId','personId','ownerUid','personName','source','action',
+          'activityKey','reason','notes','actorUid','actorName','createdAt','status',
+          'location','capturedAt','validatedBy','validatedAt','remoteRequestId'
+        ]) &&
+        d.keys().hasAll([
+          'id','eventId','personId','ownerUid','personName','source','action',
+          'activityKey','reason','notes','actorUid','actorName','createdAt','status',
+          'location','capturedAt','validatedBy','validatedAt','remoteRequestId'
+        ]) &&
+        d.id == id && id == d.personId+'__'+d.action+'__jornada' &&
+        d.eventId == eventId && d.source == 'remoto' &&
+        d.action in ['entrada','salida'] && d.activityKey == 'jornada' &&
+        d.ownerUid is string && d.ownerUid == remote.ownerUid &&
+        d.actorUid == request.auth.uid && d.actorUid != d.ownerUid &&
+        d.actorName == remote.reviewerName && d.personName == remote.personName &&
+        d.status == 'validado' && d.createdAt == request.time &&
+        d.validatedBy == request.auth.uid && d.validatedAt == request.time &&
+        d.reason is string && d.reason.size() <= 400 &&
+        d.notes is string && d.notes.size() <= 400 &&
+        validAttendanceLocation(d.location) && d.capturedAt == remote.capturedAt;
     }
     function attendanceValidated(eventId,personId,action) {
       let id=personId + '__' + action + '__jornada';
@@ -1715,11 +1828,13 @@ match /agora_finance_requests/{requestId} {
       allow create: if canEdit() && eventId.matches('^[A-Za-z0-9_-]{1,100}$') &&
         request.resource.data.keys().hasOnly([
           'eventId','title','site','startsAt','endsAt','active',
-          'supervisorUids','createdBy','createdAt','updatedBy','updatedAt','revision'
+          'supervisorUids','createdBy','createdAt','updatedBy','updatedAt','revision',
+          'validationMode','remoteWindowMinutes'
         ]) &&
         request.resource.data.keys().hasAll([
           'eventId','title','site','startsAt','endsAt','active',
-          'supervisorUids','createdBy','createdAt','updatedBy','updatedAt','revision'
+          'supervisorUids','createdBy','createdAt','updatedBy','updatedAt','revision',
+          'validationMode','remoteWindowMinutes'
         ]) &&
         request.resource.data.eventId == eventId &&
         request.resource.data.title is string &&
@@ -1734,6 +1849,8 @@ match /agora_finance_requests/{requestId} {
           duration.value(48,'h') &&
         request.resource.data.supervisorUids is list &&
         request.resource.data.supervisorUids.size() <= 20 &&
+        request.resource.data.validationMode in ['presencial','remoto'] &&
+        request.resource.data.remoteWindowMinutes in [5,10,15,30] &&
         request.resource.data.active == true &&
         request.resource.data.revision == 1 &&
         request.resource.data.createdBy == request.auth.uid &&
@@ -1778,7 +1895,7 @@ match /agora_finance_requests/{requestId} {
       }
       match /entries/{id} {
         allow get, list: if canEdit() || attendanceSupervisor(eventId);
-        allow create: if attendanceEntryCreate(eventId,id);
+        allow create: if attendanceEntryCreate(eventId,id) || attendanceRemoteEntryCreate(eventId,id);
         allow update: if canEdit() && resource.data.status == 'pendiente' &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'status','validatedBy','validatedAt','validationNote'
@@ -1867,7 +1984,7 @@ match /agora_finance_requests/{requestId} {
           request.resource.data.notes is string &&
           request.resource.data.notes.size() <= 600 &&
           request.resource.data.status == 'horas_validadas' &&
-          request.resource.data.source in ['qr','manual','provisional','reloj'] &&
+          request.resource.data.source in ['qr','manual','provisional','reloj','remoto'] &&
           request.resource.data.approvedBy == request.auth.uid &&
           request.resource.data.approvedAt == request.time &&
           ((attendanceValidated(eventId,personId,'entrada') &&
@@ -1875,6 +1992,17 @@ match /agora_finance_requests/{requestId} {
            attendanceClockCompleted(eventId,personId));
         allow update, delete: if false;
       }
+      match /remote_requests/{requestId} {
+        allow get, list: if canEdit() || attendanceSupervisor(eventId) ||
+          (signedIn() && resource.data.ownerUid == request.auth.uid);
+        allow create: if attendanceRemoteRequestCreate(eventId,requestId);
+        allow update: if attendanceRemoteRequestReview(eventId,requestId);
+        allow delete: if false;
+      }
+    }
+    // Collection-group reads for the staff member's own remote check-ins only.
+    match /{path=**}/remote_requests/{requestId} {
+      allow get, list: if signedIn() && resource.data.ownerUid == request.auth.uid;
     }
 
     // Autorregistros laborales privados. Lo declarado por Staff/Supervisor

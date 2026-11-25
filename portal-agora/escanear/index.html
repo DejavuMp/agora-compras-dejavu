@@ -49,6 +49,17 @@
               <p>Usa las jornadas ya capturadas en Operaciones. Se publica solamente el nombre y el horario del personal asignado, sin tarifas ni expedientes.</p>
               <label for="scan-new-event">Jornada del cronograma</label>
               <select id="scan-new-event"><option value="">Selecciona jornada…</option></select>
+              <label for="scan-validation-mode">Validación de asistencia</label>
+              <select id="scan-validation-mode">
+                <option value="presencial">Presencial · QR o pase manual</option>
+                <option value="remoto">Remota · solicitud del Staff con GPS</option>
+              </select>
+              <label for="scan-remote-window">Ventana alrededor del horario programado</label>
+              <select id="scan-remote-window">
+                <option value="5">5 minutos</option><option value="10" selected>10 minutos</option>
+                <option value="15">15 minutos</option><option value="30">30 minutos</option>
+              </select>
+              <p id="scan-validation-help">En modo remoto, el Staff comparte ubicación puntual dentro de la ventana seleccionada. Si el responsable no responde enseguida, la solicitud permanece pendiente; la ubicación por sí sola no valida asistencia.</p>
               <div class="attendance-section-caption">Supervisores autorizados para esta jornada</div>
               <div id="scan-new-supervisors" class="attendance-supervisor-list"></div>
               <button type="button" data-write id="scan-configure" class="profile-button profile-button-primary">Habilitar pase de lista</button>
@@ -85,7 +96,7 @@
             <details open>
               <summary>Escanear QR de jornada</summary>
               <div class="attendance-method-content">
-                <p>Confirma la presencia del colaborador. El QR de identificación personal no funciona aquí.</p>
+                  <p id="scan-qr-guidance">Confirma la presencia del colaborador. El QR de identificación personal no funciona aquí.</p>
                 <div class="qr-scan-actions">
                   <button type="button" id="scan-open-camera" class="profile-button profile-button-primary"><span aria-hidden="true">▣</span> Abrir cámara</button>
                 </div>
@@ -102,14 +113,14 @@
                   <p id="scan-qr-identity"></p>
                   <p>Confirma presencialmente la identidad antes de registrar.</p>
                   <div class="attendance-qr-actions">
-                    <button type="button" data-write id="scan-qr-entry" class="profile-button profile-button-primary">Registrar entrada</button>
-                    <button type="button" data-write id="scan-qr-exit" class="profile-button profile-button-outline">Registrar salida</button>
+                    <button type="button" data-write id="scan-qr-entry" class="profile-button profile-button-primary">Confirmar entrada</button>
+                    <button type="button" data-write id="scan-qr-exit" class="profile-button profile-button-outline">Confirmar salida</button>
                     <button type="button" data-write id="scan-qr-activity" class="profile-button profile-button-primary">Confirmar actividad</button>
                   </div>
                 </section>
               </div>
             </details>
-            <details open>
+            <details id="scan-manual-method" open>
               <summary>Pase de lista manual</summary>
               <div class="attendance-method-content">
                 <p>Para personal sin QR o sin teléfono. No necesita crear otra cuenta.</p>
@@ -147,6 +158,11 @@
               </div>
             </details>
           </div>
+          <section id="scan-remote-requests" class="attendance-history" hidden>
+            <h2>Solicitudes remotas con GPS</h2>
+            <p>Revisa la ubicación reportada por el dispositivo y confirma la hora. El registro aprobado queda marcado como remoto y muestra quién lo validó.</p>
+            <div id="scan-remote-entries" aria-live="polite"></div>
+          </section>
           <section class="attendance-history">
             <h2>Asistencias registradas</h2>
             <p>Entrada, salida o actividad registrada con hora de Firebase y supervisor responsable. Son registros pendientes hasta que Coordinación los valide.</p>

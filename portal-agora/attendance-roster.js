@@ -1,6 +1,6 @@
 /**
  * Lista de jornada: RELOJ OFICIAL y VALIDACIÓN POR QR son fuentes distintas.
- * Lee exclusivamente documentos autorizados por canEdit(), nunca GPS o pagos.
+ * Lee exclusivamente documentos autorizados por canEdit(); no consulta pagos.
  */
 import {collection,query,where,getDocsFromServer}
  from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
@@ -60,9 +60,10 @@ async function loadRoster(session,eventId){
  if(!event){box.textContent="No se encontró la jornada.";return}
  box.textContent="Consultando reloj oficial y validaciones QR…";
  try{
-  const [clockSnaps,qrSnaps]=await Promise.all([
+  const [clockSnaps,qrSnaps,entrySnaps]=await Promise.all([
    getDocsFromServer(query(collection(session.db,"agora_ops_clock"),where("eventId","==",eventId))),
-   getDocsFromServer(query(collection(session.db,"agora_ops_incidents"),where("eventId","==",eventId)))
+   getDocsFromServer(query(collection(session.db,"agora_ops_incidents"),where("eventId","==",eventId))),
+   getDocsFromServer(collection(session.db,"agora_ops_attendance_sheets",eventId,"entries"))
   ]);
   const assigned=new Set(event.roster.map(p=>p.personId));
   const clockByPerson=new Map();
@@ -87,6 +88,15 @@ async function loadRoster(session,eventId){
     previous.actividades=(previous.actividades||0)+1;
    scanByPerson.set(v.personId,previous);
   }
+  for(const snapshot of entrySnaps.docs){
+   const v=snapshot.data();
+   if(!assigned.has(v.personId)||!['entrada','salida'].includes(v.action))continue;
+   const previous=scanByPerson.get(v.personId)||{};
+   if(v.status==='validado')previous[v.action]=v.capturedAt||v.createdAt;
+   else previous.pending=true;
+   previous.source=v.source;previous.reviewer=v.actorName||"";
+   scanByPerson.set(v.personId,previous);
+  }
   const rows=event.roster.map(person=>{
    const clock=clockByPerson.get(person.personId);
    const scan=scanByPerson.get(person.personId);
@@ -97,7 +107,10 @@ async function loadRoster(session,eventId){
    ].filter(Boolean).join(" · "):"—";
    const status=clock?.status==="finalizada"?"Salida oficial registrada":
      clock?.status==="en_curso"?"Reloj oficial en curso":
-     scan?"QR verificado · Sin marcaje oficial":"Sin registro";
+    scan?.pending?"Pase pendiente de validación":
+    scan?(scan.source==="remoto"?"Pase remoto · "+(scan.reviewer||"Responsable"):
+      scan.source?"Pase "+scan.source+" · Sin marcaje oficial":"QR verificado · Sin marcaje oficial"):
+      "Sin registro";
    return '<tr><td>'+esc(person.name)+'</td>'+
     '<td>'+esc(formatTime(clock?.startedAt))+'</td>'+
     '<td>'+esc(formatTime(clock?.endedAt))+'</td>'+
@@ -107,7 +120,7 @@ async function loadRoster(session,eventId){
   box.innerHTML='<div class="attendance-roster-summary"><strong>'+esc(event.name)+'</strong>'+
     '<span>'+event.roster.length+' integrante(s) asignados</span></div>'+
     (event.roster.length?'<div class="attendance-roster-table-scroll"><table class="attendance-roster-table">'+
-     '<thead><tr><th>Integrante</th><th>Reloj entrada</th><th>Reloj salida</th><th>QR presencial</th><th>Estado</th></tr></thead>'+
+     '<thead><tr><th>Integrante</th><th>Reloj entrada</th><th>Reloj salida</th><th>Pase de lista</th><th>Estado</th></tr></thead>'+
      '<tbody>'+rows+'</tbody></table></div>':
      '<p>No hay personal registrado en esta jornada.</p>')+
     '<button type="button" class="profile-button profile-button-outline" data-roster-reload="'+esc(eventId)+'">Actualizar lista</button>';
