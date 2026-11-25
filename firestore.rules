@@ -1765,7 +1765,7 @@ match /agora_finance_requests/{requestId} {
         request.resource.data.evidenceImage is string &&
         request.resource.data.evidenceImage.size() <= 185000 &&
         (request.resource.data.evidenceImage == '' ||
-         request.resource.data.evidenceImage.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]{100,184900}$')) &&
+         request.resource.data.evidenceImage.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')) &&
         request.resource.data.capturedBy == request.auth.uid &&
         request.resource.data.createdAt == request.time &&
         request.resource.data.updatedAt == request.time &&
