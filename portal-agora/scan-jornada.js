@@ -116,7 +116,7 @@ async function readSheets(){
   state.sheets=sheets.docs.map(d=>({id:d.id,...d.data()}));
  }else{
   const q=query(collection(db,"agora_ops_attendance_sheets"),
-    where("supervisorUids","array-contains",state.user.uid),where("active","==",true));
+    where("supervisorUids","array-contains",state.user.uid));
   const docs=await getDocsFromServer(q);
   state.sheets=docs.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.active===true);
   state.schedule=null;
