@@ -81,7 +81,6 @@ async function confirmAttendance(action){
  const buttons=[$("scan-entry"),$("scan-exit"),$("scan-activity")];
  buttons.forEach(b=>b.disabled=true);
  try{
- try{
   const url=new URL("escanear/",root);
   for(const [k,v] of Object.entries({
    v:"1",u:state.scan.uid,e:state.scan.eventId,p:state.scan.personId,
