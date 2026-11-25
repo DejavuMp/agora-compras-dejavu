@@ -1,7 +1,7 @@
 /**
  * Verificación estricta antes de habilitar autorregistros laborales en Firestore.
- * Conserva una copia de las reglas activas y sólo admite añadir el bloque
- * agora_ops_work_claims cuando todo el resto coincide exactamente.
+ * Conserva una copia de las reglas activas y sólo admite dos cambios conocidos:
+ * el bloque aislado de autorregistros y salida sin coordenadas cuando el GPS falla.
  */
 import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
 const project=process.env.FIREBASE_PROJECT_ID;
@@ -23,7 +23,13 @@ if(!claimBlock.includes('match /agora_ops_work_claims/{claimId}')||
    claimBlock.includes('allow delete: if true')){
   throw Error('El bloque de autorregistros no es el esperado; despliegue cancelado.');
 }
-const baselineCandidate=candidate.slice(0,claimAt)+candidate.slice(catchAllAt);
+const withoutClaims=candidate.slice(0,claimAt)+candidate.slice(catchAllAt);
+const strictExitGeo="           request.resource.data.keys().hasAll(['endGeo','endNote','endedAt']) &&\n           shiftGeoValid(request.resource.data.endGeo) &&";
+const optionalExitGeo="           request.resource.data.keys().hasAll(['endNote','endedAt']) &&\n           (!request.resource.data.keys().hasAny(['endGeo']) ||\n             shiftGeoValid(request.resource.data.endGeo)) &&";
+if(withoutClaims.split(optionalExitGeo).length!==2){
+  throw Error('La excepción de salida sin GPS no coincide exactamente; despliegue cancelado.');
+}
+const baselineCandidate=withoutClaims.replace(optionalExitGeo,strictExitGeo);
 function normalize(s){return String(s).replace(/\r\n?/g,'\n').trim()}
 const headers={Authorization:'Bearer '+token,Accept:'application/json'};
 async function getJson(path){
@@ -45,12 +51,12 @@ const dir='.github/firebase-staff/.preflight';
 mkdirSync(dir,{recursive:true});
 writeFileSync(dir+'/antes-dejavu.rules',live,'utf8');
 writeFileSync(dir+'/ruleset-name.txt',release.rulesetName+'\n','utf8');
-// Sólo se permite que producción sea la base exacta del candidato o que ya
-// tenga desplegado el candidato completo. Cualquier otra diferencia se detiene.
+// Sólo se permite la base exacta del respaldo, más los dos cambios probados,
+// o que producción ya tenga desplegado el candidato completo.
 if(normalize(live)===normalize(candidate)){
-  console.log('Las reglas vigentes ya contienen los autorregistros; no se requiere cambiar contenido.');
+  console.log('Las reglas vigentes ya contienen los cambios verificados; no se requiere modificar contenido.');
 }else if(normalize(live)===normalize(baselineCandidate)){
-  console.log('Producción coincide exactamente al quitar el bloque aislado de autorregistros. Se preservan todas las reglas vigentes.');
+  console.log('Producción coincide exactamente con la base respaldada; sólo se añaden los cambios probados.');
 }else{
   throw Error('REGLAS DISTINTAS EN PRODUCCIÓN. Se guardó respaldo. Se detiene para NO sobrescribir permisos existentes.');
 }
