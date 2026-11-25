@@ -1374,3 +1374,46 @@ body:not(.login-mode) footer{
  .attendance-task select{width:100%}
  .attendance-task-container>[data-action="open-tasks"]{width:100%}
 }
+
+
+/* Solicitudes de jornada almacenadas, con evidencia fotográfica privada pequeña. */
+.assignment-history-header{
+ display:flex;justify-content:space-between;align-items:center;
+ flex-wrap:wrap;gap:12px;margin:22px 0 11px;
+ padding-top:18px;border-top:1px solid #41444a;
+}
+.assignment-history-header strong{color:#f4f5f2;font-size:15px}
+.assignment-history-header button{font-size:11px}
+.assignment-history{display:grid;gap:8px}
+.assignment-history-item{
+ border:1px solid #3e4247;border-radius:10px;
+ background:#202327;overflow:hidden;
+}
+.assignment-history-item summary{
+ display:flex;align-items:center;justify-content:space-between;
+ flex-wrap:wrap;gap:12px;padding:13px 15px;
+ cursor:pointer;list-style:none;color:#f5f4f2;
+}
+.assignment-history-item summary::-webkit-details-marker{display:none}
+.assignment-history-item summary span{display:grid;gap:5px;min-width:0}
+.assignment-history-item summary strong{font-size:13px}
+.assignment-history-item summary small{font-size:11px;color:#bfc2c7}
+.assignment-history-body{
+ border-top:1px solid #43464c;padding:15px;
+ display:grid;gap:8px;
+}
+.assignment-history-body p{
+ margin:0;font-size:12px;line-height:1.55;
+ color:#d5d8da;overflow-wrap:anywhere;
+}
+.assignment-history-image{
+ max-width:min(100%,540px);max-height:480px;
+ object-fit:contain;border-radius:7px;background:#161819;
+ border:1px solid #41454b;margin:6px 0;
+}
+.assignment-history-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:6px}
+.assignment-history-actions .profile-button{font-size:11px}
+@media(max-width:560px){
+ .assignment-history-actions{display:grid}
+ .assignment-history-header{align-items:flex-start}
+}
