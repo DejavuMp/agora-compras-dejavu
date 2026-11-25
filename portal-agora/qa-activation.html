@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#151719">
+  <meta name="referrer" content="no-referrer">
+  <title>Activación QA · ÁGORA</title>
+  <style>
+    :root{color-scheme:dark;font-family:Arial,sans-serif;background:#101113;color:#f4f4f4}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;box-sizing:border-box}
+    main{width:min(100%,480px);padding:28px;border:1px solid #34363a;border-radius:18px;background:#191a1d}
+    h1{font-size:1.4rem;margin:0 0 8px}p{line-height:1.55;color:#c7c7c7}
+    label{display:block;margin:18px 0 6px;font-size:.94rem}
+    select,input,button{box-sizing:border-box;width:100%;padding:12px;border-radius:8px;font:inherit}
+    select,input{background:#101113;border:1px solid #57595e;color:#fff}
+    button{margin-top:18px;border:0;background:#c8202f;color:#fff;font-weight:700;cursor:pointer}
+    button:disabled{opacity:.65;cursor:wait}#status{min-height:1.6em;margin-top:12px;color:#fff}
+    small{color:#bcbec2}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Activación de cuentas QA</h1>
+    <p>Este paso envía el correo de verificación a tu buzón. Solo está habilitado para las dos cuentas de prueba. La contraseña se valida directamente con Firebase, se mantiene solo en memoria y no se guarda ni se envía a ÁGORA.</p>
+    <form id="activation-form">
+      <label for="email">Cuenta QA</label>
+      <select id="email" name="email" required>
+        <option value="">Selecciona la cuenta</option>
+        <option value="admi.agora+qa.staff@gmail.com">Staff QA</option>
+        <option value="admi.agora+qa.supervisor@gmail.com">Supervisor QA</option>
+      </select>
+      <label for="password">Contraseña de Firebase</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <button id="submit" type="submit">Enviar verificación</button>
+    </form>
+    <p id="status" role="status" aria-live="polite"></p>
+    <small>Después de abrir el enlace de tu buzón, vuelve al portal ÁGORA. Este paso no habilita funciones ni aprueba pagos.</small>
+  </main>
+  <script type="module" src="./qa-activation.js?v=20261125-qa1"></script>
+</body>
+</html>

@@ -241,3 +241,19 @@ test("Staff, Agencia y Administrador conectan al mismo Firestore sin escrituras 
   assert.match(css,/\.role-jornada/);
   assert.match(css,/\.role-assignment-form/);
 });
+
+
+test("el activador QA no persiste credenciales ni lee Firestore y solo acepta los alias aprobados",async()=>{
+  const [page,script,config]=await Promise.all([
+    read("qa-activation.html"),read("qa-activation.js"),read("firebase.js")
+  ]);
+  assert.match(page,/name="robots" content="noindex,nofollow"/);
+  assert.match(page,/qa-activation\.js/);
+  assert.match(script,/admi\.agora\+qa\.staff@gmail\.com/);
+  assert.match(script,/admi\.agora\+qa\.supervisor@gmail\.com/);
+  assert.match(script,/inMemoryPersistence/);
+  assert.match(script,/sendEmailVerification\(user/);
+  assert.match(script,/updateProfile\(user/);
+  assert.doesNotMatch(script,/console\.(?:log|error)|localStorage|sessionStorage|firestore/);
+  assert.match(config,/export const firebaseConfig/);
+});
