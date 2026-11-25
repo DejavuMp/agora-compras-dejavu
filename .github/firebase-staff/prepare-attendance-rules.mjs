@@ -33,6 +33,62 @@ if(process.env.GITHUB_REF!=="refs/heads/main"||
    process.env.GITHUB_EVENT_NAME!=="workflow_dispatch")
  throw Error("Publicación limitada a ejecución manual desde main.");
 const sha=s=>createHash("sha256").update(s,"utf8").digest("hex");
+function reconcileIdentityPhoneAccess(content,repositoryRules){
+ const helperMatches=[...repositoryRules.matchAll(/function identitySignedIn\(\)\s*\{/g)];
+ if(helperMatches.length!==1)throw Error("No hay una única función de identidad telefónica revisada en reglas de main.");
+ const helperStart=helperMatches[0].index;
+ const helperEnd=repositoryRules.indexOf("\n    function ",helperStart+1);
+ if(helperEnd<0)throw Error("No se reconoce el límite de identitySignedIn.");
+ const approvedHelper=repositoryRules.slice(helperStart,helperEnd).trimEnd();
+ if(!approvedHelper.includes("request.auth.token.firebase.sign_in_provider == 'phone'")||
+    !approvedHelper.includes("request.auth.token.phone_number is string"))
+  throw Error("La función de identidad telefónica no coincide con la variante segura revisada.");
+ const liveHelpers=[...content.matchAll(/function identitySignedIn\(\)\s*\{/g)];
+ if(liveHelpers.length>1)throw Error("Hay varias funciones identitySignedIn en producción.");
+ let result=content;
+ if(liveHelpers.length===0){
+  const insertion=result.indexOf("\n    function userPath()");
+  if(insertion<0)throw Error("No se reconoce dónde insertar la función de identidad telefónica.");
+  result=result.slice(0,insertion)+"\n    "+approvedHelper+"\n"+result.slice(insertion);
+ }else{
+  const liveStart=liveHelpers[0].index;
+  const liveEnd=result.indexOf("\n    function ",liveStart+1);
+  if(liveEnd<0)throw Error("No se reconoce el límite de identitySignedIn activo.");
+  const liveHelper=result.slice(liveStart,liveEnd);
+  if(!liveHelper.includes("request.auth.token.firebase.sign_in_provider == 'phone'")||
+     !liveHelper.includes("request.auth.token.phone_number is string"))
+   throw Error("identitySignedIn activo difiere de la variante segura revisada.");
+ }
+ function updateMatch(path,actions,appendOwnGet=false){
+  const matches=[...result.matchAll(new RegExp("match "+path+"\\s*\\{","g"))];
+  if(matches.length!==1)throw Error("No se reconoce una única regla "+path+"; detener.");
+  const start=matches[0].index;
+  const next=result.indexOf("\n    match ",start+1);
+  const close=result.indexOf("\n    }\n",start);
+  if(close<0||(next>=0&&next<close))throw Error("No se reconoce el límite de "+path+"; detener.");
+  const block=result.slice(start,close+7);
+  let changes=0;
+  const updated=block.replace(/allow (get|create): if ([\\s\\S]*?);/g,(whole,action,expr)=>{
+   if(!actions.includes(action))return whole;
+   changes++;
+   if(action==="get"&&appendOwnGet&&!expr.includes("request.auth.uid == uid"))
+    return "allow get: if ("+expr+") || (identitySignedIn() && request.auth.uid == uid);";
+   if(expr.includes("identitySignedIn()"))return whole;
+   if(!expr.includes("signedIn()"))
+    throw Error("La regla "+path+" "+action+" no usa el predicado esperado; detener.");
+   return "allow "+action+": if "+expr.replace(/\\bsignedIn\\(\\)/g,"identitySignedIn()")+";";
+  });
+  for(const action of actions)
+   if(!new RegExp("allow "+action+": if ").test(block))
+    throw Error("Falta la autorización "+action+" en "+path+"; detener.");
+  if(changes<actions.length)throw Error("No se procesaron todas las reglas de "+path+"; detener.");
+  result=result.slice(0,start)+updated+result.slice(close+7);
+ }
+ updateMatch("/agora_users/\\{uid\\}",["get"],true);
+ updateMatch("/agora_identity_registrations/\\{uid\\}",["get","create"]);
+ return result;
+}
+
 function reconcileOperationsRules(content){
  const matches=[...content.matchAll(/match\s+\/agora_ops_incidents\/\{[^}]+\}\s*\{/g)];
  if(matches.length!==1)
@@ -137,7 +193,7 @@ const live=await readLive();
 if(!live.content.startsWith("rules_version = '2';")||
    live.content.length<1000||live.content.length>450000)
  throw Error("Contenido de reglas reales no reconocido; detener.");
-const protectedLive=reconcileOperationsRules(live.content);
+const protectedLive=reconcileIdentityPhoneAccess(\n reconcileOperationsRules(live.content),candidate);
 
 if(stage){
  const state=JSON.parse(readFileSync(stateFile,"utf8"));
