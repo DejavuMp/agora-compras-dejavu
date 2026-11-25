@@ -2,7 +2,7 @@ import {auth,db} from "./firebase.js";
 import {
   onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signInWithRedirect,signInWithEmailAndPassword,signOut
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
-import {doc,getDoc,getDocs,collection,query,orderBy,limit,setDoc,updateDoc,serverTimestamp}
+import {doc,getDoc,getDocs,collection,query,orderBy,limit,setDoc,updateDoc,serverTimestamp,where,writeBatch}
   from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 import {saveProfile,saveFinancial} from "../identidad/firebase-identity.js";
 import {projectTodayAssignments} from "../identidad/domain.mjs";
@@ -570,6 +570,7 @@ function staffOperationsSpace(){
     '<header class="role-module-heading"><div><h2>Mis jornadas</h2>'+
       '<p>Una jornada puede incluir varias actividades. Consulta tus asignaciones personales.</p></div>'+
       '<div class="role-space-actions">'+
+        '<button type="button" class="profile-button profile-button-primary" data-action="new-work-claim">+ Registrar trabajo o asignación</button>'+
         '<a class="profile-button profile-button-primary" href="'+esc(href("mi-operacion/"))+'">Mi operación</a>'+
         '<a class="profile-button profile-button-outline" href="'+esc(href("escanear/"))+'">Pasar lista (supervisores)</a></div></header>'+
     roleNotice()+
@@ -577,12 +578,14 @@ function staffOperationsSpace(){
       (assigned.length>3?'<details class="role-more-jornadas"><summary>Ver otras jornadas ('+(assigned.length-3)+')</summary><div class="role-jornada-list">'+assigned.slice(3).map(staffJornadaCard).join("")+'</div></details>':""):
       '<p class="role-empty">No hay jornadas vigentes o próximas en tu ficha personal.</p>':
       '<p class="role-empty">Todavía no encontramos una ficha de Operaciones vinculada a tu cuenta. Coordinación debe vincular tu UID al personal asignado.</p>')+
+    '<section class="work-claims"><h3>Mis trabajos registrados</h3><p>Los trabajos que declares quedan pendientes de revisión. Las horas escritas manualmente no se muestran como asistencia verificada.</p><div id="my-work-claims" aria-live="polite">Cargando tus registros…</div></section>'+
+    workClaimDialog(false)+
     '<dialog id="staff-shift-qr-dialog" class="role-dialog" aria-labelledby="staff-shift-qr-title">'+
       '<div class="role-dialog-head"><div><strong id="staff-shift-qr-title">QR de jornada / actividad</strong>'+
       '<p>Preséntalo al coordinador o supervisor autorizado. Es distinto de tu identificación.</p></div>'+
       '<button type="button" data-action="close-shift-qr" aria-label="Cerrar QR de jornada">×</button></div>'+
       '<div id="staff-shift-qr-content"></div></dialog>'+
-    '<div class="role-legacy-links"><a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/visor.html"))+'" target="_blank" rel="noopener noreferrer">Registrar entrada / salida · sistema actual ↗</a></div>'+
+    '<div class="role-legacy-links"><a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/visor.html"))+'">Registrar entrada / salida</a></div>'+
     '<p class="role-transition">El marcaje oficial sigue en Jornadas mientras se integra en esta pantalla. Se conserva tu historial.</p>'+
   '</section>';
 }
@@ -722,6 +725,45 @@ function assignmentDialog(){
     '<div id="assignment-history" class="assignment-history"></div>'+
   '</dialog>';
 }
+function workClaimDialog(review=false){
+  if(review)return '<section class="work-claims"><h3>Trabajos pendientes de validación</h3><p>Revisa autorregistros, solicita aclaraciones o valida horas e importe. La persona que declara no puede aprobarse a sí misma.</p><div id="work-claims-review">Cargando registros pendientes…</div></section>';
+  const now=new Date(),date=[now.getFullYear(),String(now.getMonth()+1).padStart(2,"0"),String(now.getDate()).padStart(2,"0")].join("-");
+  return '<dialog class="role-dialog" id="work-claim-dialog" aria-labelledby="work-claim-title"><div class="role-dialog-head"><div><strong id="work-claim-title">Registrar trabajo o asignación</strong><p>Se guardará a tu nombre y quedará pendiente de validación.</p></div><button type="button" data-action="close-work-claim" aria-label="Cerrar">×</button></div><form id="work-claim-form" class="role-assignment-form">'+
+    '<label>Situación<select name="recordType" required><option value="proximo">Trabajo próximo</option><option value="en_curso">Trabajo en curso</option><option value="realizado">Trabajo realizado en fecha anterior</option></select></label>'+
+    '<label>Proyecto, evento o actividad<input name="project" maxlength="150" required></label><label>Cliente (opcional)<input name="client" maxlength="120"></label><label>Sucursal o lugar<input name="site" maxlength="150" required></label><label>Fecha de trabajo<input name="date" type="date" value="'+date+'" required></label><label>Tipo de actividad<input name="activityType" maxlength="100" placeholder="Montaje, volanteo, supervisión…"></label>'+
+    '<label>Horario previsto · inicio<input name="plannedStart" type="time"></label><label>Horario previsto · fin<input name="plannedEnd" type="time"></label><label>Hora real declarada · entrada<input name="actualStart" type="time"></label><label>Hora real declarada · salida<input name="actualEnd" type="time"></label>'+
+    '<label class="role-wide">Descripción del trabajo<textarea name="description" rows="3" maxlength="600" required></textarea></label><label>Quién solicitó el trabajo<input name="requester" maxlength="140" required placeholder="Nombre del coordinador o persona"></label><label>Quién supervisó (opcional)<input name="supervisor" maxlength="140"></label><label>Medio de solicitud<select name="channel" required>'+["WhatsApp","Llamada","Verbal","Correo","Asignación interna","Otro"].map(x=>'<option>'+esc(x)+'</option>').join("")+'</select></label>'+
+    '<label>Tarifa acordada (si la conoces)<input name="declaredRate" type="number" min="0.01" step="0.01" placeholder="Si no la sabes, déjala vacía"></label><label>Horas extra declaradas<input name="overtimeHours" type="number" min="0" max="24" step="0.25" value="0"></label><label>Gastos adicionales declarados (MXN)<input name="expenses" type="number" min="0" max="50000" step="0.01" value="0"></label><label class="role-wide">Observaciones<textarea name="notes" rows="2" maxlength="500"></textarea></label><label class="role-wide">Evidencia de solicitud (imagen opcional)<input id="work-claim-evidence" type="file" accept="image/jpeg,image/png,image/webp"></label><div class="role-wide role-draft-warning">El registro no crea una asistencia verificada ni aprueba un pago.</div><div class="role-wide role-dialog-actions"><button type="submit" class="profile-button profile-button-primary">Guardar registro</button></div></form></dialog>';
+}
+async function loadWorkClaims(){
+  if(!state.user)return;
+  const isStaff=routeSpace==="staff";
+  if(!isStaff&&!(["admin","coordinador"].includes(role())&&allowed(routeSpace)))return;
+  const target=document.getElementById(isStaff?"my-work-claims":"work-claims-review");
+  if(!target)return;
+  const q=isStaff?query(collection(db,"agora_ops_work_claims"),where("ownerUid","==",state.user.uid)):query(collection(db,"agora_ops_work_claims"));
+  const snap=await getDocs(q);
+  const rows=snap.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>(b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0));
+  if(!rows.length){target.textContent=isStaff?"Aún no has registrado trabajos.":"No hay autorregistros.";return}
+  target.innerHTML=rows.slice(0,isStaff?20:60).map(x=>{
+    const types={proximo:"Próximo",en_curso:"En curso · provisional declarado",realizado:"Realizado · retrospectivo"};
+    const states={pendiente:"Pendiente de validación",aclaracion:"Requiere aclaración",validado:"Validado",rechazado:"Rechazado",cancelado:"Cancelado"};
+    const type=types[x.recordType]||"Trabajo",status=states[x.status]||x.status;
+    const hours=x.approvedHours??x.declaredHours,rate=x.approvedRate??x.declaredRate;
+    const amount=hours!=null?" · Horas "+Number(hours).toFixed(2)+(x.declaredHours!=null&&x.approvedHours==null?" declaradas":" aprobadas")+(rate!=null?" · Importe "+(x.approvedAmount==null?"estimado ":"aprobado ")+Number(x.approvedAmount??(Number(rate)*Number(hours))).toFixed(2)+" MXN":" · Tarifa pendiente de confirmar"):" · Horas pendientes de confirmar";
+    let review="";
+    if(!isStaff&&["pendiente","aclaracion"].includes(x.status))review='<form class="work-claim-review" data-claim-id="'+esc(x.id)+'"><label>Decisión<select name="status"><option value="validado">Validar</option><option value="aclaracion">Requiere aclaración</option><option value="rechazado">Rechazar</option></select></label><label>Horas aprobadas<input name="approvedHours" type="number" min="0" max="36" step="0.25" value="'+(Number(hours)||"")+'"></label><label>Tarifa aprobada MXN/h<input name="approvedRate" type="number" min="0.01" step="0.01" value="'+(Number(rate)||"")+'"></label><label>Comentario<input name="validationNote" maxlength="400"></label><button class="profile-button profile-button-primary" type="submit">Guardar revisión</button></form>';
+    const finish=isStaff&&x.recordType==="en_curso"&&!x.actualEnd?'<form class="work-claim-finish" data-claim-id="'+esc(x.id)+'"><label>Hora de salida declarada<input name="actualEnd" type="time" required></label><button class="profile-button profile-button-outline" type="submit">Terminar trabajo</button></form>':"";
+    return '<article class="work-claim-card"><div><strong>'+esc(x.project||"Trabajo")+'</strong><span class="role-time">'+esc(status)+'</span></div><p>'+esc(x.date||"")+' · '+esc(type)+' · '+esc(x.site||"")+'</p><p>Solicitó: '+esc(x.requester||"No indicado")+' · '+esc(x.channel||"")+'</p><p>'+esc(x.description||"")+esc(amount)+'</p>'+(Number(x.overtimeHours)>0?'<p>Horas extra declaradas: '+Number(x.overtimeHours).toFixed(2)+'</p>':"")+(Number(x.expenses)>0?'<p>Gastos declarados: $'+Number(x.expenses).toFixed(2)+' MXN (pendientes de revisión)</p>':"")+(x.validationNote?'<p>Revisión: '+esc(x.validationNote)+'</p>':"")+(x.evidenceImage?'<img class="assignment-history-image" src="'+esc(x.evidenceImage)+'" alt="Evidencia privada del trabajo '+esc(x.id)+'">':"")+finish+review+'</article>';
+  }).join("");
+}
+async function workClaimStableId(uid,v){
+  const tuple=[uid,clean(v.date),clean(v.project).toLowerCase(),clean(v.site).toLowerCase(),
+    clean(v.actualStart)||clean(v.plannedStart),clean(v.actualEnd)||clean(v.plannedEnd)]
+    .join("|");
+  const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(tuple));
+  return "claim_"+[...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,"0")).join("").slice(0,48);
+}
 function coordinationOperationsSpace(admin=false){
   const edit=["admin","coordinador"].includes(role());
   const list=edit?coordinationJornadas(state.roleData?.schedule,new Date(),60):[];
@@ -741,9 +783,10 @@ function coordinationOperationsSpace(admin=false){
        '<p class="role-empty">No hay jornadas próximas en el cronograma operativo.</p>')+
       '<div class="role-legacy-links"><a class="profile-button profile-button-primary" href="'+esc(href("escanear/"))+'">Pasar lista · QR o manual</a>'+
       '<button type="button" data-action="view-attendance" class="profile-button profile-button-outline">Pase de lista</button>'+
-        '<a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/"))+'" target="_blank" rel="noopener noreferrer">Editar agenda vigente ↗</a>'+
-        '<a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/control-jornadas.html"))+'" target="_blank" rel="noopener noreferrer">Control de asistencia ↗</a></div>'+
-      '<p class="role-transition">El cronograma original continúa como fuente oficial de asignaciones. Las solicitudes nuevas permanecen en borrador hasta habilitar su registro y aprobación seguros.</p>'+
+        '<a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/"))+'">Editar agenda vigente</a>'+
+        '<a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/control-jornadas.html"))+'">Control de asistencia</a></div>'+
+      '<p class="role-transition">El cronograma original continúa como fuente oficial. Los trabajos autorregistrados se revisan aparte y no alteran marcajes existentes.</p>'+
+      workClaimDialog(true)+
       assignmentDialog()+
       '<dialog id="attendance-roster-dialog" class="role-dialog" aria-labelledby="attendance-roster-title">'+
         '<div class="role-dialog-head"><div><strong id="attendance-roster-title">Pase de lista</strong>'+
@@ -763,6 +806,7 @@ function emptySpace(){
       '<img src="'+esc(iconSrc(meta.icon))+'" alt="" width="90" height="90">'+
       '<div><div class="profile-kicker">ÁGORA · Operaciones</div><h1>'+esc(meta.title)+'</h1></div></div>'+
     body+'</section>';
+  loadWorkClaims().catch(e=>{console.error(e);notice(errorText(e),"error")});
 }
 
 function render(){
@@ -819,6 +863,17 @@ app.addEventListener("click",event=>{
   const target=event.target.closest("[data-action]");
   if(!target)return;
   const task=target.dataset.action;
+  if(task==="new-work-claim"){
+    if(!allowed("staff")||!state.user||!state.roleData?.staff?.personId)return notice("Tu cuenta necesita una ficha de Operaciones vinculada antes de registrar trabajo.","error");
+    const dlg=document.getElementById("work-claim-dialog");
+    if(dlg?.showModal)dlg.showModal();else dlg?.setAttribute("open","");
+    return;
+  }
+  if(task==="close-work-claim"){
+    const dlg=document.getElementById("work-claim-dialog");
+    if(dlg?.close)dlg.close();else dlg?.removeAttribute("open");
+    return;
+  }
   if(task==="open-tasks"){
     if(!allowed("staff")||!state.user||!state.roleData?.staff)return;
     const eventId=clean(target.dataset.eventId);
@@ -989,6 +1044,76 @@ app.addEventListener("submit",event=>{
       form.querySelector("#assignment-activities")?.replaceChildren();
       await showAssignmentHistory();
     },"Solicitud guardada con folio; pendiente de asignación.");
+  }
+  if(form.id==="work-claim-form"){
+    if(!allowed("staff")||!state.user||!state.roleData?.staff?.personId)
+      return notice("La cuenta no tiene una ficha de Operaciones vinculada.","error");
+    return run(async()=>{
+      const v=Object.fromEntries(new FormData(form)),recordType=clean(v.recordType);
+      if(!["proximo","en_curso","realizado"].includes(recordType))throw Error("Selecciona el tipo de trabajo.");
+      if(recordType==="proximo"&&(!v.plannedStart||!v.plannedEnd))throw Error("Indica el horario previsto para el trabajo próximo.");
+      if(recordType==="realizado"&&(!v.actualStart||!v.actualEnd))throw Error("Indica el horario real declarado del trabajo realizado.");
+      const rate=String(v.declaredRate||"").trim()?Number(v.declaredRate):null;
+      const expenses=Number(v.expenses||0),overtimeHours=Number(v.overtimeHours||0);
+      if(rate!==null&&(!Number.isFinite(rate)||rate<=0||rate>100000))throw Error("La tarifa debe ser mayor a cero o quedar pendiente de confirmar.");
+      if(!Number.isFinite(expenses)||expenses<0||expenses>50000||!Number.isFinite(overtimeHours)||overtimeHours<0||overtimeHours>24)throw Error("Revisa gastos adicionales y horas extra.");
+      if(recordType==="en_curso"&&!v.actualStart){const now=new Date();v.actualStart=String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");}
+      const evidenceImage=await compressAssignmentImage(form.querySelector("#work-claim-evidence")?.files?.[0]);
+      const ownerUid=state.user.uid,actorName=name(),claimId=await workClaimStableId(ownerUid,v);
+      const priorClaims=await getDocs(query(collection(db,"agora_ops_work_claims"),where("ownerUid","==",ownerUid)));
+      if(priorClaims.docs.some(item=>item.id===claimId))
+        throw Error("Ya existe un registro equivalente de ese turno. Revísalo en Mis trabajos para evitar duplicar horas.");
+      const payload={id:claimId,ownerUid,personId:state.roleData.staff.personId,personName:actorName,recordType,
+        project:clean(v.project).slice(0,150),client:clean(v.client).slice(0,120),site:clean(v.site).slice(0,150),date:clean(v.date),activityType:clean(v.activityType).slice(0,100),
+        plannedStart:clean(v.plannedStart),plannedEnd:clean(v.plannedEnd),actualStart:clean(v.actualStart),actualEnd:clean(v.actualEnd),
+        description:clean(v.description).slice(0,600),requester:clean(v.requester).slice(0,140),supervisor:clean(v.supervisor).slice(0,140),channel:clean(v.channel),
+        declaredRate:rate,overtimeHours,expenses,notes:clean(v.notes).slice(0,500),evidenceImage,status:"pendiente",validationNote:"",declaredHours:null,approvedHours:null,approvedRate:null,approvedAmount:null,
+        createdBy:ownerUid,createdAt:serverTimestamp(),updatedBy:ownerUid,updatedAt:serverTimestamp(),lastHistoryId:"created"};
+      if(payload.actualStart&&payload.actualEnd){
+        const [sh,sm]=payload.actualStart.split(":").map(Number),[eh,em]=payload.actualEnd.split(":").map(Number);
+        let mins=(eh*60+em)-(sh*60+sm);if(mins<0)mins+=1440;
+        if(mins<=0||mins>36*60)throw Error("Revisa las horas reales declaradas.");
+        payload.declaredHours=Math.round(mins/60*100)/100;
+      }
+      const batch=writeBatch(db);
+      batch.set(doc(db,"agora_ops_work_claims",claimId),payload);
+      batch.set(doc(db,"agora_ops_work_claims",claimId,"history","created"),{claimId,action:"creado",actorUid:ownerUid,actorName,at:serverTimestamp(),note:"Registro declarado por la persona trabajadora.",ownerUid});
+      await batch.commit();
+      form.reset();
+      const dialog=document.getElementById("work-claim-dialog");if(dialog?.close)dialog.close();else dialog?.removeAttribute("open");
+      await loadWorkClaims();
+    },"Trabajo guardado con folio y pendiente de validación.");
+  }
+  if(form.matches(".work-claim-finish")){
+    if(!allowed("staff")||!state.user)return notice("No tienes permiso para terminar este registro.","error");
+    return run(async()=>{
+      const claimId=clean(form.dataset.claimId),end=clean(new FormData(form).get("actualEnd"));
+      if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(end))throw Error("Indica una hora de salida válida.");
+      const ref=doc(db,"agora_ops_work_claims",claimId),current=await getDoc(ref);
+      if(!current.exists()||current.data().ownerUid!==state.user.uid||current.data().recordType!=="en_curso"||current.data().actualEnd)throw Error("Este trabajo ya no está en curso.");
+      const start=current.data().actualStart,[sh,sm]=start.split(":").map(Number),[eh,em]=end.split(":").map(Number);
+      let minutes=eh*60+em-(sh*60+sm);if(minutes<=0)minutes+=1440;
+      const hours=Math.round(minutes/60*100)/100;if(hours<=0||hours>24)throw Error("El horario declarado supera 24 horas.");
+      const historyId=crypto.randomUUID(),batch=writeBatch(db);
+      batch.update(ref,{actualEnd:end,declaredHours:hours,updatedBy:state.user.uid,updatedAt:serverTimestamp(),lastHistoryId:historyId});
+      batch.set(doc(db,"agora_ops_work_claims",claimId,"history",historyId),{claimId,action:"finalizada",actorUid:state.user.uid,actorName:name(),at:serverTimestamp(),note:"La persona declaró la hora de salida.",eventTime:end,ownerUid:state.user.uid});
+      await batch.commit();await loadWorkClaims();
+    },"Salida declarada guardada; sigue pendiente de validación.");
+  }
+  if(form.matches(".work-claim-review")){
+    if(!["admin","coordinador"].includes(role())||!allowed(routeSpace))return notice("No tienes permiso para revisar trabajos.","error");
+    return run(async()=>{
+      const claimId=clean(form.dataset.claimId),values=Object.fromEntries(new FormData(form));
+      const next=clean(values.status),hours=Number(values.approvedHours||0),rate=String(values.approvedRate||"").trim()?Number(values.approvedRate):null,note=clean(values.validationNote).slice(0,400);
+      if(!["validado","aclaracion","rechazado"].includes(next))throw Error("Selecciona una decisión válida.");
+      if(next==="validado"&&(!Number.isFinite(hours)||hours<=0||hours>36))throw Error("Indica las horas aprobadas.");
+      if(rate!==null&&(!Number.isFinite(rate)||rate<=0||rate>100000))throw Error("La tarifa aprobada debe ser mayor a cero.");
+      const claimRef=doc(db,"agora_ops_work_claims",claimId),historyId=crypto.randomUUID(),batch=writeBatch(db);
+      const current=await getDoc(claimRef);if(!current.exists())throw Error("El trabajo ya no está disponible.");
+      batch.update(claimRef,{status:next,validationNote:note,approvedHours:next==="validado"?hours:null,approvedRate:next==="validado"?rate:null,approvedAmount:next==="validado"&&rate!==null?Math.round(hours*rate*100)/100:null,updatedBy:state.user.uid,updatedAt:serverTimestamp(),lastHistoryId:historyId});
+      batch.set(doc(db,"agora_ops_work_claims",claimId,"history",historyId),{claimId,action:next,actorUid:state.user.uid,actorName:name(),at:serverTimestamp(),note,ownerUid:current.data().ownerUid});
+      await batch.commit();await loadWorkClaims();
+    },"Revisión guardada. Aprobación laboral y pago conservan estados separados.");
   }
   if(form.hasAttribute("data-draft-activity")){
     const formData=new FormData(form);

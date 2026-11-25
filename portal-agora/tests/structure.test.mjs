@@ -16,7 +16,7 @@ test("el portal conserva la autenticación Google y el mismo proyecto Firebase",
   assert.match(app,/getDoc\(doc\(db,"agora_identity_registry",linked\.agoraId\)\)/);
   assert.match(app,/getDoc\(doc\(db,"agora_users",user\.uid\)\)/);
   assert.match(html,/src="\.\/app\.js(?:\?v=[^"]+)?"/);
-  assert.match(html,/href="\.\/perfil\.css"/);
+  assert.match(html,/href="\.\/perfil\.css(?:\?v=[^"]+)?"/);
   assert.match(app,/type="submit" disabled/);
   assert.match(app,/data-action="google"/);
 });
@@ -91,7 +91,7 @@ test("las tres páginas tienen ruta propia, etiqueta y regreso al perfil",async(
     const html=await read(path+"/index.html");
     assert.match(html,/<main id="app">/);
     assert.match(html,/src="\.\.\/app\.js(?:\?v=[^"]+)?"/);
-    assert.match(html,/href="\.\.\/perfil\.css"/);
+    assert.match(html,/href="\.\.\/perfil\.css(?:\?v=[^"]+)?"/);
     assert.match(html,/href="\.\.\/"/);
     assert.match(app,new RegExp(''+path));
   }
@@ -118,7 +118,7 @@ test("Mi perfil integra solo Mi operación y Expediente privado sin salir del po
     assert.ok(html.includes("<title>ÁGORA · "+title+"</title>"));
     assert.match(html,/name="robots" content="noindex,nofollow"/);
     assert.match(html,/src="\.\.\/app\.js(?:\?v=[^"]+)?"/);
-    assert.match(html,/href="\.\.\/perfil\.css"/);
+    assert.match(html,/href="\.\.\/perfil\.css(?:\?v=[^"]+)?"/);
     assert.match(html,/href="\.\.\/"/);
   }
 });
@@ -216,7 +216,7 @@ test("iconos originales y tipografía adaptable siguen en el portal",async()=>{
   assert.match(css,/\.credential-modal/);
 });
 
-test("Staff, Agencia y Administrador conectan al mismo Firestore sin escrituras operativas nuevas",async()=>{
+test("Staff, Agencia y Administrador conectan al mismo Firestore con autorregistro protegido",async()=>{
   const app=await read("app.js");
   const css=await read("perfil.css");
   assert.match(app,/getDoc\(doc\(db,"agora_ops_staff",uid\)\)/);
@@ -237,9 +237,16 @@ test("Staff, Agencia y Administrador conectan al mismo Firestore sin escrituras 
   assert.match(app,/agora_ops_assignment_requests/);
   assert.match(app,/showAssignmentHistory/);
   assert.match(app,/Solicitud guardada con folio/);
+  assert.match(app,/data-action="new-work-claim"/);
+  assert.match(app,/agora_ops_work_claims/);
+  assert.match(app,/recordType/);
+  assert.match(app,/Trabajo realizado en fecha anterior/);
+  assert.match(app,/Revisión guardada\. Aprobación laboral y pago conservan estados separados/);
+  assert.match(app,/lastHistoryId/);
   assert.doesNotMatch(app,/setDoc\(doc\(db,"agora_ops_(?:control|staff|shift_access)"/);
   assert.match(css,/\.role-jornada/);
   assert.match(css,/\.role-assignment-form/);
+  assert.match(css,/\.work-claim-card/);
 });
 
 
