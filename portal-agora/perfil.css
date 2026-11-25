@@ -1079,3 +1079,12 @@ body:not(.login-mode) footer{
 @media(max-width:600px){
  .attendance-roster-summary{align-items:start;flex-direction:column}
 }
+
+.role-space-actions{
+ display:flex;align-items:center;flex-wrap:wrap;gap:9px;
+}
+.role-space-actions .profile-button{white-space:normal;font-size:12px}
+@media(max-width:600px){
+ .role-space-actions{display:grid;width:100%}
+ .role-space-actions .profile-button{width:100%}
+}
