@@ -7,6 +7,7 @@ import {doc,getDoc,setDoc,serverTimestamp}
 import {saveProfile,saveFinancial} from "../identidad/firebase-identity.js";
 import {projectTodayAssignments} from "../identidad/domain.mjs";
 import {ownJornadas,coordinationJornadas,operationTotals,validateAssignmentDraft,assignmentDraftText,REQUEST_CHANNELS} from "./roles-operacion.mjs";
+import {mountOwnAttendance} from "./attendance-live.js";
 
 // Una sola identidad Firebase para todas las vistas. Sin módulos operativos.
 const ROOT=new URL("./",import.meta.url);
@@ -278,6 +279,11 @@ function credentialDialog(){
       '<span class="credential-valid">Vigente</span>'+
     '</div>'+
     '<p class="profile-muted">El QR permite comprobar la vigencia. No comparte información privada del expediente.</p>'+
+    '<details class="credential-attendance-panel" id="credential-attendance-details" open>'+
+      '<summary>Mi pase de lista · Entrada y salida</summary>'+
+      '<div id="credential-attendance"><p class="profile-muted" role="status">Comprobando mi jornada…</p></div>'+
+    '</details>'+
+
     '<div class="modal-actions">'+
       (link?'<button class="profile-button" type="button" data-action="share-credential">Compartir verificación</button>'+
         '<a class="profile-button profile-button-outline" href="'+esc(link)+'" target="_blank" rel="noopener noreferrer">Comprobar vigencia</a>':"")+
@@ -393,6 +399,15 @@ function profile(){
     credentialDialog()+
   '</section>';
   prepareProfilePhotos();
+  if(new URLSearchParams(location.search).get("asistencia")==="1"){
+    // Sólo un enlace de acción explícita abre automáticamente la credencial.
+    const modal=document.getElementById("credential-dialog");
+    if(modal&& !modal.open){
+      if(modal.showModal)modal.showModal();else modal.setAttribute("open","");
+      drawQr();
+      mountOwnAttendance({auth,db,target:document.getElementById("credential-attendance"),identity:state.identity});
+    }
+  }
 }
 
 // Los campos se conservan con los mismos nombres que Identidad Única y RH.
@@ -733,7 +748,9 @@ app.addEventListener("click",event=>{
     const modal=document.getElementById("credential-dialog");
     if(!modal)return;
     if(modal.showModal)modal.showModal();else modal.setAttribute("open","");
-    drawQr();prepareProfilePhotos();return;
+    drawQr();prepareProfilePhotos();
+    mountOwnAttendance({auth,db,target:document.getElementById("credential-attendance"),identity:state.identity});
+    return;
   }
   if(task==="close-credential"){
     const modal=document.getElementById("credential-dialog");
