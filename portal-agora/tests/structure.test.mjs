@@ -230,7 +230,8 @@ test("Staff, Agencia y Administrador conectan al mismo Firestore sin escrituras 
   assert.match(app,/data-action="add-assignment-activity"/);
   assert.match(app,/data-draft-activity/);
   assert.match(app,/validateAssignmentDraft/);
-  assert.match(app,/Borrador preparado\. No se ha guardado en Firebase/);
+  assert.match(app,/Solicitud guardada con folio/);
+  assert.match(app,/agora_ops_assignment_requests/);
   assert.match(app,/compressAssignmentImage/);
   assert.match(app,/agora_ops_assignment_requests/);
   assert.match(app,/showAssignmentHistory/);
