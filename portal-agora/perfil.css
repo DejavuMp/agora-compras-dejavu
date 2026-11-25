@@ -1191,9 +1191,13 @@ body:not(.login-mode) footer{
 .work-claims h3{margin:0 0 6px;font-size:1.12rem}.work-claims>p{margin:0 0 14px;color:#c7c8ca;font-size:.9rem}
 .work-claim-card{margin:10px 0;padding:14px;border:1px solid rgba(255,255,255,.14);border-radius:14px;background:rgba(10,10,10,.5)}
 .work-claim-card>div{display:flex;justify-content:space-between;gap:12px;align-items:center}.work-claim-card p{margin:8px 0;color:#d4d5d6;font-size:.9rem}
+.remote-request-buttons{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.remote-attendance-item{display:grid;gap:5px;padding:12px 0;border-bottom:1px solid #383d43}
+.remote-attendance-item span{color:#dfc58d;font-size:.9rem;font-weight:650}
+.remote-attendance-item small{color:#bfc2c7;overflow-wrap:anywhere}
 .work-claim-review{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.12)}
 .work-claim-review label{display:grid;gap:5px;font-size:.84rem;color:#ddd}.work-claim-review input,.work-claim-review select{min-width:0;width:100%;padding:10px;border:1px solid #555;border-radius:9px;background:#17181a;color:#fff}
-@media(max-width:600px){.work-claim-review{grid-template-columns:1fr}.work-claim-card>div{align-items:flex-start;flex-direction:column}.role-space-actions{display:grid;grid-template-columns:1fr;width:100%}}
+@media(max-width:600px){.work-claim-review{grid-template-columns:1fr}.work-claim-card>div{align-items:flex-start;flex-direction:column}.role-space-actions,.remote-request-buttons{display:grid;grid-template-columns:1fr;width:100%}}
 .attendance-role{
  display:inline-flex;align-items:center;width:max-content;
  color:#d9e5dd;background:#28352d;border:1px solid #425e49;

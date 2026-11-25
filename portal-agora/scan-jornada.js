@@ -36,6 +36,7 @@ const dateInput=v=>{
 const state={
  user:null,isCoordinator:false,allowed:false,working:false,
  schedule:null,sheets:[],sheet:null,roster:[],entries:[],approvals:[],clocks:[],
+ remoteRequests:[],
  qr:null,camera:null,epoch:0
 };
 function notice(msg,kind=""){
@@ -180,7 +181,7 @@ function renderSheets(){
  }
 }
 async function selectSheet(eventId){
- state.sheet=null;state.roster=[];state.entries=[];state.approvals=[];state.clocks=[];
+ state.sheet=null;state.roster=[];state.entries=[];state.approvals=[];state.clocks=[];state.remoteRequests=[];
  state.qr=null;$("scan-qr-result").hidden=true;
  if(!eventId){$("scan-event-content").hidden=true;return}
  const sheet=state.sheets.find(x=>x.eventId===eventId);
@@ -195,15 +196,17 @@ async function refreshSheet(){
  const id=state.sheet.eventId;
  const collections=[
   getDocsFromServer(collection(db,"agora_ops_attendance_sheets",id,"roster")),
-  getDocsFromServer(collection(db,"agora_ops_attendance_sheets",id,"entries"))
+  getDocsFromServer(collection(db,"agora_ops_attendance_sheets",id,"entries")),
+  getDocsFromServer(collection(db,"agora_ops_attendance_sheets",id,"remote_requests"))
  ];
  if(state.isCoordinator){
   collections.push(getDocsFromServer(collection(db,"agora_ops_attendance_sheets",id,"approvals")));
   collections.push(getDocsFromServer(query(collection(db,"agora_ops_clock"),where("eventId","==",id))));
  }
- const [roster,entries,approvals,clocks]=await Promise.all(collections);
+ const [roster,entries,remoteRequests,approvals,clocks]=await Promise.all(collections);
  state.roster=roster.docs.map(d=>d.data());
  state.entries=entries.docs.map(d=>d.data());
+ state.remoteRequests=remoteRequests.docs.map(d=>({id:d.id,...d.data()}));
  state.approvals=approvals?approvals.docs.map(d=>d.data()):[];
  state.clocks=clocks?clocks.docs.map(d=>d.data()):[];
 }
@@ -227,9 +230,15 @@ function renderSheet(){
  $("scan-event-title").textContent=sheet.title;
  $("scan-event-meta").textContent=fmt(sheet.startsAt)+" – "+fmt(sheet.endsAt)+" · "+sheet.site;
  $("scan-active-status").textContent=sheet.active?"Lista habilitada":"Lista cerrada";
- $("scan-create-entry").disabled=!sheet.active;
- $("scan-register-provisional").disabled=!sheet.active;
+ $("scan-create-entry").disabled=!sheet.active||sheet.validationMode==="remoto";
+ $("scan-manual-method").hidden=sheet.validationMode==="remoto";
+ $("scan-register-provisional").disabled=!sheet.active||sheet.validationMode==="remoto";
+ document.querySelector(".attendance-methods").hidden=sheet.validationMode==="remoto";
  $("scan-supervisors").hidden=!state.isCoordinator;
+ $("scan-remote-requests").hidden=sheet.validationMode!=="remoto";
+ $("scan-qr-guidance").textContent=sheet.validationMode==="remoto"?
+  "Modo remoto activo: el Staff solicita su pase desde Mi espacio. Revisa aquí las solicitudes con ubicación y hora; el GPS no las aprueba automáticamente.":
+  "Confirma la presencia del colaborador. El QR de identificación personal no funciona aquí.";
  const names=rosterPeople();
  $("scan-person").innerHTML='<option value="">Elige colaborador…</option>'+
   names.map(p=>'<option value="'+esc(p.personId)+'">'+esc(p.name)+
@@ -237,7 +246,41 @@ function renderSheet(){
  const entryNames=new Set(state.entries.map(x=>x.personId));
  $("scan-count").textContent=names.length+" personas · "+entryNames.size+" con registro";
  renderEntries();renderApprovals();
+ renderRemoteRequests();
  if(state.isCoordinator)renderSupervisorControl();
+}
+const displayTime=value=>{
+ const date=value?.toDate?value.toDate():new Date(value);
+ return Number.isFinite(date.getTime())?new Intl.DateTimeFormat("es-MX",{
+  weekday:"short",day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"
+ }).format(date):"—";
+};
+function renderRemoteRequests(){
+ const target=$("scan-remote-entries");
+ if(!target)return;
+ const rows=[...state.remoteRequests].sort((a,b)=>(
+  (b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0)
+  )).slice(0,30);
+ target.innerHTML=rows.length?rows.map(item=>{
+  const statusLabel={pendiente:"Pendiente de revisión",validado:"Pase confirmado",rechazado:"Rechazado"}[item.status]||item.status;
+  const geo=item.location||{};
+  const detail=Number.isFinite(geo.lat)&&Number.isFinite(geo.lng)?
+   "GPS "+Number(geo.lat).toFixed(5)+", "+Number(geo.lng).toFixed(5)+
+   " · precisión ±"+Math.round(Number(geo.accuracy)||0)+" m":"GPS no disponible";
+  const mapUrl=Number.isFinite(geo.lat)&&Number.isFinite(geo.lng)?
+   "https://maps.google.com/?q="+encodeURIComponent(geo.lat+","+geo.lng):"";
+  const receipt="Pase de lista "+(item.status==="validado"?"confirmado":"solicitado")+
+   " · "+item.action+" · "+displayTime(item.capturedAt)+" · "+detail+
+   (item.reviewerName?" · Hecho por "+item.reviewerName:" · Responsable pendiente");
+  const actions=state.sheet.active&&item.status==="pendiente"&&item.ownerUid!==state.user.uid?
+   '<div class="attendance-row-actions"><button type="button" data-remote-review="validado" data-remote-id="'+esc(item.id)+'" class="profile-button profile-button-primary">Confirmar pase</button><button type="button" data-remote-review="rechazado" data-remote-id="'+esc(item.id)+'" class="profile-button profile-button-outline">Rechazar</button></div>':"";
+  return '<article class="attendance-row"><div><strong>'+esc(item.personName)+" · "+esc(item.action)+
+   '</strong><small>'+esc(statusLabel)+" · solicitado "+esc(displayTime(item.capturedAt))+" · "+esc(detail)+
+   '</small>'+(mapUrl?'<small><a href="'+esc(mapUrl)+'" target="_blank" rel="noopener noreferrer">Abrir ubicación en mapa</a></small>':"")+
+   (item.reviewerName?'<small>Responsable: '+esc(item.reviewerName)+" · revisó "+esc(displayTime(item.reviewedAt))+"</small>":"")+
+   (item.validationNote?'<small>Observación: '+esc(item.validationNote)+"</small>":"")+
+   '<small>'+esc(receipt)+'</small></div>'+actions+'</article>';
+ }).join(""):'<p class="role-empty">No hay solicitudes remotas en esta jornada.</p>';
 }
 function renderSupervisorControl(){
  const people=shiftPreview(state.schedule,state.sheet.eventId).people
@@ -298,8 +341,8 @@ function fillApproval(){
  const clock=clockFor(person);
  const entry=recordFor(person.personId,"entrada");
  const exit=recordFor(person.personId,"salida");
- $("scan-review-start").value=dateInput(clock?.startedAt||entry?.createdAt);
- $("scan-review-end").value=dateInput(clock?.endedAt||exit?.createdAt);
+ $("scan-review-start").value=dateInput(clock?.startedAt||entry?.capturedAt||entry?.createdAt);
+ $("scan-review-end").value=dateInput(clock?.endedAt||exit?.capturedAt||exit?.createdAt);
  $("scan-review-break").value="0";
  $("scan-review-notes").value="";
 }
@@ -310,11 +353,16 @@ async function configureSheet(){
  const preview=shiftPreview(state.schedule,id);
  if(preview.roster.length>100)throw Error("Esta jornada supera 100 integrantes: dividir la lista antes de habilitar.");
  const assigned=[...document.querySelectorAll('#scan-new-supervisors input:checked')].map(x=>x.value);
+ const validationMode=$("scan-validation-mode").value;
+ const remoteWindowMinutes=Number($("scan-remote-window").value);
+ if(!["presencial","remoto"].includes(validationMode)||![5,10,15,30].includes(remoteWindowMinutes))
+  throw Error("Elige un modo y una ventana de validación válidos.");
  const batch=writeBatch(db),stamp=serverTimestamp(),base=sheetRef(id);
  batch.set(base,{
   eventId:id,title:preview.title,site:preview.site,
   startsAt:Timestamp.fromDate(preview.startsAt),endsAt:Timestamp.fromDate(preview.endsAt),
   active:true,supervisorUids:assigned,
+  validationMode,remoteWindowMinutes,
   createdBy:state.user.uid,createdAt:stamp,
   updatedBy:state.user.uid,updatedAt:stamp,revision:1
  });
@@ -351,6 +399,18 @@ async function updateSupervisors(){
  notice("Permisos de supervisión actualizados.","success");
  await readSheets();await selectSheet(state.sheet.eventId);
 }
+function preciseLocation(){
+ if(!navigator.geolocation)throw Error("El dispositivo no ofrece ubicación GPS.");
+ return new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(position=>{
+  const {latitude:lat,longitude:lng,accuracy}=position.coords;
+  if(![lat,lng,accuracy].every(Number.isFinite)||accuracy>150){
+   reject(Error("La ubicación no fue lo bastante precisa. Activa GPS y vuelve a intentar."));return;
+  }
+  resolve({lat,lng,accuracy});
+ },error=>reject(Error(error.code===1?"Permite ubicación para registrar el pase.":
+  error.code===3?"La ubicación tardó demasiado; inténtalo otra vez.":"No se pudo obtener la ubicación.")),
+ {enableHighAccuracy:true,maximumAge:0,timeout:20000}));
+}
 async function toggleSheet(){
  if(!state.isCoordinator||!state.sheet)throw Error("Solo Coordinación administra la lista.");
  const eventId=state.sheet.eventId,active=!state.sheet.active;
@@ -371,15 +431,22 @@ async function registerEntry({person,source,action,activityKey="jornada",reason,
  if(!state.sheet||!state.allowed||!liveAccount())throw Error("Inicia sesión en una jornada autorizada.");
  if(!state.sheet.active)throw Error("Esta lista está cerrada.");
  const stamp=serverTimestamp();
- const draft=entryDraft({
+ const location=await preciseLocation();
+ const capturedAt=serverTimestamp();
+ const shownAt=Timestamp.fromDate(new Date());
+ const actorName=clean(state.user.displayName||state.user.email||"Responsable").slice(0,140);
+ const draft={...entryDraft({
   eventId:state.sheet.eventId,person,source,action,activityKey,
   reason,notes,actorUid:state.user.uid,stamp
- });
+ }),actorName,location,capturedAt};
  const ref=entryRef(state.sheet.eventId,draft.id);
  if((await getDocFromServer(ref)).exists())
   throw Error("Esta entrada, salida o actividad ya fue registrada. No se duplicó.");
  await setDoc(ref,draft);
- notice("Asistencia "+action+" guardada en Firebase. Pendiente de validación de Coordinación.","success");
+ notice("Pase de lista "+action+" registrado a las "+displayTime(shownAt)+
+  " · GPS "+location.lat.toFixed(5)+", "+location.lng.toFixed(5)+
+  " (±"+Math.round(location.accuracy)+" m) · hecho por "+actorName+
+  ". Pendiente de validación de Coordinación.","success");
  await refreshSheet();renderSheet();
 }
 async function manualEntry(){
@@ -422,6 +489,42 @@ async function reviewEntry(id,status){
  });
  notice("Registro "+(status==="validado"?"validado":"rechazado")+
   " por Coordinación. Sin aprobación de pago automática.","success");
+ await refreshSheet();renderSheet();
+}
+async function reviewRemoteRequest(id,status){
+ if(!state.sheet||!state.sheet.active||!state.allowed)throw Error("Jornada no disponible.");
+ const item=state.remoteRequests.find(x=>x.id===id&&x.status==="pendiente");
+ if(!item||item.ownerUid===state.user.uid)throw Error("No puedes validar tu propia solicitud.");
+ const reviewerName=clean(state.user.displayName||state.user.email||"Responsable").slice(0,140);
+ let note="";
+ if(status==="rechazado"){
+  note=prompt("Motivo del rechazo (obligatorio):","");
+  if(note===null)return;
+  note=clean(note).slice(0,600);
+  if(note.length<8)throw Error("Explica el rechazo con al menos 8 caracteres.");
+ }else{
+  if(!confirm("¿Confirmas este pase remoto con la ubicación GPS y hora reportada?"))return;
+  note=clean(prompt("Observación de validación (opcional):","")||"").slice(0,600);
+ }
+ const stamp=serverTimestamp(),batch=writeBatch(db);
+ batch.update(doc(db,"agora_ops_attendance_sheets",state.sheet.eventId,"remote_requests",id),{
+  status,reviewedBy:state.user.uid,reviewerName,reviewedAt:stamp,validationNote:note
+ });
+ if(status==="validado"){
+  const entryId=item.personId+"__"+item.action+"__jornada";
+  const entry={id:entryId,eventId:item.eventId,personId:item.personId,
+   ownerUid:item.ownerUid,personName:item.personName,source:"remoto",action:item.action,
+   activityKey:"jornada",reason:"",notes:item.notes||"",actorUid:state.user.uid,
+   actorName:reviewerName,createdAt:stamp,status:"validado",location:item.location,
+   capturedAt:item.capturedAt,validatedBy:state.user.uid,validatedAt:stamp,remoteRequestId:id};
+  batch.set(entryRef(state.sheet.eventId,entryId),entry);
+ }
+ await batch.commit();
+ const statusText=status==="validado"?"Pase de lista confirmado":"Solicitud remota rechazada";
+ notice(statusText+" · "+item.personName+" · "+item.action+" · "+
+  displayTime(item.capturedAt)+" · GPS "+Number(item.location.lat).toFixed(5)+", "+
+  Number(item.location.lng).toFixed(5)+" (±"+Math.round(Number(item.location.accuracy))+" m) · Hecho por "+reviewerName+".",
+  status==="validado"?"success":"warning");
  await refreshSheet();renderSheet();
 }
 async function approveHours(){
@@ -487,10 +590,12 @@ async function handleQR(raw){
  $("scan-qr-result").hidden=false;
  $("scan-qr-identity").textContent=person.name+" · "+state.sheet.title+
     (scan.activityKey?" · Actividad "+scan.activityKey:"");
- $("scan-qr-entry").hidden=!!scan.activityKey;
- $("scan-qr-exit").hidden=!!scan.activityKey;
- $("scan-qr-activity").hidden=!scan.activityKey;
- notice("QR vigente y asignación confirmada. Comprueba físicamente al colaborador.","success");
+ const remoteMode=state.sheet.validationMode==="remoto";
+ $("scan-qr-entry").hidden=remoteMode||!!scan.activityKey;
+ $("scan-qr-exit").hidden=remoteMode||!!scan.activityKey;
+ $("scan-qr-activity").hidden=remoteMode||!scan.activityKey;
+ notice(remoteMode?"QR vigente. El pase a distancia requiere solicitud GPS desde el dispositivo del Staff.":
+  "QR vigente y asignación confirmada. Comprueba físicamente al colaborador.","success");
 }
 async function qrEntry(action){
  if(!state.qr)throw Error("Escanea primero un QR válido.");
@@ -502,7 +607,8 @@ async function qrEntry(action){
   t:String(scan.issuedAt)
  }))url.searchParams.set(key,value);
  parseShiftQr(url.href,{origin:root.href,now:Date.now()});
- if(!confirm("¿Confirmas que "+person.name+" está físicamente presente?"))return;
+ if(state.sheet.validationMode==="remoto")throw Error("Esta jornada requiere solicitud remota desde el dispositivo del Staff.");
+ if(!confirm("¿Confirmas que "+person.name+" está físicamente presente y autorizas capturar la ubicación de este dispositivo?"))return;
  await registerEntry({
   person,source:"qr",action,
   activityKey:action==="actividad"?scan.activityKey:"jornada",
@@ -553,6 +659,14 @@ $("scan-logout").addEventListener("click",()=>act(async()=>{
 }));
 $("scan-sheets").addEventListener("change",e=>act(()=>selectSheet(e.target.value)));
 $("scan-new-event").addEventListener("change",previewNewSupervisors);
+$("scan-validation-mode").addEventListener("change",()=>{
+ const remote=$("scan-validation-mode").value==="remoto";
+ $("scan-remote-window").hidden=!remote;
+ $("scan-validation-help").textContent=remote?
+  "El Staff comparte una ubicación GPS puntual dentro de esta ventana. Si el responsable no responde enseguida, la solicitud permanece pendiente. La ubicación sola no valida asistencia.":
+  "El Supervisor o Coordinador escanea el QR o pasa lista en el lugar de la jornada.";
+});
+$("scan-remote-window").hidden=true;
 $("scan-configure").addEventListener("click",()=>act(configureSheet));
 $("scan-update-supervisors").addEventListener("click",()=>act(updateSupervisors));
 $("scan-toggle-active").addEventListener("click",()=>act(toggleSheet));
@@ -572,6 +686,11 @@ $("scan-refresh").addEventListener("click",()=>act(async()=>{
 $("scan-entries").addEventListener("click",e=>{
  const b=e.target.closest("[data-review]");
  if(!b)return;act(()=>reviewEntry(b.dataset.id,b.dataset.review));
+});
+$("scan-remote-entries").addEventListener("click",e=>{
+ const button=e.target.closest("[data-remote-review]");
+ if(!button)return;
+ act(()=>reviewRemoteRequest(button.dataset.remoteId,button.dataset.remoteReview));
 });
 $("scan-review-person").addEventListener("change",fillApproval);
 $("scan-approve-hours").addEventListener("click",()=>act(approveHours));

@@ -263,7 +263,7 @@ function renderAttendance(){
     '<p>Sede: '+esc(placeLabel(e))+'</p>'+
     '<p><b>Asignado por:</b> '+esc(assignedBy||"No registrado en esta asignación anterior")+'</p>'+
     (e.notes?'<p><b>Indicaciones:</b> '+esc(e.notes)+'</p>':"")+
-    (r?'<p><b>Marcaje anterior:</b> '+esc(r.status==="finalizada"?"salida registrada":"jornada abierta")+'. Se conserva como antecedente.</p>':"")+ 
+    (r?'<p><b>Marcaje anterior:</b> '+esc(r.status==="finalizada"?"salida registrada":"jornada abierta")+'. Se conserva como antecedente.</p>':"")+
     '<p><b>Asistencia:</b> tu Supervisor o Coordinador registrará entrada, descansos y salida. Presenta el QR de esta jornada desde Mi espacio.</p>'+
     '</div>';
   $("j-punches").innerHTML="";
