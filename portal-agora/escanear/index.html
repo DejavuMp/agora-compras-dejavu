@@ -5,70 +5,176 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
   <meta name="referrer" content="no-referrer">
-  <meta name="theme-color" content="#111214">
-  <meta name="description" content="Escáner autorizado de QR de jornadas de ÁGORA Dejavú.">
-  <title>ÁGORA · Escáner de jornadas</title>
+  <meta name="theme-color" content="#101113">
+  <meta name="description" content="Pase de lista por jornada: QR, manual y personal provisional, ÁGORA Dejavú.">
+  <title>ÁGORA · Pase de lista</title>
   <link rel="icon" href="../assets/icono-administrador-hq.webp" type="image/webp">
   <link rel="stylesheet" href="../style.css">
   <link rel="stylesheet" href="../perfil.css">
   <script type="module" src="../scan-jornada.js"></script>
 </head>
 <body>
-  <a class="skip" href="#scan-main">Ir al escáner</a>
+  <a class="skip" href="#scan-main">Ir al pase de lista</a>
   <header class="header">
-    <a class="brand" href="../" aria-label="Volver a ÁGORA">
+    <a class="brand" href="../" aria-label="Volver a Mi perfil">
       <img class="brand-mark" src="../assets/logo-agora-hq.webp" alt="ÁGORA Dejavú Marketing" width="144" height="54">
     </a>
-    <div class="session">
-      <span id="scan-session">Sin sesión</span>
+    <div class="session"><span id="scan-session">Sin sesión</span>
       <button type="button" id="scan-logout" hidden>Cerrar sesión</button>
     </div>
   </header>
   <main id="scan-main">
-    <section class="qr-scan-page">
+    <section class="qr-scan-page" aria-label="Pase de lista">
       <div class="profile-kicker">ÁGORA · OPERACIONES</div>
-      <h1>Escanear jornada</h1>
-      <p class="qr-scan-intro">Escanea el QR específico que te muestra cada colaborador. No uses el QR de su credencial de identificación.</p>
-      <div id="scan-status" class="qr-scan-status" role="status" aria-live="polite">Comprobando sesión…</div>
+      <h1>Pasar lista</h1>
+      <p class="qr-scan-intro">Una jornada, un control de asistencia. Puedes escanear un QR, pasar lista manualmente o registrar personal provisional.</p>
+      <div id="scan-status" class="qr-scan-status" role="status" aria-live="polite">Comprobando tu sesión…</div>
       <div id="scan-login" hidden class="qr-scan-access">
-        <h2>Acceso para coordinación</h2>
-        <p>El escaneo requiere una cuenta autorizada de Coordinación o Administración.</p>
-        <button type="button" id="scan-google" class="profile-button profile-button-primary">Acceder con Google</button>
+        <h2>Acceso a Operaciones</h2>
+        <p>La asistencia necesita una sesión autorizada de Supervisor, Coordinación o Administración.</p>
+        <button type="button" id="scan-google" class="profile-button profile-button-primary">Entrar con Google</button>
       </div>
       <div id="scan-restricted" hidden class="qr-scan-access">
-        <h2>No tienes permiso para registrar asistencia</h2>
-        <p>Administración debe asignarte un rol de coordinación. El puesto «Supervisor» por sí solo no concede permiso para modificar asistencia.</p>
-        <a class="profile-button profile-button-outline" href="../">Volver a mi perfil</a>
+        <h2>Sin jornadas de supervisión asignadas</h2>
+        <p>Coordinación deberá habilitar tu jornada y autorizar tu cuenta como Supervisor. Esta pantalla no te da acceso al cronograma general ni a los pagos.</p>
+        <a class="profile-button profile-button-outline" href="../">Volver a Mi perfil</a>
       </div>
       <div id="scan-workspace" hidden class="qr-scan-workspace">
-        <div class="qr-scan-actions">
-          <button type="button" id="scan-open-camera" class="profile-button profile-button-primary">Abrir cámara y escanear QR</button>
-          <span class="profile-muted">O pega el enlace del QR cuando no esté disponible la cámara.</span>
-        </div>
-        <div id="scan-camera" class="qr-scan-camera" hidden>
-          <video id="scan-video" autoplay playsinline muted aria-label="Vista de la cámara para escanear QR"></video>
-          <button type="button" class="profile-button profile-button-outline" id="scan-close-camera">Cerrar cámara</button>
-        </div>
-        <label class="qr-scan-manual" for="scan-input">Enlace de QR de jornada
-          <textarea id="scan-input" rows="2" placeholder="Pega aquí el enlace del QR de jornada" autocapitalize="off" autocomplete="off" spellcheck="false"></textarea>
-        </label>
-        <button type="button" id="scan-verify" class="profile-button profile-button-outline">Verificar jornada y asignación</button>
-        <section id="scan-result" class="qr-scan-result" hidden aria-labelledby="scan-review-heading">
-          <h2 id="scan-review-heading">Verificación presencial</h2>
-          <div class="qr-scan-identity" id="scan-identity"></div>
-          <p>Comprueba que quien presenta el QR es la persona asignada y que está físicamente presente. Este QR no es una identificación personal.</p>
-          <div class="qr-scan-submit">
-            <button type="button" id="scan-entry" class="profile-button profile-button-primary" hidden>Confirmar entrada por QR</button>
-            <button type="button" id="scan-exit" class="profile-button profile-button-primary" hidden>Confirmar salida por QR</button>
-            <button type="button" id="scan-activity" class="profile-button profile-button-primary" hidden>Confirmar actividad por QR</button>
+        <span id="scan-role" class="attendance-role">Operación</span>
+        <section id="scan-coordinator" class="attendance-setup" hidden aria-label="Habilitar jornadas y supervisores">
+          <details>
+            <summary>Preparar jornada y asignar supervisor</summary>
+            <div class="attendance-setup-content">
+              <p>Usa las jornadas ya capturadas en Operaciones. Se publica solamente el nombre y el horario del personal asignado, sin tarifas ni expedientes.</p>
+              <label for="scan-new-event">Jornada del cronograma</label>
+              <select id="scan-new-event"><option value="">Selecciona jornada…</option></select>
+              <div class="attendance-section-caption">Supervisores autorizados para esta jornada</div>
+              <div id="scan-new-supervisors" class="attendance-supervisor-list"></div>
+              <button type="button" data-write id="scan-configure" class="profile-button profile-button-primary">Habilitar pase de lista</button>
+            </div>
+          </details>
+        </section>
+        <section class="attendance-current">
+          <div class="attendance-current-head">
+            <label for="scan-sheets">Jornada activa
+              <select id="scan-sheets"><option value="">Selecciona una jornada…</option></select>
+            </label>
+            <button type="button" id="scan-refresh" class="profile-button profile-button-outline">Actualizar</button>
           </div>
-          <p class="profile-muted">La validación queda guardada con hora de Firebase y responsable de coordinación. Es distinta del reloj oficial de Jornadas.</p>
+        </section>
+        <section id="scan-event-content" hidden>
+          <div class="attendance-event-intro">
+            <div>
+              <h2 id="scan-event-title"></h2>
+              <p id="scan-event-meta"></p>
+              <small id="scan-count"></small>
+            </div>
+            <span id="scan-active-status" class="attendance-role"></span>
+          </div>
+          <details id="scan-supervisors" class="attendance-setup" hidden>
+            <summary>Permisos de supervisión</summary>
+            <div class="attendance-setup-content">
+              <p>Solo las cuentas seleccionadas podrán pasar lista en esta jornada. No verán tarifas ni datos de pagos.</p>
+              <div id="scan-supervisor-options" class="attendance-supervisor-list"></div>
+              <button type="button" data-write id="scan-update-supervisors" class="profile-button profile-button-outline">Guardar supervisores autorizados</button>
+            </div>
+          </details>
+          <div class="attendance-methods">
+            <details open>
+              <summary><span>1</span> Escanear QR de jornada</summary>
+              <div class="attendance-method-content">
+                <p>Confirma la presencia del colaborador. El QR de identificación personal no funciona aquí.</p>
+                <div class="qr-scan-actions">
+                  <button type="button" id="scan-open-camera" class="profile-button profile-button-primary"><span aria-hidden="true">▣</span> Abrir cámara</button>
+                </div>
+                <div id="scan-camera" class="qr-scan-camera" hidden>
+                  <video id="scan-video" autoplay playsinline muted aria-label="Vista de cámara para leer QR"></video>
+                  <button type="button" id="scan-close-camera" class="profile-button profile-button-outline">Cerrar cámara</button>
+                </div>
+                <label class="qr-scan-manual" for="scan-input">O pega el enlace del QR
+                  <textarea id="scan-input" rows="2" placeholder="Enlace del QR de jornada o actividad" spellcheck="false" autocapitalize="off"></textarea>
+                </label>
+                <button type="button" id="scan-verify" class="profile-button profile-button-outline">Verificar QR</button>
+                <section id="scan-qr-result" class="attendance-qr-result" hidden>
+                  <strong>Colaborador asignado</strong>
+                  <p id="scan-qr-identity"></p>
+                  <p>Confirma presencialmente la identidad antes de registrar.</p>
+                  <div class="attendance-qr-actions">
+                    <button type="button" data-write id="scan-qr-entry" class="profile-button profile-button-primary">Registrar entrada</button>
+                    <button type="button" data-write id="scan-qr-exit" class="profile-button profile-button-outline">Registrar salida</button>
+                    <button type="button" data-write id="scan-qr-activity" class="profile-button profile-button-primary">Confirmar actividad</button>
+                  </div>
+                </section>
+              </div>
+            </details>
+            <details>
+              <summary><span>2</span> Pase de lista manual</summary>
+              <div class="attendance-method-content">
+                <p>Para personal sin QR o sin teléfono. No necesita crear otra cuenta.</p>
+                <label for="scan-person">Colaborador</label>
+                <select id="scan-person"><option value="">Selecciona una persona…</option></select>
+                <label for="scan-manual-action">Registro</label>
+                <select id="scan-manual-action">
+                  <option value="entrada">Entrada</option>
+                  <option value="salida">Salida</option>
+                  <option value="actividad">Actividad completada</option>
+                </select>
+                <label for="scan-activity-options">Actividad de la misma jornada</label>
+                <select id="scan-activity-options"><option value="jornada">Jornada completa</option></select>
+                <label for="scan-manual-reason">Motivo del registro manual</label>
+                <input type="text" id="scan-manual-reason" maxlength="400" placeholder="Ej. No contaba con teléfono ni QR">
+                <label for="scan-manual-notes">Observaciones (opcional)</label>
+                <textarea id="scan-manual-notes" maxlength="400" rows="2" placeholder="Detalle breve"></textarea>
+                <button type="button" data-write id="scan-create-entry" class="profile-button profile-button-primary">Registrar asistencia manual</button>
+              </div>
+            </details>
+            <details>
+              <summary><span>3</span> Persona no encontrada</summary>
+              <div class="attendance-method-content">
+                <p>Registra una presencia provisional. Coordinación deberá verificar la asignación y la identidad antes de validar horas para pago.</p>
+                <label for="scan-provisional-name">Nombre completo</label>
+                <input type="text" id="scan-provisional-name" maxlength="140" placeholder="Nombre del colaborador">
+                <label for="scan-provisional-reason">Por qué no aparece en la lista</label>
+                <textarea id="scan-provisional-reason" maxlength="400" rows="3" placeholder="Quién solicitó el apoyo y por qué no estaba asignado"></textarea>
+                <button type="button" data-write id="scan-register-provisional" class="profile-button profile-button-primary">Registrar entrada provisional</button>
+              </div>
+            </details>
+          </div>
+          <section class="attendance-history">
+            <h2>Asistencias registradas</h2>
+            <p>Entrada, salida o actividad registrada con hora de Firebase y supervisor responsable. Son registros pendientes hasta que Coordinación los valide.</p>
+            <div id="scan-entries" aria-live="polite"></div>
+          </section>
+          <section id="scan-payment-panel" class="attendance-payment" hidden>
+            <h2>Validación de horas para pago</h2>
+            <p>Solo Coordinación. Selecciona una persona con entrada y salida verificadas o con reloj oficial concluido. No se muestran ni modifican tarifas o cuentas bancarias.</p>
+            <div id="scan-approvals"></div>
+            <label for="scan-review-person">Colaborador con asistencia completa</label>
+            <select id="scan-review-person"><option value="">Seleccionar…</option></select>
+            <div class="attendance-time-grid">
+              <label for="scan-review-start">Entrada revisada
+                <input type="datetime-local" id="scan-review-start">
+              </label>
+              <label for="scan-review-end">Salida revisada
+                <input type="datetime-local" id="scan-review-end">
+              </label>
+            </div>
+            <label for="scan-review-break">Descanso en minutos
+              <input type="number" id="scan-review-break" value="0" min="0" max="600" step="1">
+            </label>
+            <label for="scan-review-notes">Observaciones y correcciones
+              <textarea id="scan-review-notes" maxlength="600" rows="2" placeholder="Justificación de correcciones, si existen"></textarea>
+            </label>
+            <button type="button" data-write id="scan-approve-hours" class="profile-button profile-button-primary">Validar horas para revisión de pago</button>
+            <button type="button" id="scan-copy-payroll" class="profile-button profile-button-outline">Copiar resumen para el módulo de pagos</button>
+            <p class="role-help">Esta acción valida horas, no autoriza ni realiza transferencias. Los pagos se gestionan en su módulo separado.</p>
+          </section>
         </section>
       </div>
-      <p class="qr-scan-foot">Se conservarán las entradas y salidas anteriores. El escaneo no crea jornadas nuevas ni cambia su horario original.</p>
+      <p class="qr-scan-foot">La credencial digital sirve únicamente para identificación. Los marcajes originales de Jornadas se conservan, y el pase de lista nuevo no los sobrescribe.</p>
     </section>
   </main>
-  <footer>ÁGORA · Dejavú Marketing · Control presencial por coordinación</footer>
-  <noscript>Activa JavaScript para usar el escáner.</noscript>
+  <footer>© Dejavú Marketing · ÁGORA · Jornada y asistencia</footer>
+  <noscript>Activa JavaScript para utilizar el pase de lista.</noscript>
 </body>
 </html>
