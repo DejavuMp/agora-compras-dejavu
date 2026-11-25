@@ -154,5 +154,37 @@ try{
  }));
  await no("otro personal no ve actividades ajenas",getDoc(activity(other)));
  await yes("coordinador consulta actividades",getDoc(activity(coord)));
+
+ const requestId="12345678-1234-4234-9234-1234567890ab";
+ const reqRef=db=>doc(db,"agora_ops_assignment_requests",requestId);
+ const requestData=()=>({
+  id:requestId,requester:"Cliente KFC",channel:"WhatsApp",
+  contact:"",requestedAt:"2026-11-25T08:45",
+  project:"Activación de prueba",site:"Oficina Dejavú",
+  date:"2026-11-25",start:"09:00",end:"18:00",
+  headcount:3,description:"Solicitó personal para oficina",
+  activities:["Cotizar","Coordinar materiales"],
+  evidenceNote:"Captura recibida por mensaje",
+  evidenceImage:"data:image/jpeg;base64,"+"A".repeat(120),
+  capturedBy:"coordAs",createdAt:serverTimestamp(),
+  status:"pendiente",linkedEventId:"",
+  updatedAt:serverTimestamp(),updatedBy:"coordAs"
+ });
+ await no("supervisor no crea solicitudes administrativas",setDoc(reqRef(sup),{
+  ...requestData(),capturedBy:"supAs",updatedBy:"supAs"
+ }));
+ await yes("coordinación guarda solicitud con captura privada",setDoc(reqRef(coord),requestData()));
+ await yes("coordinación consulta solicitud y evidencia",getDoc(reqRef(coord)));
+ await no("supervisor no consulta capturas ni contactos privados",getDoc(reqRef(sup)));
+ await no("personal Staff no consulta las solicitudes de coordinación",getDoc(reqRef(staff)));
+ await no("coordinación no puede reemplazar captura histórica",updateDoc(reqRef(coord),{
+  evidenceNote:"Reescribir evidencia",updatedAt:serverTimestamp(),updatedBy:"coordAs"
+ }));
+ await yes("coordinación vincula solicitud a una jornada publicada",updateDoc(reqRef(coord),{
+  status:"confirmada",linkedEventId:eventId,
+  updatedAt:serverTimestamp(),updatedBy:"coordAs"
+ }));
+ await no("coordinación no puede borrar solicitud",setDoc(reqRef(coord),requestData()));
+
  console.log("ÁGORA asistencia: "+passed+" controles de seguridad en emulador.");
 }finally{await env.cleanup()}
