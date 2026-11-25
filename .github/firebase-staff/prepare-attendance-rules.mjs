@@ -206,7 +206,7 @@ if(stage){
   expectedHash:sha(reconciled),blockHash:sha(block),
   oldRuleBytes:Buffer.byteLength(live.content),
   newRuleBytes:Buffer.byteLength(reconciled),
-  strategy:"staff-validation-deny plus attendance-before-explicit-deny-all"
+  strategy:"staff-validation-deny+ops-paymentDueDate+safe-email-verified+attendance"
  };
  writeFileSync(expectedFile,reconciled,"utf8");
  writeFileSync(stateFile,JSON.stringify(state,null,2)+"\n","utf8");
