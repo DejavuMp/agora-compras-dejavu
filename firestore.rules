@@ -995,7 +995,8 @@ match /agora_finance_requests/{requestId} {
         get(identityLinkPath(request.auth.uid)).data.agoraId == agoraId;
     }
     function identityAssigned(record) {
-      return identityCoordinator() && request.auth.uid in record.coordinatorUids;
+      return identityCoordinator() && record.coordinatorUids is list &&
+        request.auth.uid in record.coordinatorUids;
     }
     function validIdentityAuditAfter(auditId,targetUid,agoraId) {
       return auditId is string && auditId.size() >= 24 && auditId.size() <= 64 &&
