@@ -1178,3 +1178,9 @@ body:not(.login-mode) footer{
  .qr-scan-submit{display:grid}
  .qr-scan-submit button{width:100%}
 }
+
+/* Mantener controles de cámara, sesión y confirmación realmente ocultos. */
+.qr-scan-page [hidden],
+.role-dialog [hidden]{
+ display:none !important;
+}
