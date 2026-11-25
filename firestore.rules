@@ -1666,14 +1666,7 @@ match /agora_finance_requests/{requestId} {
     function attendanceProvisional(d) {
       return d.source == 'provisional' &&
         d.ownerUid == '' &&
-        d.personId.matches('^prov_[a-f0-9]{20}
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
-) &&
+        d.personId.matches('^prov_[a-f0-9]{20}$') &&
         d.reason.size() >= 10;
     }
     function attendanceEntryCreate(eventId,id) {
@@ -1689,25 +1682,11 @@ match /agora_finance_requests/{requestId} {
         ]) &&
         d.id == id && d.eventId == eventId &&
         d.personId is string &&
-        d.personId.matches('^[A-Za-z0-9_-]{1,90}
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
-) &&
+        d.personId.matches('^[A-Za-z0-9_-]{1,90}$') &&
         d.personName is string && d.personName.size() >= 2 && d.personName.size() <= 140 &&
         d.action in ['entrada','salida','actividad'] &&
         d.activityKey is string &&
-        d.activityKey.matches('^[A-Za-z0-9_-]{1,80}
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
-) &&
+        d.activityKey.matches('^[A-Za-z0-9_-]{1,80}$') &&
         ((d.action in ['entrada','salida'] && d.activityKey == 'jornada') ||
          (d.action == 'actividad' && d.activityKey != 'jornada')) &&
         id == d.personId + '__' + d.action + '__' + d.activityKey &&
@@ -1739,14 +1718,7 @@ match /agora_finance_requests/{requestId} {
          request.auth.uid in resource.data.supervisorUids &&
          exists(identityLinkPath(request.auth.uid)) &&
          get(identityLinkPath(request.auth.uid)).data.active == true);
-      allow create: if canEdit() && eventId.matches('^[A-Za-z0-9_-]{1,100}
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
-) &&
+      allow create: if canEdit() && eventId.matches('^[A-Za-z0-9_-]{1,100}$') &&
         request.resource.data.keys().hasOnly([
           'eventId','title','site','startsAt','endsAt','active',
           'supervisorUids','createdBy','createdAt','updatedBy','updatedAt','revision'
@@ -1790,14 +1762,7 @@ match /agora_finance_requests/{requestId} {
         allow get, list: if canEdit() || attendanceSupervisor(eventId);
         allow create: if canEdit() &&
           existsAfter(attendanceSheetPath(eventId)) &&
-          personId.matches('^[A-Za-z0-9_-]{1,90}
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
-) &&
+          personId.matches('^[A-Za-z0-9_-]{1,90}$') &&
           request.resource.data.keys().hasOnly([
             'eventId','personId','uid','name','activityKeys','createdBy','createdAt'
           ]) &&
@@ -1835,64 +1800,7 @@ match /agora_finance_requests/{requestId} {
         allow get, list: if canEdit() || attendanceSupervisor(eventId) ||
           (opsStaff() && resource.data.uid == request.auth.uid);
         allow create: if
-          activityId.matches('^[A-Za-z0-9_-]{10,70}
-        allow get, list: if canEdit();
-        allow create: if canEdit() &&
-          personId.matches('^[A-Za-z0-9_-]{1,90}
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
-) &&
-          request.resource.data.keys().hasOnly([
-            'eventId','personId','personName','startAt','endAt',
-            'breakMinutes','approvedMinutes','notes','status',
-            'approvedBy','approvedAt','source'
-          ]) &&
-          request.resource.data.keys().hasAll([
-            'eventId','personId','personName','startAt','endAt',
-            'breakMinutes','approvedMinutes','notes','status',
-            'approvedBy','approvedAt','source'
-          ]) &&
-          request.resource.data.eventId == eventId &&
-          request.resource.data.personId == personId &&
-          request.resource.data.personName is string &&
-          request.resource.data.personName.size() >= 2 &&
-          request.resource.data.personName.size() <= 140 &&
-          request.resource.data.startAt is timestamp &&
-          request.resource.data.endAt is timestamp &&
-          request.resource.data.endAt > request.resource.data.startAt &&
-          request.resource.data.endAt <= request.resource.data.startAt +
-            duration.value(36,'h') &&
-          request.resource.data.breakMinutes is int &&
-          request.resource.data.breakMinutes >= 0 &&
-          request.resource.data.breakMinutes <= 600 &&
-          request.resource.data.approvedMinutes is int &&
-          request.resource.data.approvedMinutes > 0 &&
-          request.resource.data.approvedMinutes <= 1440 &&
-          request.resource.data.notes is string &&
-          request.resource.data.notes.size() <= 600 &&
-          request.resource.data.status == 'horas_validadas' &&
-          request.resource.data.source in ['qr','manual','provisional','reloj'] &&
-          request.resource.data.approvedBy == request.auth.uid &&
-          request.resource.data.approvedAt == request.time &&
-          ((attendanceValidated(eventId,personId,'entrada') &&
-            attendanceValidated(eventId,personId,'salida')) ||
-           attendanceClockCompleted(eventId,personId));
-        allow update, delete: if false;
-      }
-    }
-
-    // Todas las demás colecciones permanecen cerradas.
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
-) &&
+          activityId.matches('^[A-Za-z0-9_-]{10,70}$') &&
           request.resource.data.keys().hasOnly([
             'id','eventId','personId','uid','name','status','createdAt','createdBy',
             'updatedAt','updatedBy'
@@ -1903,64 +1811,7 @@ match /agora_finance_requests/{requestId} {
           ]) &&
           request.resource.data.id == activityId &&
           request.resource.data.eventId == eventId &&
-          request.resource.data.personId.matches('^[A-Za-z0-9_-]{1,90}
-        allow get, list: if canEdit();
-        allow create: if canEdit() &&
-          personId.matches('^[A-Za-z0-9_-]{1,90}
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
-) &&
-          request.resource.data.keys().hasOnly([
-            'eventId','personId','personName','startAt','endAt',
-            'breakMinutes','approvedMinutes','notes','status',
-            'approvedBy','approvedAt','source'
-          ]) &&
-          request.resource.data.keys().hasAll([
-            'eventId','personId','personName','startAt','endAt',
-            'breakMinutes','approvedMinutes','notes','status',
-            'approvedBy','approvedAt','source'
-          ]) &&
-          request.resource.data.eventId == eventId &&
-          request.resource.data.personId == personId &&
-          request.resource.data.personName is string &&
-          request.resource.data.personName.size() >= 2 &&
-          request.resource.data.personName.size() <= 140 &&
-          request.resource.data.startAt is timestamp &&
-          request.resource.data.endAt is timestamp &&
-          request.resource.data.endAt > request.resource.data.startAt &&
-          request.resource.data.endAt <= request.resource.data.startAt +
-            duration.value(36,'h') &&
-          request.resource.data.breakMinutes is int &&
-          request.resource.data.breakMinutes >= 0 &&
-          request.resource.data.breakMinutes <= 600 &&
-          request.resource.data.approvedMinutes is int &&
-          request.resource.data.approvedMinutes > 0 &&
-          request.resource.data.approvedMinutes <= 1440 &&
-          request.resource.data.notes is string &&
-          request.resource.data.notes.size() <= 600 &&
-          request.resource.data.status == 'horas_validadas' &&
-          request.resource.data.source in ['qr','manual','provisional','reloj'] &&
-          request.resource.data.approvedBy == request.auth.uid &&
-          request.resource.data.approvedAt == request.time &&
-          ((attendanceValidated(eventId,personId,'entrada') &&
-            attendanceValidated(eventId,personId,'salida')) ||
-           attendanceClockCompleted(eventId,personId));
-        allow update, delete: if false;
-      }
-    }
-
-    // Todas las demás colecciones permanecen cerradas.
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
-) &&
+          request.resource.data.personId.matches('^[A-Za-z0-9_-]{1,90}$') &&
           request.resource.data.uid is string &&
           request.resource.data.uid.size() > 0 &&
           exists(attendanceRosterPath(eventId,request.resource.data.personId)) &&
@@ -1992,14 +1843,7 @@ match /agora_finance_requests/{requestId} {
       match /approvals/{personId} {
         allow get, list: if canEdit();
         allow create: if canEdit() &&
-          personId.matches('^[A-Za-z0-9_-]{1,90}
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-
-) &&
+          personId.matches('^[A-Za-z0-9_-]{1,90}$') &&
           request.resource.data.keys().hasOnly([
             'eventId','personId','personName','startAt','endAt',
             'breakMinutes','approvedMinutes','notes','status',
