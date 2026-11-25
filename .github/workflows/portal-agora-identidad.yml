@@ -31,6 +31,9 @@ jobs:
           node --check portal-agora/attendance-policy.mjs
           node --check portal-agora/attendance-live.js
           node --check portal-agora/attendance-roster.js
+          node --check portal-agora/qr-jornada.mjs
+          node --check portal-agora/staff-shift-qr.js
+          node --check portal-agora/scan-jornada.js
           node --check portal-agora/firebase.js
           node --check portal-agora/verify.js
       - name: Comprobar autonomía y permisos mínimos
