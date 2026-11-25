@@ -8,6 +8,7 @@ import {saveProfile,saveFinancial} from "../identidad/firebase-identity.js";
 import {projectTodayAssignments} from "../identidad/domain.mjs";
 import {ownJornadas,coordinationJornadas,operationTotals,validateAssignmentDraft,assignmentDraftText,REQUEST_CHANNELS} from "./roles-operacion.mjs";
 import {mountOwnAttendance} from "./attendance-live.js";
+import {mountRoster} from "./attendance-roster.js";
 
 // Una sola identidad Firebase para todas las vistas. Sin módulos operativos.
 const ROOT=new URL("./",import.meta.url);
@@ -632,10 +633,16 @@ function coordinationOperationsSpace(admin=false){
       (list.length?'<div class="role-jornada-list">'+list.slice(0,6).map(scheduleCard).join("")+'</div>'+
         (list.length>6?'<details class="role-more-jornadas"><summary>Ver otras jornadas ('+(list.length-6)+')</summary><div class="role-jornada-list">'+list.slice(6).map(scheduleCard).join("")+'</div></details>':""):
        '<p class="role-empty">No hay jornadas próximas en el cronograma operativo.</p>')+
-      '<div class="role-legacy-links"><a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/"))+'" target="_blank" rel="noopener noreferrer">Editar agenda vigente ↗</a>'+
+      '<div class="role-legacy-links"><button type="button" data-action="view-attendance" class="profile-button profile-button-primary">Pase de lista · Entradas y salidas</button>'+
+        '<a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/"))+'" target="_blank" rel="noopener noreferrer">Editar agenda vigente ↗</a>'+
         '<a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/control-jornadas.html"))+'" target="_blank" rel="noopener noreferrer">Control de asistencia ↗</a></div>'+
       '<p class="role-transition">El cronograma original continúa como fuente oficial de asignaciones. Las solicitudes nuevas permanecen en borrador hasta habilitar su registro y aprobación seguros.</p>'+
-      assignmentDialog():
+      assignmentDialog()+
+      '<dialog id="attendance-roster-dialog" class="role-dialog" aria-labelledby="attendance-roster-title">'+
+        '<div class="role-dialog-head"><div><strong id="attendance-roster-title">Pase de lista</strong>'+
+          '<p>Entradas y salidas oficiales por jornada, actualizadas desde Firebase.</p></div>'+
+          '<button type="button" data-action="close-attendance-roster" aria-label="Cerrar pase de lista">×</button></div>'+
+        '<div id="attendance-roster-content"></div></dialog>':
       '<p class="role-empty">Esta cuenta tiene permisos de consulta, no de coordinación. No puede crear ni modificar asignaciones.</p>')+
   '</section>';
 }
@@ -705,6 +712,20 @@ app.addEventListener("click",event=>{
   const target=event.target.closest("[data-action]");
   if(!target)return;
   const task=target.dataset.action;
+  if(task==="view-attendance"){
+    if(!["admin","coordinador"].includes(role())||!allowed(routeSpace))return;
+    const dialog=document.getElementById("attendance-roster-dialog");
+    const target=document.getElementById("attendance-roster-content");
+    if(!dialog||!target)return;
+    if(dialog.showModal)dialog.showModal();else dialog.setAttribute("open","");
+    mountRoster({db,target,schedule:state.roleData?.schedule});
+    return;
+  }
+  if(task==="close-attendance-roster"){
+    const dialog=document.getElementById("attendance-roster-dialog");
+    if(dialog?.close)dialog.close();else dialog?.removeAttribute("open");
+    return;
+  }
   if(task==="new-assignment"){
     if(!["admin","coordinador"].includes(role())||!allowed(routeSpace))return;
     const dlg=document.getElementById("assignment-dialog");
