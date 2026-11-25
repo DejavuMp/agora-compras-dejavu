@@ -34,29 +34,26 @@ if(process.env.GITHUB_REF!=="refs/heads/main"||
  throw Error("Publicación limitada a ejecución manual desde main.");
 const sha=s=>createHash("sha256").update(s,"utf8").digest("hex");
 function protectIncidentValidation(content){
- const matches=[...content.matchAll(/match\\s+\\/agora_ops_incidents\\/\\{[^}]+\\}\\s*\\{/g)];
+ const matches=[...content.matchAll(/match\s+\/agora_ops_incidents\/\{[^}]+\}\s*\{/g)];
  if(matches.length!==1)
   throw Error("No se reconoce una única regla de incidentes; conservar producción y detener.");
  const start=matches[0].index;
- const close=content.indexOf("\\n    }\\n",start);
- if(close<0||content.indexOf("\\n    match ",start)<0||
-    content.indexOf("\\n    match ",start)<close)
+ const close=content.indexOf("\n    }\n",start);
+ const nextMatch=content.indexOf("\n    match ",start);
+ if(close<0||(nextMatch>=0&&nextMatch<close))
   throw Error("No se reconoce el límite de la regla de incidentes; detener.");
- const block=content.slice(start,close+6);
- const create=/allow create: if ([\\s\\S]*?);/g;
- let count=0,protectedCount=0;
+ const block=content.slice(start,close+7);
+ const create=/allow create: if ([\s\S]*?);/g;
+ let count=0;
  const updated=block.replace(create,(whole,expr)=>{
   count++;
-  if(expr.includes("canEdit() || request.resource.data.type != 'validacion_asistencia'")){
-   protectedCount++;
+  if(expr.includes("(canEdit() || request.resource.data.type != 'validacion_asistencia')"))
    return whole;
-  }
-  protectedCount++;
-  return "allow create: if ("+expr+") &&\\n        (canEdit() || request.resource.data.type != 'validacion_asistencia');";
+  return "allow create: if ("+expr+") &&\n        (canEdit() || request.resource.data.type != 'validacion_asistencia');";
  });
- if(count===0||protectedCount!==count)
-  throw Error("No se encontró autorización de creación verificable para incidentes; detener.");
- return content.slice(0,start)+updated+content.slice(close+6);
+ if(count===0)
+  throw Error("No se encontró autorización de creación de incidentes; detener.");
+ return content.slice(0,start)+updated+content.slice(close+7);
 }
 
 const candidate=readFileSync(stage?dir+"/firestore-repositorio.rules":"firestore.rules","utf8");
@@ -160,12 +157,12 @@ if(stage){
    "function attendanceValidated(",
    "function attendanceClockCompleted("
   ];
-  if(reserved.some(key=>live.content.includes(key)))
+  if(reserved.some(key=>protectedLive.includes(key)))
    throw Error("Nombres de asistencia ya utilizados por las reglas reales.");
-  // Única modificación autorizada: adición literal antes del cierre final.
-  reconciled=live.content.slice(0,index)+block+live.content.slice(index);
-  if(reconciled.slice(0,index)+reconciled.slice(index+block.length)!==live.content)
-   throw Error("La conciliación alteró alguna regla anterior.");
+  // La autorización existente se estrecha arriba; asistencia se inserta al cierre.
+  reconciled=protectedLive.slice(0,index)+block+protectedLive.slice(index);
+  if(reconciled.slice(0,index)+reconciled.slice(index+block.length)!==protectedLive)
+   throw Error("La conciliación alteró reglas fuera de la excepción autorizada.");
   mode="deploy";
  }
  const state={
