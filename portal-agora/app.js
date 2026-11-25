@@ -673,9 +673,9 @@ function assignmentDialog(){
   const localDate=[now.getFullYear(),String(now.getMonth()+1).padStart(2,"0"),String(now.getDate()).padStart(2,"0")].join("-");
   return '<dialog class="role-dialog" id="assignment-dialog" aria-label="Asignaciones de jornada">'+
     '<div class="role-dialog-head"><div><strong>Asignaciones de jornada</strong>'+
-      '<p>Registra la solicitud como borrador previo a la autorización.</p></div>'+
+      '<p>Guarda el origen de la solicitud y vincúlala después a una jornada publicada.</p></div>'+
       '<button type="button" data-action="close-assignment" aria-label="Cerrar formulario">×</button></div>'+
-    '<div class="role-draft-warning" role="note">Todavía no se guardan solicitudes ni evidencias en Firebase. Este borrador puede copiarse, pero no publica jornadas ni asigna personal.</div>'+
+    '<div class="role-draft-warning" role="note">La solicitud sí se guarda en Firebase de forma privada. No publica ni autoriza automáticamente una jornada.</div>'+
     '<form id="assignment-form" class="role-assignment-form">'+
       '<label>Quién solicita<input name="requester" required maxlength="140" placeholder="Nombre de la persona o cliente"></label>'+
       '<label>Medio de solicitud<select name="channel" required>'+
@@ -694,13 +694,16 @@ function assignmentDialog(){
         '<div id="assignment-activities" class="role-activity-inputs"></div>'+
         '<p class="role-help">Puedes agregar tantas actividades como necesites, incluso cuando el trabajo ya haya comenzado. Este formulario no registra todavía su ejecución.</p></div>'+
       '<label class="role-wide">Descripción de evidencia recibida<textarea name="evidenceNote" rows="2" maxlength="400" placeholder="Ej.: solicitud por llamada el día… o captura de WhatsApp disponible"></textarea></label>'+
-      '<div class="role-wide"><label>Adjuntar captura, correo o audio <input type="file" disabled aria-disabled="true"></label>'+
-        '<small class="role-help">La carga privada de archivos se habilitará cuando existan permisos de Storage validados. No se publicarán archivos en enlaces abiertos.</small></div>'+
-      '<div class="role-wide role-dialog-actions"><button type="submit" class="profile-button profile-button-primary">Preparar borrador</button></div>'+
+      '<div class="role-wide"><label>Adjuntar captura de solicitud (opcional)<input id="assignment-evidence" name="attachment" type="file" accept="image/jpeg,image/png,image/webp"></label>'+
+        '<small class="role-help">La captura se comprime a JPEG y se almacena privada en la solicitud (máximo 170 KB). Audio/PDF siguen sin carga en este formulario; registra la información por escrito.</small></div>'+
+      '<div class="role-wide role-dialog-actions"><button type="submit" class="profile-button profile-button-primary">Guardar solicitud</button></div>'+
     '</form>'+
-    '<div id="assignment-result" hidden><h3>Solicitud preparada · No guardada</h3>'+
+    '<div id="assignment-result" hidden><h3>Solicitud guardada · Pendiente de asignación</h3>'+
       '<textarea id="assignment-preview" rows="12" readonly aria-label="Texto del borrador"></textarea>'+
       '<button type="button" data-action="copy-assignment" class="profile-button profile-button-outline">Copiar texto</button></div>'+
+    '<div class="assignment-history-header"><strong>Historial de solicitudes</strong>'+
+      '<button type="button" class="profile-button profile-button-outline" data-action="load-assignment-requests">Actualizar historial</button></div>'+
+    '<div id="assignment-history" class="assignment-history"></div>'+
   '</dialog>';
 }
 function coordinationOperationsSpace(admin=false){
@@ -852,10 +855,19 @@ app.addEventListener("click",event=>{
     if(dialog?.close)dialog.close();else dialog?.removeAttribute("open");
     return;
   }
+  if(task==="load-assignment-requests"){
+    if(!["admin","coordinador"].includes(role())||!allowed(routeSpace))return;
+    return run(showAssignmentHistory);
+  }
+  if(task==="confirm-assignment"||task==="cancel-assignment"){
+    return requestStatusChange(clean(target.dataset.requestId),
+      task==="confirm-assignment"?"confirmada":"cancelada");
+  }
   if(task==="new-assignment"){
     if(!["admin","coordinador"].includes(role())||!allowed(routeSpace))return;
     const dlg=document.getElementById("assignment-dialog");
     if(dlg?.showModal)dlg.showModal();else dlg?.setAttribute("open","");
+    run(showAssignmentHistory);
     return;
   }
   if(task==="close-assignment"){
