@@ -123,8 +123,8 @@ if(stage){
  }else{
   // Rechazar cualquier colisión con helpers o colecciones previas.
   const reserved=[
-   "match /agora_ops_attendance_sheets/",
-   "match /agora_ops_assignment_requests/",
+   "match /agora_ops_attendance_sheets/{",
+   "match /agora_ops_assignment_requests/{",
    "function attendanceSupervisor(",
    "function attendanceEntryCreate(",
    "function attendanceSheetPath(",
