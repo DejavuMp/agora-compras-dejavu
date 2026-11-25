@@ -231,7 +231,10 @@ test("Staff, Agencia y Administrador conectan al mismo Firestore sin escrituras 
   assert.match(app,/data-draft-activity/);
   assert.match(app,/validateAssignmentDraft/);
   assert.match(app,/Borrador preparado\. No se ha guardado en Firebase/);
-  assert.match(app,/La carga privada de archivos se habilitará/);
+  assert.match(app,/compressAssignmentImage/);
+  assert.match(app,/agora_ops_assignment_requests/);
+  assert.match(app,/showAssignmentHistory/);
+  assert.match(app,/Solicitud guardada con folio/);
   assert.doesNotMatch(app,/setDoc\(doc\(db,"agora_ops_(?:control|staff|shift_access)"/);
   assert.match(css,/\.role-jornada/);
   assert.match(css,/\.role-assignment-form/);
