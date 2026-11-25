@@ -8,6 +8,7 @@ import {saveProfile,saveFinancial} from "../identidad/firebase-identity.js";
 import {projectTodayAssignments} from "../identidad/domain.mjs";
 import {ownJornadas,coordinationJornadas,operationTotals,validateAssignmentDraft,assignmentDraftText,REQUEST_CHANNELS} from "./roles-operacion.mjs";
 import {showShiftQr} from "./staff-shift-qr.js";
+import {renderStaffTasks,readStaffTasks} from "./staff-activities.js";
 import {mountRoster} from "./attendance-roster.js";
 
 // Una sola identidad Firebase para todas las vistas. Sin módulos operativos.
@@ -531,6 +532,10 @@ function staffJornadaCard(item){
       (item.instructions?'<p class="role-instructions">'+esc(item.instructions)+'</p>':"")+
     '</div>'+
     '<button type="button" class="profile-button profile-button-primary" data-action="show-shift-qr" data-event-id="'+esc(item.key)+'">Mostrar QR de jornada / actividad</button>'+
+    '<div class="attendance-task-container">'+
+      '<button type="button" class="profile-button profile-button-outline" data-action="open-tasks" data-event-id="'+esc(item.key)+'">Mis actividades · Agregar o marcar</button>'+
+      '<div class="attendance-task-content" data-task-for="'+esc(item.key)+'" hidden></div>'+
+    '</div>'+
     '<details class="role-add-activity"><summary>+ Proponer otra actividad en esta jornada</summary>'+
       '<form data-draft-activity="'+esc(item.key)+'" class="role-proposal-form">'+
         '<label>Actividad adicional<input name="activity" required maxlength="200" placeholder="¿Qué otra actividad realizarás?"></label>'+
@@ -550,7 +555,7 @@ function staffOperationsSpace(){
       '<p>Una jornada puede incluir varias actividades. Consulta tus asignaciones personales.</p></div>'+
       '<div class="role-space-actions">'+
         '<a class="profile-button profile-button-primary" href="'+esc(href("mi-operacion/"))+'">Mi operación</a>'+
-        '<span class="profile-muted">El QR de jornada está en cada asignación.</span></div></header>'+
+        '<a class="profile-button profile-button-outline" href="'+esc(href("escanear/"))+'">Pasar lista (supervisores)</a></div></header>'+
     roleNotice()+
     (staff?assigned.length?'<div class="role-jornada-list">'+assigned.slice(0,3).map(staffJornadaCard).join("")+'</div>'+
       (assigned.length>3?'<details class="role-more-jornadas"><summary>Ver otras jornadas ('+(assigned.length-3)+')</summary><div class="role-jornada-list">'+assigned.slice(3).map(staffJornadaCard).join("")+'</div></details>':""):
@@ -627,7 +632,7 @@ function coordinationOperationsSpace(admin=false){
       (list.length?'<div class="role-jornada-list">'+list.slice(0,6).map(scheduleCard).join("")+'</div>'+
         (list.length>6?'<details class="role-more-jornadas"><summary>Ver otras jornadas ('+(list.length-6)+')</summary><div class="role-jornada-list">'+list.slice(6).map(scheduleCard).join("")+'</div></details>':""):
        '<p class="role-empty">No hay jornadas próximas en el cronograma operativo.</p>')+
-      '<div class="role-legacy-links"><a class="profile-button profile-button-primary" href="'+esc(href("escanear/"))+'">Escanear QR de jornada</a>'+
+      '<div class="role-legacy-links"><a class="profile-button profile-button-primary" href="'+esc(href("escanear/"))+'">Pasar lista · QR o manual</a>'+
       '<button type="button" data-action="view-attendance" class="profile-button profile-button-outline">Pase de lista</button>'+
         '<a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/"))+'" target="_blank" rel="noopener noreferrer">Editar agenda vigente ↗</a>'+
         '<a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/control-jornadas.html"))+'" target="_blank" rel="noopener noreferrer">Control de asistencia ↗</a></div>'+
@@ -707,6 +712,19 @@ app.addEventListener("click",event=>{
   const target=event.target.closest("[data-action]");
   if(!target)return;
   const task=target.dataset.action;
+  if(task==="open-tasks"){
+    if(!allowed("staff")||!state.user||!state.roleData?.staff)return;
+    const eventId=clean(target.dataset.eventId);
+    const section=app.querySelector('[data-task-for="'+CSS.escape(eventId)+'"]');
+    if(!section)return;
+    section.hidden=!section.hidden;
+    if(section.hidden)return;
+    renderStaffTasks({
+      target:section,eventId,personId:state.roleData.staff.personId,
+      uid:state.user.uid
+    });
+    return;
+  }
   if(task==="show-shift-qr"){
     if(!allowed("staff")||!state.user||!state.roleData?.staff)return;
     const eventId=clean(target.dataset.eventId);
@@ -715,8 +733,16 @@ app.addEventListener("click",event=>{
     const dialog=document.getElementById("staff-shift-qr-dialog");
     const container=document.getElementById("staff-shift-qr-content");
     if(!shift||!dialog||!container)return notice("Jornada no disponible.","error");
-    showShiftQr({target:container,uid:state.user.uid,personId:state.roleData.staff.personId,shift});
     if(dialog.showModal)dialog.showModal();else dialog.setAttribute("open","");
+    container.innerHTML='<p class="profile-muted">Generando QR de jornada…</p>';
+    readStaffTasks(eventId,state.user.uid).catch(()=>[]).then(tasks=>{
+      if(!dialog.open||state.user?.uid!==auth.currentUser?.uid)return;
+      const activities=[...shift.activities,...tasks.map(a=>({
+        key:a.id,name:a.name,status:a.status
+      }))];
+      showShiftQr({target:container,uid:state.user.uid,
+        personId:state.roleData.staff.personId,shift:{...shift,activities}});
+    });
     return;
   }
   if(task==="close-shift-qr"){
