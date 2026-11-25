@@ -1,0 +1,111 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFile} from "node:fs/promises";
+import {
+  clockKey,ownAttendanceShifts,attendanceState,entryPayload,exitPayload
+} from "../attendance-policy.mjs";
+const now=new Date("2026-11-25T09:00:00-06:00");
+const ownDoc={
+ personId:"p-01",
+ events:[
+  {id:"shift-01",title:"Jornada Dejavú",type:"Oficina",status:"confirmado",
+   venueName:"Oficina",start:"2026-11-25T08:00:00-06:00",
+   end:"2026-11-25T18:00:00-06:00",
+   staff:[{personId:"p-01",start:"2026-11-25T08:00:00-06:00",end:"2026-11-25T18:00:00-06:00"}]},
+  {id:"shift-ajeno",title:"No mostrar",status:"confirmado",
+   start:"2026-11-25T08:00:00-06:00",
+   end:"2026-11-25T18:00:00-06:00",
+   staff:[{personId:"p-99"}]}
+ ]
+};
+const member={active:true,role:"staff",personId:"p-01"};
+const permit={
+ ownerUid:"valid-uid",personId:"p-01",eventId:"shift-01",
+ enabled:true,
+ startsAt:new Date("2026-11-25T07:30:00-06:00"),
+ endsAt:new Date("2026-11-25T18:30:00-06:00")
+};
+const stamp={__serverTimestamp:true};
+const geo={lat:19.4326,lng:-99.1332,accuracy:21};
+
+test("reutiliza exclusivamente UID y evento en el ID del reloj",()=>{
+ assert.equal(clockKey("uid1","shift-01"),"uid1_shift-01");
+ assert.throws(()=>clockKey("uid1","shift/02"));
+ assert.throws(()=>clockKey("","shift-01"));
+});
+test("solo muestra turnos propios para miembro staff activo",()=>{
+ const list=ownAttendanceShifts(ownDoc,member,now);
+ assert.equal(list.length,1);
+ assert.equal(list[0].title,"Jornada Dejavú");
+ assert.equal(list[0].eventId,"shift-01");
+ assert.equal(ownAttendanceShifts(ownDoc,{...member,personId:"p-99"},now).length,0);
+ assert.equal(ownAttendanceShifts(ownDoc,{...member,active:false},now).length,0);
+ assert.equal(ownAttendanceShifts(ownDoc,{...member,role:"coordinador"},now).length,0);
+});
+test("entrada solo disponible en ventana autorizada; no duplica registro",()=>{
+ assert.deepEqual(attendanceState(permit,null,now),{status:"habilitada",action:"entry"});
+ assert.equal(attendanceState({...permit,enabled:false},null,now).action,"none");
+ assert.equal(attendanceState(permit,null,new Date("2026-11-25T07:00:00-06:00")).action,"none");
+ assert.equal(attendanceState(permit,{status:"en_curso"},now).action,"exit");
+ assert.equal(attendanceState(permit,{status:"finalizada"},now).action,"none");
+});
+test("salida permitida si expira o se deshabilita permiso anterior",()=>{
+ const old={...permit,enabled:false};
+ assert.equal(attendanceState(old,{status:"en_curso"},now).action,"exit");
+ assert.equal(attendanceState(null,{status:"en_curso"},now).action,"exit");
+});
+test("entrada usa reloj oficial, UID, GPS puntual y hora servidor",()=>{
+ const payload=entryPayload("valid-uid","p-01","shift-01","Oficina · Jornada",geo,stamp);
+ assert.equal(payload.ownerUid,"valid-uid");
+ assert.equal(payload.personId,"p-01");
+ assert.equal(payload.eventId,"shift-01");
+ assert.equal(payload.status,"en_curso");
+ assert.deepEqual(payload.startGeo,geo);
+ assert.deepEqual(payload.lastGeo,geo);
+ assert.equal(payload.startedAt,stamp);
+ assert.equal(payload.updatedAt,stamp);
+ assert.throws(()=>entryPayload("valid-uid","p-01","shift-01","Oficina",null,stamp));
+});
+test("salida usa hora servidor y permite GPS opcional",()=>{
+ const payload=exitPayload("Trabajo terminado",null,stamp);
+ assert.equal(payload.status,"finalizada");
+ assert.equal(payload.endNote,"Trabajo terminado");
+ assert.ok(!("endGeo" in payload));
+ assert.equal(payload.endedAt,stamp);
+ const withGps=exitPayload("",geo,stamp);
+ assert.deepEqual(withGps.endGeo,geo);
+});
+test("credencial, verificador y pase de lista tienen salvaguardas obligatorias",async()=>{
+ const [app,live,roster,verify,rules,html,style]=await Promise.all([
+  readFile(new URL("../app.js",import.meta.url),"utf8"),
+  readFile(new URL("../attendance-live.js",import.meta.url),"utf8"),
+  readFile(new URL("../attendance-roster.js",import.meta.url),"utf8"),
+  readFile(new URL("../verify.js",import.meta.url),"utf8"),
+  readFile(new URL("../../firestore.rules",import.meta.url),"utf8"),
+  readFile(new URL("../verificar.html",import.meta.url),"utf8"),
+  readFile(new URL("../perfil.css",import.meta.url),"utf8")
+ ]);
+ assert.match(app,/id="credential-attendance"/);
+ assert.match(app,/mountOwnAttendance\(\{auth,db/);
+ assert.match(app,/data-action="view-attendance"/);
+ assert.match(app,/mountRoster\(\{db,target,schedule:state\.roleData\?\.schedule\}\)/);
+ assert.match(live,/getDocFromServer\(doc\(db,"agora_ops_members",uid\)\)/);
+ assert.match(live,/getDocFromServer\(doc\(db,"agora_ops_staff",uid\)\)/);
+ assert.match(live,/clockKey\(uid,shift\.eventId\)/);
+ assert.match(live,/getDocFromServer/);
+ assert.match(live,/serverTimestamp\(\)/);
+ assert.match(live,/setDoc\(ref,entryPayload/);
+ assert.match(live,/updateDoc\(ref,exitPayload/);
+ assert.match(live,/checkbox\?\.checked/);
+ assert.match(live,/auth\.currentUser\?\.uid!==uid/);
+ assert.match(verify,/Registrar mi propia entrada o salida/);
+ assert.match(verify,/No registra asistencia automáticamente/);
+ assert.match(html,/name="referrer" content="no-referrer"/);
+ assert.match(roster,/getDocsFromServer\(q\)/);
+ assert.match(roster,/agora_ops_clock/);
+ assert.doesNotMatch(roster,/startGeo|endGeo|latitude|clabe|salary|paymentAmount/);
+ assert.match(rules,/match \/agora_ops_clock\/\{id\}/);
+ assert.match(rules,/shiftClockOpen\(request\.auth\.uid/);
+ assert.match(style,/\.credential-attendance-panel/);
+ assert.match(style,/\.attendance-roster-table/);
+});
