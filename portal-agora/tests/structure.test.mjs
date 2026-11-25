@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 
+// Portal pages may pin app.js to a release version to avoid stale browser caches.
 const root=new URL("../",import.meta.url);
 const read=path=>readFile(new URL(path,root),"utf8");
 
