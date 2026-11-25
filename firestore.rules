@@ -1831,6 +1831,164 @@ match /agora_finance_requests/{requestId} {
           request.resource.data.validationNote.size() <= 600;
         allow delete: if false;
       }
+      match /activities/{activityId} {
+        allow get, list: if canEdit() || attendanceSupervisor(eventId) ||
+          (opsStaff() && resource.data.uid == request.auth.uid);
+        allow create: if
+          activityId.matches('^[A-Za-z0-9_-]{10,70}
+        allow get, list: if canEdit();
+        allow create: if canEdit() &&
+          personId.matches('^[A-Za-z0-9_-]{1,90}
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+) &&
+          request.resource.data.keys().hasOnly([
+            'eventId','personId','personName','startAt','endAt',
+            'breakMinutes','approvedMinutes','notes','status',
+            'approvedBy','approvedAt','source'
+          ]) &&
+          request.resource.data.keys().hasAll([
+            'eventId','personId','personName','startAt','endAt',
+            'breakMinutes','approvedMinutes','notes','status',
+            'approvedBy','approvedAt','source'
+          ]) &&
+          request.resource.data.eventId == eventId &&
+          request.resource.data.personId == personId &&
+          request.resource.data.personName is string &&
+          request.resource.data.personName.size() >= 2 &&
+          request.resource.data.personName.size() <= 140 &&
+          request.resource.data.startAt is timestamp &&
+          request.resource.data.endAt is timestamp &&
+          request.resource.data.endAt > request.resource.data.startAt &&
+          request.resource.data.endAt <= request.resource.data.startAt +
+            duration.value(36,'h') &&
+          request.resource.data.breakMinutes is int &&
+          request.resource.data.breakMinutes >= 0 &&
+          request.resource.data.breakMinutes <= 600 &&
+          request.resource.data.approvedMinutes is int &&
+          request.resource.data.approvedMinutes > 0 &&
+          request.resource.data.approvedMinutes <= 1440 &&
+          request.resource.data.notes is string &&
+          request.resource.data.notes.size() <= 600 &&
+          request.resource.data.status == 'horas_validadas' &&
+          request.resource.data.source in ['qr','manual','provisional','reloj'] &&
+          request.resource.data.approvedBy == request.auth.uid &&
+          request.resource.data.approvedAt == request.time &&
+          ((attendanceValidated(eventId,personId,'entrada') &&
+            attendanceValidated(eventId,personId,'salida')) ||
+           attendanceClockCompleted(eventId,personId));
+        allow update, delete: if false;
+      }
+    }
+
+    // Todas las demás colecciones permanecen cerradas.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+) &&
+          request.resource.data.keys().hasOnly([
+            'id','eventId','personId','uid','name','status','createdAt','createdBy',
+            'updatedAt','updatedBy'
+          ]) &&
+          request.resource.data.keys().hasAll([
+            'id','eventId','personId','uid','name','status','createdAt','createdBy',
+            'updatedAt','updatedBy'
+          ]) &&
+          request.resource.data.id == activityId &&
+          request.resource.data.eventId == eventId &&
+          request.resource.data.personId.matches('^[A-Za-z0-9_-]{1,90}
+        allow get, list: if canEdit();
+        allow create: if canEdit() &&
+          personId.matches('^[A-Za-z0-9_-]{1,90}
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+) &&
+          request.resource.data.keys().hasOnly([
+            'eventId','personId','personName','startAt','endAt',
+            'breakMinutes','approvedMinutes','notes','status',
+            'approvedBy','approvedAt','source'
+          ]) &&
+          request.resource.data.keys().hasAll([
+            'eventId','personId','personName','startAt','endAt',
+            'breakMinutes','approvedMinutes','notes','status',
+            'approvedBy','approvedAt','source'
+          ]) &&
+          request.resource.data.eventId == eventId &&
+          request.resource.data.personId == personId &&
+          request.resource.data.personName is string &&
+          request.resource.data.personName.size() >= 2 &&
+          request.resource.data.personName.size() <= 140 &&
+          request.resource.data.startAt is timestamp &&
+          request.resource.data.endAt is timestamp &&
+          request.resource.data.endAt > request.resource.data.startAt &&
+          request.resource.data.endAt <= request.resource.data.startAt +
+            duration.value(36,'h') &&
+          request.resource.data.breakMinutes is int &&
+          request.resource.data.breakMinutes >= 0 &&
+          request.resource.data.breakMinutes <= 600 &&
+          request.resource.data.approvedMinutes is int &&
+          request.resource.data.approvedMinutes > 0 &&
+          request.resource.data.approvedMinutes <= 1440 &&
+          request.resource.data.notes is string &&
+          request.resource.data.notes.size() <= 600 &&
+          request.resource.data.status == 'horas_validadas' &&
+          request.resource.data.source in ['qr','manual','provisional','reloj'] &&
+          request.resource.data.approvedBy == request.auth.uid &&
+          request.resource.data.approvedAt == request.time &&
+          ((attendanceValidated(eventId,personId,'entrada') &&
+            attendanceValidated(eventId,personId,'salida')) ||
+           attendanceClockCompleted(eventId,personId));
+        allow update, delete: if false;
+      }
+    }
+
+    // Todas las demás colecciones permanecen cerradas.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+) &&
+          request.resource.data.uid is string &&
+          request.resource.data.uid.size() > 0 &&
+          exists(attendanceRosterPath(eventId,request.resource.data.personId)) &&
+          get(attendanceRosterPath(eventId,request.resource.data.personId)).data.uid ==
+            request.resource.data.uid &&
+          (attendanceSupervisor(eventId) ||
+           (opsStaff() && request.resource.data.uid == request.auth.uid)) &&
+          request.resource.data.name is string &&
+          request.resource.data.name.size() >= 3 &&
+          request.resource.data.name.size() <= 200 &&
+          request.resource.data.status == 'pendiente' &&
+          request.resource.data.createdAt == request.time &&
+          request.resource.data.updatedAt == request.time &&
+          request.resource.data.createdBy == request.auth.uid &&
+          request.resource.data.updatedBy == request.auth.uid;
+        allow update: if
+          (canEdit() || attendanceSupervisor(eventId) ||
+           (opsStaff() && resource.data.uid == request.auth.uid)) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status','updatedAt','updatedBy'
+          ]) &&
+          request.resource.data.status in [
+            'pendiente','en_curso','terminada','no_realizada'
+          ] &&
+          request.resource.data.updatedAt == request.time &&
+          request.resource.data.updatedBy == request.auth.uid;
+        allow delete: if false;
+      }
       match /approvals/{personId} {
         allow get, list: if canEdit();
         allow create: if canEdit() &&
