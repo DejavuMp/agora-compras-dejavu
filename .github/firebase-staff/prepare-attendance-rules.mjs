@@ -100,6 +100,50 @@ function reconcileIdentityPhoneAccess(content,repositoryRules){
  }
  updateMatch("/agora_users/\\{uid\\}",["get"],true);
  updateMatch("/agora_identity_registrations/\\{uid\\}",["get","create"]);
+ function approvedFunction(source,name){
+  const matches=[...source.matchAll(new RegExp("function "+name+"\\([^)]*\\)\\s*\\{","g"))];
+  if(matches.length!==1)throw Error("No se reconoce una única función "+name+" en las reglas revisadas.");
+  const start=matches[0].index;
+  const end=source.indexOf("\n    function ",start+1);
+  if(end<0)throw Error("No se reconoce el límite de "+name+".");
+  return source.slice(start,end).trimEnd();
+ }
+ for(const name of ["identityCoordinator","identityAssigned"]){
+  const approved=approvedFunction(repositoryRules,name);
+  if(name==="identityCoordinator"&&
+     (!approved.includes("activeStaff()")||!approved.includes("role() == 'coordinador'")))
+   throw Error("identityCoordinator no coincide con la regla segura revisada.");
+  if(name==="identityAssigned"&&
+     (!approved.includes("identityCoordinator()")||!approved.includes("request.auth.uid in record.coordinatorUids")))
+   throw Error("identityAssigned no coincide con la regla segura revisada.");
+  const matches=[...result.matchAll(new RegExp("function "+name+"\\([^)]*\\)\\s*\\{","g"))];
+  if(matches.length>1)throw Error("Hay varias funciones "+name+" en reglas activas.");
+  if(matches.length===1){
+   const start=matches[0].index,end=result.indexOf("\n    function ",start+1);
+   if(end<0)throw Error("No se reconoce el límite activo de "+name+".");
+   const active=result.slice(start,end);
+   const required=name==="identityCoordinator"?
+     ["activeStaff()","role() == 'coordinador'"]:
+     ["identityCoordinator()","request.auth.uid in record.coordinatorUids"];
+   if(required.some(part=>!active.includes(part)))
+    throw Error(name+" activa difiere de la función segura revisada.");
+  }else{
+   const insertion=result.indexOf("\n    function identityJob(");
+   if(insertion<0)throw Error("No se reconoce dónde insertar "+name+"; detener.");
+   result=result.slice(0,insertion)+"\n    "+approved+"\n"+result.slice(insertion);
+  }
+ }
+ const registryMatches=[...result.matchAll(/match\s+\/agora_identity_registry\/\{[^}]+\}\s*\{/g)];
+ if(registryMatches.length!==1)throw Error("No se reconoce una única regla de directorio de identidad.");
+ const registryStart=registryMatches[0].index;
+ const registryNext=result.indexOf("\n    match ",registryStart+1);
+ const registryClose=result.indexOf("\n    }\n",registryStart);
+ if(registryClose<0||(registryNext>=0&&registryNext<registryClose))
+  throw Error("No se reconoce el límite de agora_identity_registry.");
+ const registryBlock=result.slice(registryStart,registryClose+7);
+ const assignedList="allow list: if identityAssigned(resource.data);";
+ if(!registryBlock.includes(assignedList))
+  result=result.slice(0,registryClose)+"\n      "+assignedList+result.slice(registryClose);
  return result;
 }
 
