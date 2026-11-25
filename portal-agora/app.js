@@ -2,7 +2,7 @@ import {auth,db} from "./firebase.js";
 import {
   onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signInWithRedirect,signOut
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
-import {doc,getDoc,setDoc,serverTimestamp}
+import {doc,getDoc,getDocs,collection,query,orderBy,limit,setDoc,updateDoc,serverTimestamp}
   from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 import {saveProfile,saveFinancial} from "../identidad/firebase-identity.js";
 import {projectTodayAssignments} from "../identidad/domain.mjs";
@@ -580,6 +580,94 @@ function scheduleCard(item){
       '<div><dt>Actividades registradas</dt><dd>'+item.activitiesCount+'</dd></div>'+
       '<div><dt>Estado</dt><dd>'+esc(item.status)+'</dd></div></dl></article>';
 }
+
+async function compressAssignmentImage(file){
+  if(!file)return "";
+  if(!["image/jpeg","image/png","image/webp"].includes(file.type))
+    throw Error("Adjunta una captura en JPEG, PNG o WEBP. Audio y PDF no pueden guardarse aquí.");
+  if(file.size>12*1024*1024)throw Error("La imagen supera 12 MB. Usa una más pequeña.");
+  const source=URL.createObjectURL(file);
+  const image=new Image();
+  try{
+    await new Promise((resolve,reject)=>{
+      image.onload=resolve;
+      image.onerror=()=>reject(Error("No se pudo leer la captura."));
+      image.src=source;
+    });
+    const canvas=document.createElement("canvas"),ctx=canvas.getContext("2d");
+    if(!ctx)throw Error("El navegador no permite procesar la imagen.");
+    for(const max of [1400,1100,900,700,500]){
+      const ratio=Math.min(1,max/Math.max(image.naturalWidth,image.naturalHeight));
+      canvas.width=Math.max(1,Math.round(image.naturalWidth*ratio));
+      canvas.height=Math.max(1,Math.round(image.naturalHeight*ratio));
+      ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(image,0,0,canvas.width,canvas.height);
+      for(const quality of [.8,.7,.55,.4]){
+        const data=canvas.toDataURL("image/jpeg",quality);
+        if(data.length<=170000)return data;
+      }
+    }
+    throw Error("La captura sigue siendo muy grande. Recórtala antes de agregarla.");
+  }finally{URL.revokeObjectURL(source)}
+}
+async function showAssignmentHistory(){
+  if(!["admin","coordinador"].includes(role())||!allowed(routeSpace))
+    throw Error("No tienes permiso para consultar solicitudes.");
+  const box=document.getElementById("assignment-history");
+  if(!box)return;
+  box.textContent="Consultando solicitudes privadas…";
+  const snaps=await getDocs(query(
+    collection(db,"agora_ops_assignment_requests"),orderBy("createdAt","desc"),limit(12)
+  ));
+  if(!snaps.size){box.textContent="Aún no hay solicitudes guardadas.";return}
+  box.innerHTML=snaps.docs.map(d=>{
+    const a=d.data(),image=typeof a.evidenceImage==="string"&&
+      /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(a.evidenceImage)?
+        '<img class="assignment-history-image" src="'+esc(a.evidenceImage)+
+          '" alt="Captura asociada al folio '+esc(a.id)+'">':"";
+    const when=a.createdAt?.toDate?.();
+    const date=when?new Intl.DateTimeFormat("es-MX",{
+      day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"
+    }).format(when):"Fecha por confirmar";
+    return '<details class="assignment-history-item"><summary><span><strong>'+
+      esc(a.project||"Solicitud")+'</strong><small>'+esc(a.requester||"Solicitante")+
+      ' · '+esc(a.channel||"Medio")+' · '+esc(a.status||"pendiente")+
+      '</small></span><small>'+esc(date)+'</small></summary>'+
+      '<div class="assignment-history-body">'+
+        '<p><b>Folio:</b> '+esc(a.id)+'</p>'+
+        '<p><b>Registrado por UID:</b> '+esc(a.capturedBy)+'</p>'+
+        '<p><b>Jornada:</b> '+esc(a.date)+' · '+esc(a.start)+' – '+esc(a.end)+
+        ' · '+esc(a.site)+'</p>'+
+        '<p><b>Detalle:</b> '+esc(a.description||"Sin observaciones")+'</p>'+
+        '<p><b>Origen:</b> '+esc(a.evidenceNote||"No proporcionado")+'</p>'+
+        '<p><b>Actividades:</b> '+esc((a.activities||[]).join(" · ")||"Por definir")+'</p>'+
+        (a.linkedEventId?'<p><b>Jornada vinculada:</b> '+esc(a.linkedEventId)+'</p>':"")+
+        image+
+        (a.status==="pendiente"?'<div class="assignment-history-actions">'+
+          '<button type="button" class="profile-button profile-button-outline" data-action="confirm-assignment" data-request-id="'+esc(a.id)+'">Vincular jornada publicada</button>'+
+          '<button type="button" class="profile-button profile-button-outline" data-action="cancel-assignment" data-request-id="'+esc(a.id)+'">Cancelar solicitud</button>'+
+          '</div>':"")+'</div></details>';
+  }).join("");
+}
+function requestStatusChange(requestId,nextStatus){
+  if(!["admin","coordinador"].includes(role())||!allowed(routeSpace))return;
+  const schedule=state.roleData?.schedule?.payload?.events||[];
+  let eventId="";
+  if(nextStatus==="confirmada"){
+    eventId=clean(prompt("Escribe el ID de la jornada publicada en Operaciones:",""));
+    if(!eventId)return;
+    if(!schedule.some(e=>String(e.id)===eventId&&e.status!=="cancelado"&&e.status!=="borrador"))
+      return notice("La jornada no existe o no está publicada. Primero regístrala en Operaciones.","error");
+  }else if(!confirm("¿Cancelar esta solicitud? Quedará en el historial."))return;
+  return run(async()=>{
+    await updateDoc(doc(db,"agora_ops_assignment_requests",requestId),{
+      status:nextStatus,linkedEventId:eventId,
+      updatedBy:state.user.uid,updatedAt:serverTimestamp()
+    });
+    await showAssignmentHistory();
+  },"Solicitud actualizada; se conserva el historial.");
+}
+
 function assignmentDialog(){
   const now=new Date();
   const localDate=[now.getFullYear(),String(now.getMonth()+1).padStart(2,"0"),String(now.getDate()).padStart(2,"0")].join("-");
