@@ -467,6 +467,22 @@ async function copyPaySummary(){
  await navigator.clipboard.writeText(text);
  notice("Resumen de horas copiado. Envíalo al proceso de pagos separado.","success");
 }
+function printHoursSummary(){
+ if(!state.isCoordinator||!state.sheet)throw Error("Solo Coordinación puede imprimir horas validadas.");
+ const content=payrollSummary(state.sheet,state.approvals);
+ const w=window.open("","_blank");
+ if(!w)throw Error("El navegador bloqueó la ventana de impresión. Activa ventanas emergentes para ÁGORA.");
+ w.document.open();
+ w.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8">'+
+  '<title>ÁGORA · Horas validadas</title>'+
+  '<style>body{font-family:Arial,sans-serif;color:#171819;margin:36px;'+
+  'font-size:13px}h1{font-size:23px;margin-bottom:19px}pre{font:13px/1.8 Arial,'+
+  'sans-serif;white-space:pre-wrap;overflow-wrap:anywhere}'+
+  'footer{border-top:1px solid #ccc;padding-top:12px;color:#555;font-size:11px}</style></head>'+
+  '<body><h1>ÁGORA · Dejavú Marketing</h1><pre>'+esc(content)+'</pre>'+
+  '<footer>Reporte de horas validadas, no comprobante de pago ni transferencia.</footer></body></html>');
+ w.document.close();w.focus();w.print();
+}
 async function handleQR(raw){
  const scan=parseShiftQr(clean(raw),{origin:root.href,now:Date.now()});
  if(!state.sheet||state.sheet.eventId!==scan.eventId)
@@ -573,5 +589,6 @@ $("scan-entries").addEventListener("click",e=>{
 $("scan-review-person").addEventListener("change",fillApproval);
 $("scan-approve-hours").addEventListener("click",()=>act(approveHours));
 $("scan-copy-payroll").addEventListener("click",()=>act(copyPaySummary));
+$("scan-print-payroll").addEventListener("click",()=>act(printHoursSummary));
 document.addEventListener("visibilitychange",()=>{if(document.hidden)hideCamera()});
 onAuthStateChanged(auth,user=>{loadView(user)});
