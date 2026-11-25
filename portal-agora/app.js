@@ -1,6 +1,6 @@
 import {auth,db} from "./firebase.js";
 import {
-  onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signInWithRedirect,signOut
+  onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signInWithRedirect,signInWithEmailAndPassword,signOut
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
 import {doc,getDoc,getDocs,collection,query,orderBy,limit,setDoc,updateDoc,serverTimestamp}
   from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
@@ -14,6 +14,10 @@ import {mountRoster} from "./attendance-roster.js";
 // Una sola identidad Firebase para todas las vistas. Sin módulos operativos.
 const ROOT=new URL("./",import.meta.url);
 const ADMIN_EMAIL="admi.agora@gmail.com";
+const QA_LOGIN_USERS=new Set([
+  "admi.agora+qa.staff@gmail.com",
+  "admi.agora+qa.supervisor@gmail.com"
+]);
 const JOBS=[
   "Coordinador","Subcoordinador de cuenta","Supervisor","Staff",
   "Staff de montaje","Staff de desmontaje","Volanteero","Runner"
@@ -63,6 +67,8 @@ const notice=(msg,tone="")=>{
 };
 const errorText=e=>{
   const code=String(e?.code||"");
+  if(code==="qa/email-not-verified")return "Antes de iniciar sesión, abre el enlace de verificación que llegó a tu buzón.";
+  if(code.includes("invalid-credential")||code.includes("wrong-password")||code.includes("user-not-found"))return "No se pudo autenticar la cuenta QA.";
   if(code.includes("unauthorized-domain"))return "El dominio debe autorizarse en Firebase Authentication.";
   if(code.includes("popup-closed-by-user"))return "Se canceló el acceso con Google.";
   if(code.includes("permission-denied"))return "No fue posible leer tu identidad. Revisa los permisos de Firebase.";
@@ -108,6 +114,16 @@ function renderLogin(){
             '<p id="id-login-note" class="login-pending">El acceso mediante ID y contraseña aún necesita habilitación segura. Por ahora utiliza Google.</p>')+
           '<div class="login-separator"><span>o continúa con</span></div>'+
           '<button type="button" class="btn google-login full" data-action="google">Continuar con Google</button>'+
+          (!request?'<details class="qa-access"><summary>Acceso de cuentas QA</summary>'+
+            '<form id="qa-login" aria-describedby="qa-login-note">'+
+              '<div class="field"><label for="qa-email">Cuenta QA</label>'+
+                '<select id="qa-email" name="email" required><option value="">Selecciona cuenta</option>'+
+                  '<option value="admi.agora+qa.staff@gmail.com">Staff QA</option>'+
+                  '<option value="admi.agora+qa.supervisor@gmail.com">Supervisor QA</option></select></div>'+
+              '<div class="field"><label for="qa-password">Contraseña</label>'+
+                '<input id="qa-password" name="password" type="password" autocomplete="current-password" required></div>'+
+              '<button class="btn full" type="submit">Ingresar con correo</button>'+
+            '</form><p id="qa-login-note" class="login-pending">Solo para las dos cuentas de prueba autorizadas. Se requiere correo verificado.</p></details>':'')+
           '<div class="cinema-secondary"><button class="text-btn" data-action="'+
             (request?"login":"request")+'" type="button">'+
             (request?"Volver al acceso":"Solicitar mi ID Dejavú")+'</button></div>'+
@@ -930,6 +946,19 @@ app.addEventListener("submit",event=>{
   const form=event.target;
   if(!(form instanceof HTMLFormElement))return;
   event.preventDefault();
+  if(form.id==="qa-login"){
+    const values=new FormData(form);
+    const qaEmail=clean(values.get("email")).toLowerCase();
+    const password=String(values.get("password")||"");
+    if(!QA_LOGIN_USERS.has(qaEmail)||!password)return notice("Selecciona una cuenta QA y escribe su contraseña.","error");
+    return run(async()=>{
+      try{
+        const credential=await signInWithEmailAndPassword(auth,qaEmail,password);
+        if(credential.user.email?.toLowerCase()!==qaEmail){await signOut(auth);throw Error("Cuenta QA no válida.");}
+        if(!credential.user.emailVerified){await signOut(auth);throw Object.assign(Error("Correo no verificado."),{code:"qa/email-not-verified"});}
+      }finally{form.querySelector('[name="password"]').value="";}
+    },"Acceso autorizado.");
+  }
   if(form.id==="request-id")return run(()=>register(new FormData(form)));
   if(form.id==="assignment-form"){
     if(!["admin","coordinador"].includes(role())||!allowed(routeSpace))
