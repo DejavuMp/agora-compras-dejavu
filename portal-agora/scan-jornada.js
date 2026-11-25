@@ -237,6 +237,7 @@ function renderSupervisorControl(){
  const people=shiftPreview(state.schedule,state.sheet.eventId).people
   .filter(p=>p.uid&&p.uid!==state.user.uid);
  const current=state.sheet.supervisorUids||[];
+ $("scan-toggle-active").textContent=state.sheet.active?"Cerrar pase de lista":"Reabrir pase de lista";
  $("scan-supervisor-options").innerHTML=people.map(p=>
    '<label class="attendance-person-option"><input type="checkbox" name="supervisor" value="'+
    esc(p.uid)+'" '+(current.includes(p.uid)?"checked":"")+'>'+
@@ -344,6 +345,17 @@ async function updateSupervisors(){
  notice("Permisos de supervisión actualizados.","success");
  await readSheets();await selectSheet(state.sheet.eventId);
 }
+async function toggleSheet(){
+ if(!state.isCoordinator||!state.sheet)throw Error("Solo Coordinación administra la lista.");
+ const eventId=state.sheet.eventId,active=!state.sheet.active;
+ if(!confirm(active?"¿Reabrir el pase de lista?":"¿Cerrar el pase de lista? Los supervisores no podrán registrar nuevas asistencias."))return;
+ await updateDoc(sheetRef(eventId),{
+   active,updatedBy:state.user.uid,
+   updatedAt:serverTimestamp(),revision:state.sheet.revision+1
+ });
+ await readSheets();renderSheets();$("scan-sheets").value=eventId;await selectSheet(eventId);
+ notice(active?"Pase de lista reabierto.":"Pase de lista cerrado. Los registros previos permanecen.","success");
+}
 function randomProvisional(){
  const bytes=new Uint8Array(10);
  crypto.getRandomValues(bytes);
@@ -386,9 +398,12 @@ async function provisionalEntry(){
  const person={personId:randomProvisional(),uid:"",name};
  await registerEntry({
   person,source:"provisional",action:"entrada",reason,
-  notes:"Alta provisional capturada por supervisión"
+  notes:("Solicitado por: "+clean($("scan-provisional-requester").value)+
+    " | Medio: "+$("scan-provisional-channel").value+
+    " | Alta provisional por supervisión").slice(0,400)
  });
  $("scan-provisional-name").value="";$("scan-provisional-reason").value="";
+ $("scan-provisional-requester").value="";
 }
 async function reviewEntry(id,status){
  if(!state.isCoordinator||!state.sheet)throw Error("Solo Coordinación valida la asistencia.");
@@ -520,6 +535,7 @@ $("scan-sheets").addEventListener("change",e=>act(()=>selectSheet(e.target.value
 $("scan-new-event").addEventListener("change",previewNewSupervisors);
 $("scan-configure").addEventListener("click",()=>act(configureSheet));
 $("scan-update-supervisors").addEventListener("click",()=>act(updateSupervisors));
+$("scan-toggle-active").addEventListener("click",()=>act(toggleSheet));
 $("scan-person").addEventListener("change",renderActivityChoices);
 $("scan-create-entry").addEventListener("click",()=>act(manualEntry));
 $("scan-register-provisional").addEventListener("click",()=>act(provisionalEntry));
