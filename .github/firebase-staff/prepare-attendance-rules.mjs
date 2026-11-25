@@ -54,23 +54,42 @@ function reconcileOperationsRules(content){
  if(count===0)
   throw Error("No se encontró autorización de creación de incidentes; detener.");
  const incidentRules=content.slice(0,start)+updated+content.slice(close+7);
- // Production has an older schema which omits a coordinator-only payment date
- // already used by the Operations editor and covered by the emulator test.
- const helpers=[...incidentRules.matchAll(/function opsValidReport\(\)\s*\{/g)];
+ // Missing verification claims stay denied without a Firestore rules evaluation error.
+ const authHelpers=[...incidentRules.matchAll(/function signedIn\(\)\s*\{/g)];
+ if(authHelpers.length!==1)
+  throw Error("No se reconoce una única función de inicio de sesión; detener.");
+ const authStart=authHelpers[0].index;
+ const authEnd=incidentRules.indexOf("\n    function identitySignedIn()",authStart);
+ if(authEnd<0)
+  throw Error("No se reconoce el límite de signedIn; detener.");
+ const authBlock=incidentRules.slice(authStart,authEnd);
+ const unsafeClaim="request.auth.token.email_verified == true";
+ const safeClaim="request.auth.token.get('email_verified',false) == true";
+ let identityRules=incidentRules;
+ if(authBlock.includes(unsafeClaim)){
+  if((authBlock.match(/request\.auth\.token\.email_verified\s*==\s*true/g)||[]).length!==1)
+   throw Error("La verificación del claim no es única; detener.");
+  const safeAuthBlock=authBlock.replace(unsafeClaim,safeClaim);
+  identityRules=incidentRules.slice(0,authStart)+safeAuthBlock+incidentRules.slice(authEnd);
+ }else if(!authBlock.includes(safeClaim)){
+  throw Error("La regla de email_verified no coincide con ninguna variante segura conocida; detener.");
+ }
+ // Production may omit paymentDueDate although Operations and its tests use it.
+ const helpers=[...identityRules.matchAll(/function opsValidReport\(\)\s*\{/g)];
  if(helpers.length!==1)
   throw Error("No se reconoce una única validación de reportes de Operaciones; detener.");
  const helperStart=helpers[0].index;
- const helperEnd=incidentRules.indexOf("\n    function opsOwnReport()",helperStart);
+ const helperEnd=identityRules.indexOf("\n    function opsOwnReport()",helperStart);
  if(helperEnd<0)
   throw Error("No se reconoce el límite del esquema de reportes; detener.");
- const helper=incidentRules.slice(helperStart,helperEnd);
- if(helper.includes("'paymentDueDate'")) return incidentRules;
+ const helper=identityRules.slice(helperStart,helperEnd);
+ if(helper.includes("'paymentDueDate'")) return identityRules;
  const fieldList=/['"]returnNote['"]\s*,\s*['"]revision['"]\s*,\s*['"]updatedAt['"]\s*,\s*['"]type['"]\s*,\s*['"]status['"]/g;
  if((helper.match(fieldList)||[]).length!==1)
   throw Error("El esquema de reportes no coincide con la versión revisada; detener.");
  const updatedHelper=helper.replace(fieldList,
   "'returnNote','paymentDueDate','revision','updatedAt','type','status'");
- return incidentRules.slice(0,helperStart)+updatedHelper+incidentRules.slice(helperEnd);
+ return identityRules.slice(0,helperStart)+updatedHelper+identityRules.slice(helperEnd);
 }
 
 const candidate=readFileSync(stage?dir+"/firestore-repositorio.rules":"firestore.rules","utf8");
@@ -187,7 +206,7 @@ if(stage){
   expectedHash:sha(reconciled),blockHash:sha(block),
   oldRuleBytes:Buffer.byteLength(live.content),
   newRuleBytes:Buffer.byteLength(reconciled),
-  strategy:"staff-validation-deny plus attendance-before-explicit-deny-all"
+  strategy:"staff-validation-deny+ops-paymentDueDate+safe-email-verified+attendance"
  };
  writeFileSync(expectedFile,reconciled,"utf8");
  writeFileSync(stateFile,JSON.stringify(state,null,2)+"\n","utf8");
