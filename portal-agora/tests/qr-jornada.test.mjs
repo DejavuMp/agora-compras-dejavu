@@ -109,7 +109,10 @@ test("interfaz admite QR manual y delegación mínima por jornada",async()=>{
  assert.match(scanner,/confirm\("¿Confirmas que/);
  assert.match(scanner,/BarcodeDetector/);
  assert.match(staff,/newShiftQr\(/);
- assert.match(staff,/qr-shift-activity/);
+ assert.match(staff,/const activityKey=""/);
+ assert.doesNotMatch(staff,/qr-shift-activity/);
+ assert.match(scanner,/const next=options\.find/);
+ assert.doesNotMatch(scanner,/scan-activity-options|scan-manual-reason/);
  assert.doesNotMatch(identity,/Registrar mi propia entrada o salida/);
  assert.doesNotMatch(app,/mountOwnAttendance|credential-attendance-panel/);
  assert.match(roster,/QR presencial/);
