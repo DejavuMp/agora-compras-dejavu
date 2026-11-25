@@ -20,8 +20,7 @@ if(!/^[0-9a-f]{24,64}$/i.test(id)){
       result.innerHTML="<b>"+(active?"CREDENCIAL VIGENTE":"CREDENCIAL NO VIGENTE")+"</b>"+
        "<p><b>ID:</b> "+esc(d.agoraId)+"</p><p><b>Nombre:</b> "+esc(d.displayName)+
        "</p><p><b>Cargo:</b> "+esc(d.jobTitle)+"</p>"+
-       (active?'<p><a class="btn outline" href="./?asistencia=1">Registrar mi propia entrada o salida</a></p>':"")+
-       '<p>Este QR verifica identidad y vigencia. No registra asistencia automáticamente; el marcaje requiere iniciar sesión con la cuenta del titular y una jornada autorizada.</p>';
+       '<p>Este QR es exclusivamente para identificación y vigencia. Para el pase de lista se utiliza un QR distinto que se genera dentro de cada jornada o actividad en el espacio Staff.</p>';
     }
   }catch(e){
     console.error(e);
