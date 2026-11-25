@@ -75,39 +75,41 @@ test("salida usa hora servidor y permite GPS opcional",()=>{
  const withGps=exitPayload("",geo,stamp);
  assert.deepEqual(withGps.endGeo,geo);
 });
-test("credencial, verificador y pase de lista tienen salvaguardas obligatorias",async()=>{
- const [app,live,roster,verify,rules,html,style]=await Promise.all([
+test("credencial personal únicamente acredita identidad; las jornadas usan QR separado",async()=>{
+ const [app,roster,verify,rules,html,style,staff,scanner]=await Promise.all([
   readFile(new URL("../app.js",import.meta.url),"utf8"),
-  readFile(new URL("../attendance-live.js",import.meta.url),"utf8"),
   readFile(new URL("../attendance-roster.js",import.meta.url),"utf8"),
   readFile(new URL("../verify.js",import.meta.url),"utf8"),
   readFile(new URL("../../firestore.rules",import.meta.url),"utf8"),
   readFile(new URL("../verificar.html",import.meta.url),"utf8"),
-  readFile(new URL("../perfil.css",import.meta.url),"utf8")
+  readFile(new URL("../perfil.css",import.meta.url),"utf8"),
+  readFile(new URL("../staff/index.html",import.meta.url),"utf8"),
+  readFile(new URL("../escanear/index.html",import.meta.url),"utf8")
  ]);
- assert.match(app,/id="credential-attendance"/);
- assert.match(app,/mountOwnAttendance\(\{auth,db/);
+ assert.match(app,/id="credential-dialog"/);
+ assert.match(app,/id="credential-qr-modal"/);
+ assert.match(app,/data-action="open-credential"/);
+ assert.doesNotMatch(app,/mountOwnAttendance|credential-attendance-panel/);
+ assert.match(app,/QR es exclusivamente de identificación/);
+ assert.match(verify,/agora_identity_credentials/);
+ assert.match(verify,/d\.active===true/);
+ assert.match(verify,/exclusivamente para identificación y vigencia/);
+ assert.doesNotMatch(verify,/Registrar mi propia entrada o salida/);
+ assert.match(app,/data-action="show-shift-qr"/);
  assert.match(app,/data-action="view-attendance"/);
- assert.match(app,/mountRoster\(\{db,target,schedule:state\.roleData\?\.schedule\}\)/);
- assert.match(live,/getDocFromServer\(doc\(db,"agora_ops_members",uid\)\)/);
- assert.match(live,/getDocFromServer\(doc\(db,"agora_ops_staff",uid\)\)/);
- assert.match(live,/clockKey\(uid,shift\.eventId\)/);
- assert.match(live,/getDocFromServer/);
- assert.match(live,/serverTimestamp\(\)/);
- assert.match(live,/setDoc\(ref,entryPayload/);
- assert.match(live,/updateDoc\(ref,exitPayload/);
- assert.match(live,/checkbox\?\.checked/);
- assert.match(live,/data-exit-location-consent/);
- assert.match(live,/if\(exitConsent\?\.checked\)/);
- assert.match(live,/auth\.currentUser\?\.uid!==uid/);
- assert.match(verify,/Registrar mi propia entrada o salida/);
- assert.match(verify,/No registra asistencia automáticamente/);
+ assert.match(app,/escanear\//);
+ assert.match(app,/showShiftQr/);
+ assert.match(app,/mountRoster/);
+ assert.match(staff,/qrcodejs/);
+ assert.match(scanner,/scan-jornada\.js/);
+ assert.match(scanner,/noindex,nofollow/);
  assert.match(html,/name="referrer" content="no-referrer"/);
- assert.match(roster,/getDocsFromServer\(q\)/);
  assert.match(roster,/agora_ops_clock/);
- assert.doesNotMatch(roster,/startGeo|endGeo|latitude|clabe|salary|paymentAmount/);
+ assert.match(roster,/agora_ops_incidents/);
+ assert.match(roster,/Reloj entrada/);
+ assert.match(roster,/QR presencial/);
  assert.match(rules,/match \/agora_ops_clock\/\{id\}/);
- assert.match(rules,/shiftClockOpen\(request\.auth\.uid/);
- assert.match(style,/\.credential-attendance-panel/);
- assert.match(style,/\.attendance-roster-table/);
+ assert.match(rules,/match \/agora_ops_incidents\/\{id\}/);
+ assert.match(style,/\.qr-shift-image/);
+ assert.match(style,/\.qr-scan-page/);
 });
