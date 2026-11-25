@@ -36,9 +36,9 @@ export function rosterEvents(schedule,now=new Date()){
  const time=now.getTime();
  return (Array.isArray(schedule?.payload?.events)?schedule.payload.events:[])
   .filter(e=>e?.id&&e.status!=="cancelado"&&e.status!=="borrador"&&
-    Number.isFinite(new Date(e.start).getTime())&&
-    Math.abs(new Date(e.start).getTime()-time)<30*86400000)
-  .sort((a,b)=>new Date(a.start)-new Date(b.start))
+    Number.isFinite(toDate(e.start).getTime())&&
+    Math.abs(toDate(e.start).getTime()-time)<30*86400000)
+  .sort((a,b)=>toDate(a.start).getTime()-toDate(b.start).getTime())
   .slice(0,100)
   .map(e=>({id:String(e.id),title:String(e.title||e.project||"Jornada"),date:e.start}));
 }
