@@ -215,3 +215,16 @@ No confundir un QR breve generado en navegador con un token firmado por servidor
 4. Prueba funcional de extremo a extremo con dos cuentas reales: un Staff asignado, Supervisor delegado y Coordinación validando horas. Hasta que se verifique el paso 3 no se debe indicar que el guardado productivo está funcionando; hasta que se verifique el 4 no se debe utilizar como único control laboral.
 
 La sección `Asignaciones de jornada` en Agencia ahora guarda una **solicitud persistente y privada**, con folio UUID, quién solicita, canal (WhatsApp, llamada, correo, presencial, otro), proyecto, sede, horario, personal requerido, descripción y actividades. La imagen de evidencia opcional se convierte a **JPEG comprimido (máximo 170 KB)** y se guarda como cadena privada en el documento Firestore de la solicitud, sólo legible para `canEdit()` (coordinadores/administradores); no se crea ningún enlace de descarga público ni se toca Storage. El historial permite consultar y vincular la solicitud a una jornada **ya publicada** en Operaciones; no crea una nueva agenda paralela ni autoriza automáticamente personal. **No se aceptan audio ni PDF en este formulario**: documentar la llamada con texto y, para documentos más grandes, utilizar el proceso de Archivos privado cuando esté verificado. El registro provisional conserva solicitante, medio y motivo en su nota de asistencia.
+
+
+## Activación de reglas de asistencia — sólo manual, con identidad federada (25 NOV 2026)
+
+El frontend del módulo se publicó desde PR #57. Los escenarios de Firestore pasaron en emulador, pero **Google Cloud rechazó el intento de autenticación federada iniciado automáticamente por `push`** con `unauthorized_client: The given credential is rejected by the attribute condition`. Este error ocurrió antes de leer o modificar las reglas reales. Por eso el nuevo workflow se restringe ahora a **`workflow_dispatch` manual desde `main`**, respetando la política OIDC existente que permitió despliegues manuales de Firestore en el repositorio anteriormente.
+
+Instrucción al administrador con acceso de GitHub:
+1. Abrir `https://github.com/DejavuMp/agora-compras-dejavu/actions/workflows/asistencia-produccion-segura.yml`.
+2. Seleccionar **Run workflow** → rama **main**.
+3. Escribir exactamente `agora-dejavu-38b8c` en `project_confirmation`.
+4. Revisar resultado y descargar `respaldo-obligatorio-asistencia-firestore`. **No desplegar manualmente el archivo completo** si el preflight detecta deriva entre producción y la línea base; primero conciliar las diferencias con respaldo.
+
+El preflight compara el nuevo ruleset con el ruleset que había antes de la integración (commit fijo `8960ea9e75899fd9a61499be894979a2beb5125a`), nunca con el padre más reciente de `main`. Reconsulta las reglas reales después del backup y antes de publicar, y verifica la versión resultante. Si la condición OIDC de Google también rechaza el workflow manual por su ruta, un administrador de IAM debe autorizar **explícitamente** ese workflow; **no se debe suplantar ni bypassar el proveedor WIF**. Mientras no exista despliegue confirmado, el frontend mostrará permiso denegado para las nuevas colecciones; no se debe presentar como funcional el guardado productivo.
