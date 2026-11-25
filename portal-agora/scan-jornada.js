@@ -215,11 +215,23 @@ function renderSheet(){
  renderEntries();renderApprovals();
  if(state.isCoordinator)renderSupervisorControl();
 }
-function renderActivityChoices(){
+async function renderActivityChoices(){
  const person=rosterPeople().find(p=>p.personId===$("scan-person").value);
  const keys=person?.activityKeys||[];
+ let more=[];
+ if(person?.uid&&state.sheet){
+  try{
+   const tasks=await getDocsFromServer(query(
+     collection(db,"agora_ops_attendance_sheets",state.sheet.eventId,"activities"),
+     where("uid","==",person.uid)
+   ));
+   more=tasks.docs.map(d=>({id:d.id,name:d.data().name}));
+  }catch(e){console.warn("No se pudieron consultar actividades nuevas",e?.code||e)}
+ }
  $("scan-activity-options").innerHTML='<option value="jornada">Jornada completa</option>'+
-  keys.map(x=>'<option value="'+esc(x)+'">Actividad '+esc(x)+'</option>').join("");
+  keys.map(x=>'<option value="'+esc(x)+'">Actividad '+esc(x)+'</option>').join("")+
+  more.filter(t=>!keys.includes(t.id)).map(t=>
+   '<option value="'+esc(t.id)+'">'+esc(t.name)+'</option>').join("");
 }
 function renderSupervisorControl(){
  const people=shiftPreview(state.schedule,state.sheet.eventId).people
@@ -431,8 +443,13 @@ async function handleQR(raw){
  const person=state.roster.find(p=>p.personId===scan.personId&&p.uid===scan.uid);
  if(!person)throw Error("El QR no corresponde a un colaborador asignado a esta jornada.");
  if(scan.uid===state.user.uid)throw Error("No puedes registrar tu propia asistencia.");
- if(scan.activityKey&&!(person.activityKeys||[]).includes(scan.activityKey))
-  throw Error("La actividad no está en la asignación actual.");
+ if(scan.activityKey&&!(person.activityKeys||[]).includes(scan.activityKey)){
+  const task=await getDocFromServer(doc(db,"agora_ops_attendance_sheets",
+    state.sheet.eventId,"activities",scan.activityKey));
+  if(!task.exists()||task.data().uid!==person.uid||
+     task.data().personId!==person.personId)
+   throw Error("La actividad no está en la asignación actual.");
+ }
  state.qr={scan,person};
  $("scan-qr-result").hidden=false;
  $("scan-qr-identity").textContent=person.name+" · "+state.sheet.title+
