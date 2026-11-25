@@ -7,7 +7,7 @@ import {doc,getDoc,setDoc,serverTimestamp}
 import {saveProfile,saveFinancial} from "../identidad/firebase-identity.js";
 import {projectTodayAssignments} from "../identidad/domain.mjs";
 import {ownJornadas,coordinationJornadas,operationTotals,validateAssignmentDraft,assignmentDraftText,REQUEST_CHANNELS} from "./roles-operacion.mjs";
-import {mountOwnAttendance} from "./attendance-live.js";
+import {showShiftQr} from "./staff-shift-qr.js";
 import {mountRoster} from "./attendance-roster.js";
 
 // Una sola identidad Firebase para todas las vistas. Sin módulos operativos.
@@ -279,12 +279,7 @@ function credentialDialog(){
         '<p>El código QR está pendiente de emisión.</p>')+
       '<span class="credential-valid">Vigente</span>'+
     '</div>'+
-    '<p class="profile-muted">El QR permite comprobar la vigencia. No comparte información privada del expediente.</p>'+
-    '<details class="credential-attendance-panel" id="credential-attendance-details" open>'+
-      '<summary>Mi pase de lista · Entrada y salida</summary>'+
-      '<div id="credential-attendance"><p class="profile-muted" role="status">Comprobando mi jornada…</p></div>'+
-    '</details>'+
-
+    '<p class="profile-muted">Este QR es exclusivamente de identificación y vigencia. Para asistencia utiliza el QR de una jornada en Staff.</p>'+
     '<div class="modal-actions">'+
       (link?'<button class="profile-button" type="button" data-action="share-credential">Compartir verificación</button>'+
         '<a class="profile-button profile-button-outline" href="'+esc(link)+'" target="_blank" rel="noopener noreferrer">Comprobar vigencia</a>':"")+
@@ -400,15 +395,6 @@ function profile(){
     credentialDialog()+
   '</section>';
   prepareProfilePhotos();
-  if(new URLSearchParams(location.search).get("asistencia")==="1"){
-    // Sólo un enlace de acción explícita abre automáticamente la credencial.
-    const modal=document.getElementById("credential-dialog");
-    if(modal&& !modal.open){
-      if(modal.showModal)modal.showModal();else modal.setAttribute("open","");
-      drawQr();
-      mountOwnAttendance({auth,db,target:document.getElementById("credential-attendance"),identity:state.identity});
-    }
-  }
 }
 
 // Los campos se conservan con los mismos nombres que Identidad Única y RH.
@@ -544,6 +530,7 @@ function staffJornadaCard(item){
       '<p>Coordinación todavía no ha detallado las actividades.</p>')+
       (item.instructions?'<p class="role-instructions">'+esc(item.instructions)+'</p>':"")+
     '</div>'+
+    '<button type="button" class="profile-button profile-button-primary" data-action="show-shift-qr" data-event-id="'+esc(item.key)+'">Mostrar QR de jornada / actividad</button>'+
     '<details class="role-add-activity"><summary>+ Proponer otra actividad en esta jornada</summary>'+
       '<form data-draft-activity="'+esc(item.key)+'" class="role-proposal-form">'+
         '<label>Actividad adicional<input name="activity" required maxlength="200" placeholder="¿Qué otra actividad realizarás?"></label>'+
@@ -562,13 +549,18 @@ function staffOperationsSpace(){
     '<header class="role-module-heading"><div><h2>Mis jornadas</h2>'+
       '<p>Una jornada puede incluir varias actividades. Consulta tus asignaciones personales.</p></div>'+
       '<div class="role-space-actions">'+
-        '<a class="profile-button profile-button-primary" href="'+esc(href("?asistencia=1"))+'">Mi credencial · Entrada / salida</a>'+
-        '<a class="profile-button profile-button-outline" href="'+esc(href("mi-operacion/"))+'">Mi operación</a></div></header>'+
+        '<a class="profile-button profile-button-primary" href="'+esc(href("mi-operacion/"))+'">Mi operación</a>'+
+        '<span class="profile-muted">El QR de jornada está en cada asignación.</span></div></header>'+
     roleNotice()+
     (staff?assigned.length?'<div class="role-jornada-list">'+assigned.slice(0,3).map(staffJornadaCard).join("")+'</div>'+
       (assigned.length>3?'<details class="role-more-jornadas"><summary>Ver otras jornadas ('+(assigned.length-3)+')</summary><div class="role-jornada-list">'+assigned.slice(3).map(staffJornadaCard).join("")+'</div></details>':""):
       '<p class="role-empty">No hay jornadas vigentes o próximas en tu ficha personal.</p>':
       '<p class="role-empty">Todavía no encontramos una ficha de Operaciones vinculada a tu cuenta. Coordinación debe vincular tu UID al personal asignado.</p>')+
+    '<dialog id="staff-shift-qr-dialog" class="role-dialog" aria-labelledby="staff-shift-qr-title">'+
+      '<div class="role-dialog-head"><div><strong id="staff-shift-qr-title">QR de jornada / actividad</strong>'+
+      '<p>Preséntalo al coordinador o supervisor autorizado. Es distinto de tu identificación.</p></div>'+
+      '<button type="button" data-action="close-shift-qr" aria-label="Cerrar QR de jornada">×</button></div>'+
+      '<div id="staff-shift-qr-content"></div></dialog>'+
     '<div class="role-legacy-links"><a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/visor.html"))+'" target="_blank" rel="noopener noreferrer">Registrar entrada / salida · sistema actual ↗</a></div>'+
     '<p class="role-transition">El marcaje oficial sigue en Jornadas mientras se integra en esta pantalla. Se conserva tu historial.</p>'+
   '</section>';
@@ -635,7 +627,8 @@ function coordinationOperationsSpace(admin=false){
       (list.length?'<div class="role-jornada-list">'+list.slice(0,6).map(scheduleCard).join("")+'</div>'+
         (list.length>6?'<details class="role-more-jornadas"><summary>Ver otras jornadas ('+(list.length-6)+')</summary><div class="role-jornada-list">'+list.slice(6).map(scheduleCard).join("")+'</div></details>':""):
        '<p class="role-empty">No hay jornadas próximas en el cronograma operativo.</p>')+
-      '<div class="role-legacy-links"><button type="button" data-action="view-attendance" class="profile-button profile-button-primary">Pase de lista · Entradas y salidas</button>'+
+      '<div class="role-legacy-links"><a class="profile-button profile-button-primary" href="'+esc(href("escanear/"))+'">Escanear QR de jornada</a>'+
+      '<button type="button" data-action="view-attendance" class="profile-button profile-button-outline">Pase de lista</button>'+
         '<a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/"))+'" target="_blank" rel="noopener noreferrer">Editar agenda vigente ↗</a>'+
         '<a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/control-jornadas.html"))+'" target="_blank" rel="noopener noreferrer">Control de asistencia ↗</a></div>'+
       '<p class="role-transition">El cronograma original continúa como fuente oficial de asignaciones. Las solicitudes nuevas permanecen en borrador hasta habilitar su registro y aprobación seguros.</p>'+
@@ -714,6 +707,23 @@ app.addEventListener("click",event=>{
   const target=event.target.closest("[data-action]");
   if(!target)return;
   const task=target.dataset.action;
+  if(task==="show-shift-qr"){
+    if(!allowed("staff")||!state.user||!state.roleData?.staff)return;
+    const eventId=clean(target.dataset.eventId);
+    const shifts=ownJornadas(state.roleData.staff,new Date(),100);
+    const shift=shifts.find(x=>x.key===eventId);
+    const dialog=document.getElementById("staff-shift-qr-dialog");
+    const container=document.getElementById("staff-shift-qr-content");
+    if(!shift||!dialog||!container)return notice("Jornada no disponible.","error");
+    showShiftQr({target:container,uid:state.user.uid,personId:state.roleData.staff.personId,shift});
+    if(dialog.showModal)dialog.showModal();else dialog.setAttribute("open","");
+    return;
+  }
+  if(task==="close-shift-qr"){
+    const dialog=document.getElementById("staff-shift-qr-dialog");
+    if(dialog?.close)dialog.close();else dialog?.removeAttribute("open");
+    return;
+  }
   if(task==="view-attendance"){
     if(!["admin","coordinador"].includes(role())||!allowed(routeSpace))return;
     const dialog=document.getElementById("attendance-roster-dialog");
@@ -771,9 +781,7 @@ app.addEventListener("click",event=>{
     const modal=document.getElementById("credential-dialog");
     if(!modal)return;
     if(modal.showModal)modal.showModal();else modal.setAttribute("open","");
-    drawQr();prepareProfilePhotos();
-    mountOwnAttendance({auth,db,target:document.getElementById("credential-attendance"),identity:state.identity});
-    return;
+    drawQr();prepareProfilePhotos();return;
   }
   if(task==="close-credential"){
     const modal=document.getElementById("credential-dialog");
