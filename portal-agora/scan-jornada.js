@@ -80,26 +80,42 @@ function hideCamera(){
 }
 async function cameraStart(){
  if(!state.allowed||state.camera)return;
- if(!navigator.mediaDevices?.getUserMedia||!window.BarcodeDetector)
-  return notice("Este navegador no admite lectura de QR con cámara. Puedes pegar el enlace del QR.","warning");
+ if(!navigator.mediaDevices?.getUserMedia||
+      (!window.BarcodeDetector&&!window.jsQR))
+  return notice("Este navegador no ofrece lector QR compatible. Puedes pegar el enlace del QR.","warning");
  try{
   const stream=await navigator.mediaDevices.getUserMedia({
     video:{facingMode:{ideal:"environment"}},audio:false
   });
   const video=$("scan-video");
   video.srcObject=stream;await video.play();
-  const detector=new window.BarcodeDetector({formats:["qr_code"]});
-  state.camera={stream,detector};
+  const detector=window.BarcodeDetector?
+    new window.BarcodeDetector({formats:["qr_code"]}):null;
+  const canvas=document.createElement("canvas");
+  const context=canvas.getContext("2d",{willReadFrequently:true});
+  state.camera={stream,detector,canvas,context};
   $("scan-camera").hidden=false;$("scan-open-camera").disabled=true;
   const loop=async()=>{
    if(!state.camera||document.hidden)return;
    try{
-    const codes=await detector.detect(video);
-    if(codes.length&&codes[0].rawValue){
-      $("scan-input").value=codes[0].rawValue;
-      hideCamera();await handleQR(codes[0].rawValue);return;
+    let code="";
+    if(detector){
+      const results=await detector.detect(video);
+      code=results[0]?.rawValue||"";
+    }else if(window.jsQR&&context&&video.videoWidth&&video.videoHeight){
+      const factor=Math.min(1,720/video.videoWidth);
+      const width=Math.max(1,Math.round(video.videoWidth*factor));
+      const height=Math.max(1,Math.round(video.videoHeight*factor));
+      canvas.width=width;canvas.height=height;
+      context.drawImage(video,0,0,width,height);
+      const frame=context.getImageData(0,0,width,height);
+      const result=window.jsQR(frame.data,width,height,{inversionAttempts:"attemptBoth"});
+      code=result?.data||"";
     }
-   }catch(e){console.warn("Lector QR",e)}
+    if(code){
+      $("scan-input").value=code;hideCamera();await handleQR(code);return;
+    }
+   }catch(error){console.warn("Lector QR:",error?.message||error)}
    if(state.camera)requestAnimationFrame(loop);
   };
   requestAnimationFrame(loop);
