@@ -1697,9 +1697,9 @@ match /agora_finance_requests/{requestId} {
         d.actorUid == request.auth.uid &&
         d.status == 'pendiente' && d.createdAt == request.time &&
         request.time >= get(attendanceSheetPath(eventId)).data.startsAt -
-          duration.value(1,'h') &&
+          duration.value(30,'m') &&
         request.time <= get(attendanceSheetPath(eventId)).data.endsAt +
-          duration.value(12,'h');
+          duration.value(30,'m');
     }
     function attendanceValidated(eventId,personId,action) {
       let id=personId + '__' + action + '__jornada';
