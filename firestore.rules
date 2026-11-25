@@ -1958,6 +1958,145 @@ match /agora_finance_requests/{requestId} {
       }
     }
 
+    // Autorregistros laborales privados. Lo declarado por Staff/Supervisor
+    // queda separado de asistencia verificada y sólo coordinación/administración
+    // puede validar horas o importes.
+    function workClaimPath(claimId) {
+      return /databases/$(database)/documents/agora_ops_work_claims/$(claimId);
+    }
+    function workClaimHistoryPath(claimId,entryId) {
+      return /databases/$(database)/documents/agora_ops_work_claims/$(claimId)/history/$(entryId);
+    }
+    function workClaimHistoryValid(claimId,entryId,action,owner) {
+      return existsAfter(workClaimHistoryPath(claimId,entryId)) &&
+        getAfter(workClaimHistoryPath(claimId,entryId)).data.claimId == claimId &&
+        getAfter(workClaimHistoryPath(claimId,entryId)).data.action == action &&
+        getAfter(workClaimHistoryPath(claimId,entryId)).data.actorUid == request.auth.uid &&
+        getAfter(workClaimHistoryPath(claimId,entryId)).data.at == request.time &&
+        getAfter(workClaimHistoryPath(claimId,entryId)).data.ownerUid == owner;
+    }
+    match /agora_ops_work_claims/{claimId} {
+      allow get, list: if canEdit() ||
+        (opsStaff() && resource.data.ownerUid == request.auth.uid);
+      allow create: if opsStaff() &&
+        claimId.matches('^[A-Za-z0-9_-]{20,70}$') &&
+        request.resource.data.keys().hasOnly([
+          'id','ownerUid','personId','personName','recordType','project','client','site','date','activityType',
+          'plannedStart','plannedEnd','actualStart','actualEnd','description','requester','supervisor','channel',
+          'declaredRate','overtimeHours','expenses','notes','evidenceImage','status','validationNote',
+          'declaredHours','approvedHours','approvedRate','approvedAmount','createdBy','createdAt','updatedBy',
+          'updatedAt','lastHistoryId'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'id','ownerUid','personId','personName','recordType','project','client','site','date','activityType',
+          'plannedStart','plannedEnd','actualStart','actualEnd','description','requester','supervisor','channel',
+          'declaredRate','overtimeHours','expenses','notes','evidenceImage','status','validationNote',
+          'declaredHours','approvedHours','approvedRate','approvedAmount','createdBy','createdAt','updatedBy',
+          'updatedAt','lastHistoryId'
+        ]) &&
+        request.resource.data.id == claimId &&
+        request.resource.data.ownerUid == request.auth.uid &&
+        request.resource.data.personId == opsPersonId() &&
+        request.resource.data.personName is string &&
+        request.resource.data.personName.size() >= 2 && request.resource.data.personName.size() <= 140 &&
+        request.resource.data.recordType in ['proximo','en_curso','realizado'] &&
+        request.resource.data.project is string && request.resource.data.project.size() >= 2 && request.resource.data.project.size() <= 150 &&
+        request.resource.data.client is string && request.resource.data.client.size() <= 120 &&
+        request.resource.data.site is string && request.resource.data.site.size() >= 2 && request.resource.data.site.size() <= 150 &&
+        request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        request.resource.data.activityType is string && request.resource.data.activityType.size() <= 100 &&
+        request.resource.data.plannedStart is string &&
+          (request.resource.data.plannedStart == '' || request.resource.data.plannedStart.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')) &&
+        request.resource.data.plannedEnd is string &&
+          (request.resource.data.plannedEnd == '' || request.resource.data.plannedEnd.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')) &&
+        request.resource.data.actualStart is string &&
+          (request.resource.data.actualStart == '' || request.resource.data.actualStart.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')) &&
+        request.resource.data.actualEnd is string &&
+          (request.resource.data.actualEnd == '' || request.resource.data.actualEnd.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')) &&
+        (request.resource.data.recordType != 'proximo' ||
+          (request.resource.data.plannedStart != '' && request.resource.data.plannedEnd != '')) &&
+        (request.resource.data.recordType != 'realizado' ||
+          (request.resource.data.actualStart != '' && request.resource.data.actualEnd != '' && request.resource.data.declaredHours is number)) &&
+        (request.resource.data.recordType != 'en_curso' || request.resource.data.actualStart != '') &&
+        request.resource.data.description is string && request.resource.data.description.size() >= 3 && request.resource.data.description.size() <= 600 &&
+        request.resource.data.requester is string && request.resource.data.requester.size() >= 2 && request.resource.data.requester.size() <= 140 &&
+        request.resource.data.supervisor is string && request.resource.data.supervisor.size() <= 140 &&
+        request.resource.data.channel in ['WhatsApp','Llamada','Verbal','Correo','Asignación interna','Otro'] &&
+        (request.resource.data.declaredRate == null ||
+          (request.resource.data.declaredRate is number && request.resource.data.declaredRate > 0 && request.resource.data.declaredRate <= 100000)) &&
+        request.resource.data.overtimeHours is number && request.resource.data.overtimeHours >= 0 && request.resource.data.overtimeHours <= 24 &&
+        request.resource.data.expenses is number && request.resource.data.expenses >= 0 && request.resource.data.expenses <= 50000 &&
+        request.resource.data.notes is string && request.resource.data.notes.size() <= 500 &&
+        request.resource.data.evidenceImage is string && request.resource.data.evidenceImage.size() <= 185000 &&
+        (request.resource.data.evidenceImage == '' || request.resource.data.evidenceImage.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')) &&
+        request.resource.data.status == 'pendiente' && request.resource.data.validationNote == '' &&
+        (request.resource.data.declaredHours == null ||
+          (request.resource.data.declaredHours is number && request.resource.data.declaredHours > 0 && request.resource.data.declaredHours <= 36)) &&
+        request.resource.data.approvedHours == null && request.resource.data.approvedRate == null && request.resource.data.approvedAmount == null &&
+        request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time &&
+        request.resource.data.lastHistoryId == 'created' &&
+        workClaimHistoryValid(claimId,'created','creado',request.auth.uid);
+      allow update: if
+        (canEdit() && resource.data.ownerUid != request.auth.uid &&
+          resource.data.status in ['pendiente','aclaracion'] &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status','validationNote','approvedHours','approvedRate','approvedAmount',
+            'updatedBy','updatedAt','lastHistoryId'
+          ]) &&
+          request.resource.data.status in ['validado','aclaracion','rechazado'] &&
+          request.resource.data.validationNote is string && request.resource.data.validationNote.size() <= 400 &&
+          (request.resource.data.status == 'validado' ?
+            (request.resource.data.approvedHours is number && request.resource.data.approvedHours > 0 && request.resource.data.approvedHours <= 36 &&
+             (request.resource.data.approvedRate == null ||
+               (request.resource.data.approvedRate is number && request.resource.data.approvedRate > 0 && request.resource.data.approvedRate <= 100000)) &&
+             (request.resource.data.approvedAmount == null ||
+               (request.resource.data.approvedAmount is number && request.resource.data.approvedAmount >= 0 && request.resource.data.approvedAmount <= 1000000))) :
+            (request.resource.data.approvedHours == null && request.resource.data.approvedRate == null && request.resource.data.approvedAmount == null)) &&
+          request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time &&
+          request.resource.data.lastHistoryId is string &&
+          workClaimHistoryValid(claimId,request.resource.data.lastHistoryId,request.resource.data.status,resource.data.ownerUid))
+        ||
+        (opsStaff() && resource.data.ownerUid == request.auth.uid &&
+          resource.data.recordType == 'en_curso' && resource.data.status == 'pendiente' &&
+          resource.data.actualEnd == '' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'actualEnd','declaredHours','updatedBy','updatedAt','lastHistoryId'
+          ]) &&
+          request.resource.data.actualEnd.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$') &&
+          request.resource.data.declaredHours is number &&
+          request.resource.data.declaredHours > 0 && request.resource.data.declaredHours <= 24 &&
+          request.resource.data.updatedBy == request.auth.uid &&
+          request.resource.data.updatedAt == request.time &&
+          workClaimHistoryValid(claimId,request.resource.data.lastHistoryId,'finalizada',resource.data.ownerUid));
+      allow delete: if false;
+      match /history/{entryId} {
+        allow get, list: if canEdit() ||
+          (opsStaff() && get(workClaimPath(claimId)).data.ownerUid == request.auth.uid);
+        allow create: if request.resource.data.keys().hasOnly(['claimId','action','actorUid','actorName','at','note','ownerUid','eventTime']) &&
+          request.resource.data.keys().hasAll(['claimId','action','actorUid','actorName','at','note','ownerUid']) &&
+          request.resource.data.claimId == claimId &&
+          request.resource.data.actorUid == request.auth.uid &&
+          request.resource.data.actorName is string && request.resource.data.actorName.size() <= 140 &&
+          request.resource.data.at == request.time &&
+          request.resource.data.note is string && request.resource.data.note.size() <= 400 &&
+          (request.resource.data.action == 'creado' ?
+            (opsStaff() && request.resource.data.ownerUid == request.auth.uid &&
+             existsAfter(workClaimPath(claimId)) &&
+             getAfter(workClaimPath(claimId)).data.lastHistoryId == entryId) :
+            ((canEdit() || opsStaff()) && existsAfter(workClaimPath(claimId)) &&
+             getAfter(workClaimPath(claimId)).data.lastHistoryId == entryId &&
+             (request.resource.data.action == 'finalizada' ?
+               (opsStaff() && request.resource.data.ownerUid == request.auth.uid &&
+                getAfter(workClaimPath(claimId)).data.ownerUid == request.auth.uid &&
+                request.resource.data.eventTime is string &&
+                getAfter(workClaimPath(claimId)).data.actualEnd == request.resource.data.eventTime) :
+               (canEdit() && request.resource.data.action == getAfter(workClaimPath(claimId)).data.status &&
+                getAfter(workClaimPath(claimId)).data.ownerUid == request.resource.data.ownerUid))));
+        allow update, delete: if false;
+      }
+    }
+
     // Todas las demás colecciones permanecen cerradas.
     match /{document=**} {
       allow read, write: if false;

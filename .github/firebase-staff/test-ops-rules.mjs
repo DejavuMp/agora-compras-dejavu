@@ -5,7 +5,7 @@
 import {readFileSync} from 'node:fs';
 import {initializeTestEnvironment,assertFails,assertSucceeds} from '@firebase/rules-unit-testing';
 import {
-  doc,collection,query,where,getDoc,getDocs,setDoc,updateDoc,
+  doc,collection,query,where,getDoc,getDocs,setDoc,updateDoc,writeBatch,
   serverTimestamp,Timestamp
 } from 'firebase/firestore';
 const env=await initializeTestEnvironment({
@@ -148,5 +148,84 @@ try{
   await yes('coordinación fija la fecha prevista del pago',updateDoc(log(coord),{
     paymentDueDate:'2026-12-12',revision:4,updatedAt:serverTimestamp()
   }));
+  const claimId='claim_0123456789abcdefghij';
+  const claimRef=doc(staff,'agora_ops_work_claims',claimId);
+  const claimHistory=doc(staff,'agora_ops_work_claims',claimId,'history','created');
+  const claimData={
+    id:claimId,ownerUid:staffId,personId,personName:'Persona ficticia',
+    recordType:'realizado',project:'Evento de prueba',client:'',site:'Sede ficticia',
+    date:'2026-11-24',activityType:'Montaje',plannedStart:'',plannedEnd:'',
+    actualStart:'09:00',actualEnd:'17:00',description:'Trabajo declarado para prueba.',
+    requester:'Coordinador de prueba',supervisor:'',channel:'WhatsApp',
+    declaredRate:null,overtimeHours:0,expenses:0,notes:'',evidenceImage:'',
+    status:'pendiente',validationNote:'',declaredHours:8,approvedHours:null,
+    approvedRate:null,approvedAmount:null,createdBy:staffId,
+    createdAt:serverTimestamp(),updatedBy:staffId,updatedAt:serverTimestamp(),
+    lastHistoryId:'created'
+  };
+  let claimBatch=writeBatch(staff);
+  claimBatch.set(claimRef,claimData);
+  claimBatch.set(claimHistory,{claimId,action:'creado',actorUid:staffId,
+    actorName:'Persona ficticia',at:serverTimestamp(),note:'Registro propio.',ownerUid:staffId});
+  await yes('staff registra un trabajo retrospectivo propio y su historial',claimBatch.commit());
+  await no('staff no duplica un trabajo ya registrado',setDoc(claimRef,claimData));
+  await yes('staff consulta solo autorregistros propios',getDocs(query(
+    collection(staff,'agora_ops_work_claims'),where('ownerUid','==',staffId)
+  )));
+  await no('otro trabajador no puede consultar autorregistros ajenos',
+    getDoc(doc(outsider,'agora_ops_work_claims',claimId)));
+  await no('staff no puede validarse su propio trabajo',updateDoc(claimRef,{
+    status:'validado',approvedHours:8,updatedAt:serverTimestamp()
+  }));
+  const decisionId='decision_0123456789';
+  claimBatch=writeBatch(coord);
+  claimBatch.update(doc(coord,'agora_ops_work_claims',claimId),{
+    status:'validado',validationNote:'Horas revisadas',approvedHours:8,
+    approvedRate:null,approvedAmount:null,updatedBy:coordId,
+    updatedAt:serverTimestamp(),lastHistoryId:decisionId
+  });
+  claimBatch.set(doc(coord,'agora_ops_work_claims',claimId,'history',decisionId),{
+    claimId,action:'validado',actorUid:coordId,actorName:'Coordinación',
+    at:serverTimestamp(),note:'Horas revisadas',ownerUid:staffId
+  });
+  await yes('coordinación valida trabajo sin inventar tarifa ni importe',claimBatch.commit());
+  await yes('staff consulta la resolución de su trabajo',getDoc(claimRef));
+  await no('staff no puede modificar la decisión administrativa',updateDoc(claimRef,{
+    status:'pendiente',validationNote:'Manipulado',updatedAt:serverTimestamp()
+  }));
+  const liveId='claim_1123456789abcdefghij';
+  claimBatch=writeBatch(staff);
+  claimBatch.set(doc(staff,'agora_ops_work_claims',liveId),{
+    ...claimData,id:liveId,recordType:'en_curso',actualStart:'09:00',
+    actualEnd:'',declaredHours:null,lastHistoryId:'created',
+    status:'pendiente',createdBy:staffId,updatedBy:staffId
+  });
+  claimBatch.set(doc(staff,'agora_ops_work_claims',liveId,'history','created'),{
+    claimId:liveId,action:'creado',actorUid:staffId,actorName:'Persona ficticia',
+    at:serverTimestamp(),note:'Inicio declarado.',ownerUid:staffId
+  });
+  await yes('staff inicia un trabajo provisional sin convertirlo en asistencia verificada',claimBatch.commit());
+  const finishId='finish_0123456789';
+  claimBatch=writeBatch(staff);
+  claimBatch.update(doc(staff,'agora_ops_work_claims',liveId),{
+    actualEnd:'17:00',declaredHours:8,updatedBy:staffId,
+    updatedAt:serverTimestamp(),lastHistoryId:finishId
+  });
+  claimBatch.set(doc(staff,'agora_ops_work_claims',liveId,'history',finishId),{
+    claimId:liveId,action:'finalizada',actorUid:staffId,actorName:'Persona ficticia',
+    at:serverTimestamp(),note:'La persona declaró la hora de salida.',
+    eventTime:'17:00',ownerUid:staffId
+  });
+  await yes('staff cierra su declaración provisional con historial',claimBatch.commit());
+  await no('staff no puede cerrar un trabajo con una salida distinta a la auditoría',updateDoc(
+    doc(staff,'agora_ops_work_claims',liveId),{actualEnd:'18:00',updatedAt:serverTimestamp()}
+  ));
+  await no('coordinación no puede validar sin registrar historial',updateDoc(
+    doc(coord,'agora_ops_work_claims',liveId),{
+      status:'validado',validationNote:'Sin rastro',approvedHours:8,
+      approvedRate:null,approvedAmount:null,updatedBy:coordId,
+      updatedAt:serverTimestamp(),lastHistoryId:'missing_history_123456'
+    }
+  ));
   console.log('ÁGORA OPS V4: '+passed+' pruebas terminadas.');
 }finally{await env.cleanup();}
