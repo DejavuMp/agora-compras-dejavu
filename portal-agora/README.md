@@ -193,3 +193,25 @@ Este apartado **sustituye** las referencias anteriores del README que incluían 
 No confundir un QR breve generado en navegador con un token firmado por servidor ni con presencia biométrica. Para convertir el **escaneo del supervisor en marcaje oficial del reloj** se necesita una nueva autorización de servidor, vinculaciones por jornada, tokens antirreutilización, acceso restringido al supervisor por actividad y reglas/emulador. Esos cambios **no se desplegaron** porque el proyecto tiene reglas de producción con controles de respaldo y no se deben sobrescribir sin conciliación.
 
 **No se modifican Firestore Rules, Storage Rules, datos anteriores, usuarios ni permisos.** Verificar lectura y creación de un incidente QR mediante cuentas reales antes de utilizarlo como control laboral definitivo.
+
+
+## PASE DE LISTA INTEGRADO — QR / Manual / Provisional / Pagos (25 NOV 2026)
+
+### Implementación de cierre sobre el sistema ÁGORA ya existente
+- **Credencial de identidad y QR de jornada son independientes.** El QR de identidad sólo verifica ID, nombre, puesto y vigencia; no registra asistencia.
+- **Tres métodos de pase de lista:** escaneo del QR efímero de jornada/actividad (90 s), selección manual de personal previamente asignado (con y sin cuenta/QR) y alta de asistente provisional con motivo, persona y medio de solicitud registrados.
+- **Supervisor**: únicamente puede consultar y capturar asistencia de jornadas cuyo UID haya delegado Coordinación en el documento mínimo `agora_ops_attendance_sheets/{eventId}`. No recibe el cronograma global con tarifas, finanzas, datos bancarios, expediente ni autorización de pagos. La delegación exige sesión Firebase verificada e identidad Dejavú activa.
+- **Coordinación/Administración**: prepara la jornada desde el cronograma original, elige UID(s) supervisores, puede cerrar/reabrir lista, valida/rechaza registros y aprueba minutos netos tras confirmar entrada y salida (QR/manual/provisional validados o reloj original finalizado). **No realiza transferencias**. Puede copiar el resumen para el módulo de Solicitud de Recursos/Pagos, que conserva su propio control.
+- **Jornada única con actividades múltiples:** la colección `activities` guarda cualquier cantidad de tareas por UID/jornada; Staff puede agregar actividades y marcar pendiente, en curso, terminada o no realizada sin crear otra jornada ni horas adicionales. Los QR de actividad se integran a la misma jornada.
+- **Registros preservados:** `agora_ops_clock`, `agora_ops_logs` y todos los datos del personal y pagos previos permanecen intactos. Las nuevas capturas se guardan en `entries` con sello de tiempo del servidor, autor UID, modalidad y estado pendiente; el coordinador valida en campos inmutables y aprobaciones independientes.
+- **Sin tiempos de traslado** en la nueva interfaz. No se accede a GPS, importes ni bancos desde el pase de lista.
+- **Seguridad:** ruleset aditivo que no modifica ninguna regla existente; tests de emulador Firestore comprueban denegación de autoasistencia, aislamiento del Supervisor, duplicados, horas validadas y actividades.
+- **Producción protegida:** GitHub Pages publica la interfaz al fusionar el PR. Las nuevas escrituras de Firestore sólo quedan activas si el proceso `ÁGORA · Asistencia con respaldo y publicación segura` se completa. Este proceso primero respalda las reglas reales, compara SHA exacto con la base anterior, prueba el ruleset con emulador, revalida el ruleset real y sólo entonces publica Firestore. Si hay diferencias, **no sobrescribe producción** y el módulo muestra un error real de permisos.
+
+### Requisitos de salida
+1. Workflow `Dejavú Staff · Firebase (reglas seguras)` completo en verde (incluidos `test-attendance-rules.mjs`).
+2. Publicación GitHub Pages de main completada.
+3. Publicación protegida de Firestore confirmada mediante comparación del ruleset activo y respaldo almacenado en el workflow.
+4. Prueba funcional de extremo a extremo con dos cuentas reales: un Staff asignado, Supervisor delegado y Coordinación validando horas. Hasta que se verifique el paso 3 no se debe indicar que el guardado productivo está funcionando; hasta que se verifique el 4 no se debe utilizar como único control laboral.
+
+La sección antigua `Asignaciones de jornada` en Agencia sigue siendo un **borrador exportable**, no una solicitud persistente con adjuntos. Los archivos de evidencia de WhatsApp/correo/audio tampoco se suben en esta etapa: `storage.rules` actual no dispone de una ruta para esas evidencias. El registro provisional sí conserva solicitante, medio y motivo en la nota de la asistencia. No afirmar que los documentos privados se cargaron si el almacenamiento no está autorizado.
