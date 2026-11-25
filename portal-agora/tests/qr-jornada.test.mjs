@@ -86,22 +86,27 @@ test("cada registro guarda actor, hora del servidor y no toca el reloj oficial",
  assert.ok(!JSON.stringify(record).includes("startGeo"));
  assert.ok(!JSON.stringify(record).includes("salary"));
 });
-test("interfaz separa marcaje y QR y limita escritura a coordinador",async()=>{
- const [scanner,staff,app,roster,rules,identity]=await Promise.all([
+test("interfaz admite QR manual y delegación mínima por jornada",async()=>{
+ const [scanner,staff,app,roster,rules,identity,html]=await Promise.all([
   readFile(new URL("../scan-jornada.js",import.meta.url),"utf8"),
   readFile(new URL("../staff-shift-qr.js",import.meta.url),"utf8"),
   readFile(new URL("../app.js",import.meta.url),"utf8"),
   readFile(new URL("../attendance-roster.js",import.meta.url),"utf8"),
   readFile(new URL("../../firestore.rules",import.meta.url),"utf8"),
-  readFile(new URL("../verify.js",import.meta.url),"utf8")
+  readFile(new URL("../verify.js",import.meta.url),"utf8"),
+  readFile(new URL("../escanear/index.html",import.meta.url),"utf8")
  ]);
  assert.match(scanner,/\["admin","coordinador"\]/);
  assert.match(scanner,/getDocFromServer\(doc\(db,"agora_ops_control","schedule"\)\)/);
- assert.match(scanner,/verifyShiftAssignment/);
- assert.match(scanner,/validateScanPermit/);
- assert.match(scanner,/getDocFromServer\(recordRef\)/);
- assert.match(scanner,/setDoc\(recordRef,\{id:recordId,\.\.\.record\}\)/);
- assert.match(scanner,/confirm\("¿Confirmas que verificaste físicamente/);
+ assert.match(scanner,/state\.isCoordinator/);
+ assert.match(scanner,/where\("supervisorUids","array-contains",state\.user\.uid\)/);
+ assert.match(scanner,/parseShiftQr/);
+ assert.match(scanner,/getDocFromServer\(ref\)/);
+ assert.match(scanner,/setDoc\(ref,draft\)/);
+ assert.match(scanner,/entryDraft/);
+ assert.match(scanner,/reviewEntry/);
+ assert.match(scanner,/approveHours/);
+ assert.match(scanner,/confirm\("¿Confirmas que/);
  assert.match(scanner,/BarcodeDetector/);
  assert.match(staff,/newShiftQr\(/);
  assert.match(staff,/qr-shift-activity/);
@@ -109,6 +114,7 @@ test("interfaz separa marcaje y QR y limita escritura a coordinador",async()=>{
  assert.doesNotMatch(app,/mountOwnAttendance|credential-attendance-panel/);
  assert.match(roster,/QR presencial/);
  assert.match(roster,/Reloj entrada/);
+ assert.match(html,/Pase de lista manual/);
+ assert.match(rules,/match \/agora_ops_attendance_sheets\/\{eventId\}/);
  assert.match(rules,/match \/agora_ops_incidents\/\{id\}/);
- assert.match(rules,/allow create: if opsValidReport\(\)/);
 });
