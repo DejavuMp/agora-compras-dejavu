@@ -101,7 +101,7 @@ function reconcileIdentityPhoneAccess(content,repositoryRules){
  updateMatch("/agora_users/\\{uid\\}",["get"],true);
  updateMatch("/agora_identity_registrations/\\{uid\\}",["get","create"]);
  function approvedFunction(source,name){
-  const matches=[...source.matchAll(new RegExp("function "+name+"\\(\\)\\s*\\{","g"))];
+  const matches=[...source.matchAll(new RegExp("function "+name+"\\([^)]*\\)\\s*\\{","g"))];
   if(matches.length!==1)throw Error("No se reconoce una única función "+name+" en las reglas revisadas.");
   const start=matches[0].index;
   const end=source.indexOf("\n    function ",start+1);
@@ -116,7 +116,7 @@ function reconcileIdentityPhoneAccess(content,repositoryRules){
   if(name==="identityAssigned"&&
      (!approved.includes("identityCoordinator()")||!approved.includes("request.auth.uid in record.coordinatorUids")))
    throw Error("identityAssigned no coincide con la regla segura revisada.");
-  const matches=[...result.matchAll(new RegExp("function "+name+"\\(\\)\\s*\\{","g"))];
+  const matches=[...result.matchAll(new RegExp("function "+name+"\\([^)]*\\)\\s*\\{","g"))];
   if(matches.length>1)throw Error("Hay varias funciones "+name+" en reglas activas.");
   if(matches.length===1){
    const start=matches[0].index,end=result.indexOf("\n    function ",start+1);
