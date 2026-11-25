@@ -1,87 +1,29 @@
-/**
- * Preflight aislado: simula Firebase Rules API en memoria y comprueba que
- * se preserva el respaldo incluso ante diferencias de producción.
- * NUNCA consulta ni escribe en el proyecto Firebase real.
- */
-import assert from "node:assert/strict";
-import {readFileSync,rmSync} from "node:fs";
-import {fileURLToPath} from "node:url";
-
-// La copia previa debe publicarse, incluso dentro de un directorio oculto,
-// y la ausencia del artefacto no puede considerarse una ejecución exitosa.
-const workflow=readFileSync(".github/workflows/dejavu-staff-firebase-rules.yml","utf8");
-assert.match(workflow,/name: respaldo-reglas-agora-antes-dejavu-staff[\s\S]*?include-hidden-files: true[\s\S]*?if-no-files-found: error/,
-  "El respaldo real es obligatorio antes de cualquier despliegue");
-const candidate=readFileSync("firestore.rules","utf8");
-const opsMarker="    // ÁGORA · Centro de Operaciones V4 (aislado de Compras y Finanzas).";
-const endMarker="    // Todas las demás colecciones permanecen cerradas.";
-const financeMarker="// ÁGORA · Recursos y Finanzas 2026";
-const financeAt=candidate.indexOf(financeMarker);
-const opsAt=candidate.indexOf(opsMarker);
-const endAt=candidate.indexOf(endMarker,opsAt);
-assert.ok(financeAt>0&&opsAt>financeAt&&endAt>opsAt,"El archivo tiene bloques conocidos");
-const clockAt=candidate.indexOf("    // ÁGORA · Marcaje verificable y traslados (solo UID autorizado).");
-assert.ok(clockAt>opsAt&&clockAt<endAt,"La nueva ampliación de marcajes está delimitada");
-const beforeClock=candidate.slice(0,clockAt-1)+candidate.slice(endAt);
-const withoutOps=candidate.slice(0,opsAt-1)+candidate.slice(endAt);
-const legacy=candidate.slice(0,financeAt)+candidate.slice(endAt);
-const repairMarker="    // ÁGORA · Inventario, mantenimiento y reparaciones.";
-const repairAt=candidate.indexOf(repairMarker);
-assert.ok(repairAt>clockAt&&repairAt<endAt,"El módulo está aislado antes del cierre, sin modificar módulos previos");
-const beforeRepairs=candidate.slice(0,repairAt)+candidate.slice(endAt);
-const identityMarker="    // AGORA - Identidad Unica y RH. Fragmento para insertar dentro de";
-const identityAt=candidate.indexOf(identityMarker);
-assert.ok(identityAt>clockAt&&identityAt<endAt,"Identidad debe estar después de marcajes");
-const beforeIdentity=candidate.slice(0,identityAt)+candidate.slice(endAt);
-const coordinatorListNew="      allow list: if identityRh() ||\n        (identityCoordinator() && request.auth.uid in resource.data.coordinatorUids);";
-const coordinatorListOld="      allow list: if identityRh() || identityAssigned(resource.data);";
-assert.equal(candidate.split(coordinatorListNew).length,2,"La nueva regla de coordinación aparece exactamente una vez");
-const beforeCoordinatorListFix=candidate.replace(coordinatorListNew,coordinatorListOld);
-assert.equal(beforeIdentity.includes("agora_identity_"),false,"Las reglas anteriores a Identidad no contienen sus colecciones");
-const drift=candidate.replace("      allow list: if false;","      allow list: if true;");
-assert.notEqual(drift,candidate,"La alteración desconocida debe existir");
-
-const dir=".github/firebase-staff/.preflight";
-const rulesBackup=dir+"/antes-dejavu.rules";
-const refBackup=dir+"/ruleset-name.txt";
-process.env.FIREBASE_PROJECT_ID="agora-dejavu-38b8c";
-process.env.FIREBASE_ACCESS_TOKEN="qa-token-not-real";
-const originalFetch=globalThis.fetch;
-let attempts=0;
+/** Preflight simulado: nunca consulta ni escribe Firebase real. */
+import assert from 'node:assert/strict';
+import {readFileSync,rmSync} from 'node:fs';
+const workflow=readFileSync('.github/workflows/dejavu-staff-firebase-rules.yml','utf8');
+assert.match(workflow,/name: respaldo-reglas-agora-antes-dejavu-staff[\s\S]*?include-hidden-files: true[\s\S]*?if-no-files-found: error/,'El respaldo real es obligatorio');
+const candidate=readFileSync('firestore.rules','utf8');
+const claimMarker='    // Autorregistros laborales privados.';
+const endMarker='    // Todas las demás colecciones permanecen cerradas.';
+assert.equal(candidate.split(claimMarker).length,2,'El bloque laboral aparece una vez');
+assert.equal(candidate.split(endMarker).length,2,'El cierre general aparece una vez');
+const claimAt=candidate.indexOf(claimMarker),endAt=candidate.indexOf(endMarker,claimAt);
+assert.ok(endAt>claimAt,'El bloque laboral está aislado antes del cierre');
+const withoutClaims=candidate.slice(0,claimAt)+candidate.slice(endAt);
+const optionalExitGeo="           request.resource.data.keys().hasAll(['endNote','endedAt']) &&\n           (!request.resource.data.keys().hasAny(['endGeo']) ||\n             shiftGeoValid(request.resource.data.endGeo)) &&";
+const strictExitGeo="           request.resource.data.keys().hasAll(['endGeo','endNote','endedAt']) &&\n           shiftGeoValid(request.resource.data.endGeo) &&";
+assert.equal(withoutClaims.split(optionalExitGeo).length,2,'La excepción GPS aparece una vez');
+const baseline=withoutClaims.replace(optionalExitGeo,strictExitGeo);
+const drift=baseline.replace('allow read, write: if false;','allow read, write: if true;');
+const dir='.github/firebase-staff/.preflight',rulesBackup=dir+'/antes-dejavu.rules',refBackup=dir+'/ruleset-name.txt';
+process.env.FIREBASE_PROJECT_ID='agora-dejavu-38b8c';process.env.FIREBASE_ACCESS_TOKEN='qa-token-not-real';
+const originalFetch=globalThis.fetch;let attempts=0;
 async function verify(label,live,shouldPass){
-  const rulesetName="projects/agora-dejavu-38b8c/rulesets/qa-preflight";
-  globalThis.fetch=async url=>{
-    const path=String(url);
-    assert.ok(path.startsWith("https://firebaserules.googleapis.com/v1/"),"Solo URL de Rules API");
-    const response=path.endsWith("/releases/cloud.firestore")?{rulesetName}:
-      path.endsWith("/rulesets/qa-preflight")?{source:{files:[{name:"firestore.rules",content:live}]}}:
-      null;
-    assert.ok(response,"Ruta API reconocida");
-    return {ok:true,json:async()=>response};
-  };
-  attempts++;
-  let thrown=null;
-  try{await import("./safe-rules-preflight.mjs?fixture="+attempts)}
-  catch(e){thrown=e}
-  assert.equal(Boolean(thrown),!shouldPass,label+": resultado correcto");
-  if(!shouldPass)assert.match(thrown.message,/REGLAS DISTINTAS EN PRODUCCIÓN/,label+": se impide sobrescribir");
-  assert.equal(readFileSync(rulesBackup,"utf8"),live,label+": respaldo íntegro");
-  assert.equal(readFileSync(refBackup,"utf8"),rulesetName+"\n",label+": versión conservada");
-  console.log("OK "+label+": "+(shouldPass?"reglas reconocidas":"despliegue detenido")+", respaldo verificado");
+ const rulesetName='projects/agora-dejavu-38b8c/rulesets/qa-preflight';
+ globalThis.fetch=async url=>{const path=String(url);assert.ok(path.startsWith('https://firebaserules.googleapis.com/v1/'),'Solo Rules API');const response=path.endsWith('/releases/cloud.firestore')?{rulesetName}:path.endsWith('/rulesets/qa-preflight')?{source:{files:[{name:'firestore.rules',content:live}]}}:null;assert.ok(response,'Ruta API reconocida');return {ok:true,json:async()=>response};};
+ attempts++;let thrown=null;try{await import('./safe-rules-preflight.mjs?fixture='+attempts)}catch(e){thrown=e}
+ assert.equal(Boolean(thrown),!shouldPass,label+': resultado');if(!shouldPass)assert.match(thrown.message,/REGLAS DISTINTAS EN PRODUCCIÓN/,label+': deriva detenida');
+ assert.equal(readFileSync(rulesBackup,'utf8'),live,label+': respaldo íntegro');assert.equal(readFileSync(refBackup,'utf8'),rulesetName+'\n',label+': ruleset guardado');console.log('OK '+label);
 }
-try{
-  await verify("repositorio actual",candidate,true);
-  await verify("última versión main antes de reparaciones",beforeRepairs,true);
-  await verify("versión publicada antes del arreglo de coordinación",beforeCoordinatorListFix,true);
-  await verify("versión legítima anterior a Identidad",beforeIdentity,true);
-  await verify("producción actual con Operaciones y sin marcajes",beforeClock,true);
-  await verify("producción anterior a Operaciones",withoutOps,true);
-  await verify("versión histórica sin Finanzas",legacy,true);
-  await verify("diferencias desconocidas",drift,false);
-  await verify("deriva antes de reparaciones",beforeRepairs.replace("allow list: if false;","allow list: if true;"),false);
-  await verify("deriva anterior a Identidad",beforeIdentity.replace("allow list: if false;","allow list: if true;"),false);
-  await verify("deriva sobre versión anterior del directorio",beforeCoordinatorListFix.replace("allow list: if false;","allow list: if true;"),false);
-}finally{
-  globalThis.fetch=originalFetch;
-  rmSync(dir,{recursive:true,force:true});
-}
+try{await verify('base real + cambios delimitados',baseline,true);await verify('candidato ya desplegado',candidate,true);await verify('deriva ajena rechazada',drift,false);await verify('GPS solo, sin autorregistro, rechazado',withoutClaims,false);}finally{globalThis.fetch=originalFetch;rmSync(dir,{recursive:true,force:true});}
