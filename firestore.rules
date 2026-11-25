@@ -4,14 +4,13 @@ service cloud.firestore {
     function signedIn() {
       return request.auth != null && request.auth.token.get('email_verified',false) == true;
     }
-    // Solo para el titular de una identidad y su solicitud de ID.
-    // Los permisos elevados siguen usando signedIn()/agora_users.
     function identitySignedIn() {
       return signedIn() ||
         (request.auth != null &&
          request.auth.token.firebase.sign_in_provider == 'phone' &&
          request.auth.token.phone_number is string);
     }
+
     function userPath() {
       return /databases/$(database)/documents/agora_users/$(request.auth.uid);
     }
@@ -31,7 +30,7 @@ service cloud.firestore {
         request.resource.data.active is bool;
     }
     match /agora_users/{uid} {
-      allow get: if (identitySignedIn() && request.auth.uid == uid) || isAdmin();
+      allow get: if identitySignedIn() && (request.auth.uid == uid || isAdmin());
       allow list: if isAdmin();
       // El primer administrador se configura manualmente desde la consola Firebase.
       allow create, update: if isAdmin() && validStaff();
@@ -715,19 +714,18 @@ match /agora_finance_requests/{requestId} {
     match /agora_ops_incidents/{id} {
       allow get, list: if canEdit() ||
         (opsStaff() && resource.data.ownerUid == request.auth.uid);
-      allow create: if opsValidReport() && request.resource.data.id == id &&
+      allow create: if (opsValidReport() && request.resource.data.id == id &&
         request.resource.data.revision == 1 && (
           canEdit() ||
-          (opsOwnReport() && request.resource.data.status == 'pendiente' &&
-           request.resource.data.type != 'validacion_asistencia')
-        );
+          (opsOwnReport() && request.resource.data.status == 'pendiente')
+        )) &&
+        (canEdit() || request.resource.data.type != 'validacion_asistencia');
       allow update: if opsValidReport() && request.resource.data.id == resource.data.id &&
         request.resource.data.ownerUid == resource.data.ownerUid &&
         request.resource.data.personId == resource.data.personId &&
         request.resource.data.revision == resource.data.revision + 1 && (
           canEdit() ||
           (opsOwnReport() && resource.data.status == 'pendiente' &&
-            resource.data.type != 'validacion_asistencia' &&
             request.resource.data.status == 'pendiente' &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'notes','type','updatedAt','revision'
@@ -850,9 +848,8 @@ match /agora_finance_requests/{requestId} {
            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
              'status','endGeo','endNote','endedAt','updatedAt'
            ]) &&
-           request.resource.data.keys().hasAll(['endNote','endedAt']) &&
-           (!request.resource.data.keys().hasAny(['endGeo']) ||
-             shiftGeoValid(request.resource.data.endGeo)) &&
+           request.resource.data.keys().hasAll(['endGeo','endNote','endedAt']) &&
+           shiftGeoValid(request.resource.data.endGeo) &&
            request.resource.data.endNote is string &&
            request.resource.data.endNote.size() >= 4 &&
            request.resource.data.endNote.size() <= 240 &&
@@ -991,7 +988,7 @@ match /agora_finance_requests/{requestId} {
       return /databases/$(database)/documents/agora_identity_audit/$(auditId);
     }
     function identityOwnerOf(agoraId) {
-      return identitySignedIn() && exists(identityLinkPath(request.auth.uid)) &&
+      return signedIn() && exists(identityLinkPath(request.auth.uid)) &&
         get(identityLinkPath(request.auth.uid)).data.agoraId == agoraId;
     }
     function identityAssigned(record) {
@@ -1128,7 +1125,7 @@ match /agora_finance_requests/{requestId} {
     }
 
     match /agora_identity_links/{uid} {
-      allow get: if (identitySignedIn() && request.auth.uid == uid) || identityRh();
+      allow get: if (signedIn() && request.auth.uid == uid) || identityRh();
       allow list: if identityRh();
       allow create: if identityRh() &&
         request.resource.data.keys().hasOnly([
@@ -1148,8 +1145,7 @@ match /agora_finance_requests/{requestId} {
 
     match /agora_identity_registry/{agoraId} {
       allow get: if identityRh() || identityOwnerOf(agoraId) || identityAssigned(resource.data);
-      allow list: if identityRh() ||
-        (identityCoordinator() && request.auth.uid in resource.data.coordinatorUids);
+      allow list: if identityRh() || identityAssigned(resource.data);
       allow create: if identityRh() && request.resource.data.agoraId == agoraId &&
         validIdentityRegistry() && request.resource.data.createdAt == request.time &&
         request.resource.data.createdBy == request.auth.uid &&
@@ -1175,6 +1171,7 @@ match /agora_finance_requests/{requestId} {
             ]))
         );
       allow delete: if false;
+      allow list: if identityCoordinator() && request.auth.uid in resource.data.coordinatorUids;
     }
 
     match /agora_identity_profiles/{uid} {
@@ -1632,7 +1629,6 @@ match /agora_finance_requests/{requestId} {
                  get(repairRequestPath(request.resource.data.requestId)).data.photos.size() + 1))));
       allow update, delete: if false;
     }
-
 
     // ÁGORA ASISTENCIA · Registro mínimo delegado por jornada.
     // No otorga acceso de Supervisor al cronograma, finanzas o expedientes.
@@ -2096,6 +2092,7 @@ match /agora_finance_requests/{requestId} {
         allow update, delete: if false;
       }
     }
+
 
     // Todas las demás colecciones permanecen cerradas.
     match /{document=**} {
