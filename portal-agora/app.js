@@ -547,20 +547,7 @@ function staffJornadaCard(item){
       '<p>Coordinación todavía no ha detallado las actividades.</p>')+
       (item.instructions?'<p class="role-instructions">'+esc(item.instructions)+'</p>':"")+
     '</div>'+
-    '<button type="button" class="profile-button profile-button-primary" data-action="show-shift-qr" data-event-id="'+esc(item.key)+'">Mostrar QR de jornada / actividad</button>'+
-    '<div class="attendance-task-container">'+
-      '<button type="button" class="profile-button profile-button-outline" data-action="open-tasks" data-event-id="'+esc(item.key)+'">Mis actividades · Agregar o marcar</button>'+
-      '<div class="attendance-task-content" data-task-for="'+esc(item.key)+'" hidden></div>'+
-    '</div>'+
-    '<details class="role-add-activity"><summary>+ Proponer otra actividad en esta jornada</summary>'+
-      '<form data-draft-activity="'+esc(item.key)+'" class="role-proposal-form">'+
-        '<label>Actividad adicional<input name="activity" required maxlength="200" placeholder="¿Qué otra actividad realizarás?"></label>'+
-        '<label>Observación (opcional)<textarea name="note" rows="2" maxlength="400"></textarea></label>'+
-        '<button class="profile-button profile-button-outline" type="submit">Preparar mensaje</button>'+
-        '<p class="role-draft-warning">Este mensaje aún no queda guardado en Firebase. Puedes copiarlo para enviarlo a coordinación.</p>'+
-        '<textarea class="role-draft-preview" aria-label="Propuesta para coordinación" rows="5" readonly hidden></textarea>'+
-        '<button type="button" data-action="copy-activity-draft" class="profile-button profile-button-outline" hidden>Copiar propuesta</button>'+
-      '</form></details>'+
+    '<button type="button" class="profile-button profile-button-primary" data-action="show-shift-qr" data-event-id="'+esc(item.key)+'">Mostrar QR para asistencia</button>'+
     '</article>';
 }
 function staffOperationsSpace(){
@@ -573,9 +560,9 @@ function staffOperationsSpace(){
       '<p>Una jornada puede incluir varias actividades. Consulta tus asignaciones personales.</p></div>'+
       '<div class="role-space-actions">'+
         '<button type="button" class="profile-button profile-button-primary" data-action="new-work-claim">+ Registrar trabajo o asignación</button>'+
-        (quickQr?'<button type="button" class="profile-button profile-button-outline" data-action="show-shift-qr" data-event-id="'+esc(quickQr.key)+'">Abrir QR de mi jornada</button>':"")+
+        (quickQr?'<button type="button" class="profile-button profile-button-outline" data-action="show-shift-qr" data-event-id="'+esc(quickQr.key)+'">Mostrar QR para asistencia</button>':"")+
         '<a class="profile-button profile-button-primary" href="'+esc(href("mi-operacion/"))+'">Mi operación</a>'+
-        '<a class="profile-button profile-button-outline" href="'+esc(href("escanear/"))+'">Pasar lista (supervisores)</a></div></header>'+
+        (["admin","coordinador","supervisor"].includes(role())?'<a class="profile-button profile-button-outline" href="'+esc(href("escanear/"))+'">Pasar lista</a>':"")+'</div></header>'+
     roleNotice()+
     (staff?assigned.length?'<div class="role-jornada-list">'+assigned.slice(0,3).map(staffJornadaCard).join("")+'</div>'+
       (assigned.length>3?'<details class="role-more-jornadas"><summary>Ver otras jornadas ('+(assigned.length-3)+')</summary><div class="role-jornada-list">'+assigned.slice(3).map(staffJornadaCard).join("")+'</div></details>':""):
@@ -584,11 +571,11 @@ function staffOperationsSpace(){
     '<section class="work-claims"><h3>Mis trabajos registrados</h3><p>Los trabajos que declares quedan pendientes de revisión. Las horas escritas manualmente no se muestran como asistencia verificada.</p><div id="my-work-claims" aria-live="polite">Cargando tus registros…</div></section>'+
     workClaimDialog(false)+
     '<dialog id="staff-shift-qr-dialog" class="role-dialog" aria-labelledby="staff-shift-qr-title">'+
-      '<div class="role-dialog-head"><div><strong id="staff-shift-qr-title">QR de jornada / actividad</strong>'+
+      '<div class="role-dialog-head"><div><strong id="staff-shift-qr-title">QR para asistencia</strong>'+
       '<p>Preséntalo al coordinador o supervisor autorizado. Es distinto de tu identificación.</p></div>'+
       '<button type="button" data-action="close-shift-qr" aria-label="Cerrar QR de jornada">×</button></div>'+
       '<div id="staff-shift-qr-content"></div></dialog>'+
-    '<p class="role-transition">La asistencia oficial la registra tu Supervisor o Coordinador al escanear el QR o pasar lista. Este espacio conserva tus declaraciones de trabajo por separado.</p>'+
+    '<p class="role-transition">Para asistencia, muestra el QR de la jornada a tu Supervisor o Coordinador. Ellos registran entrada y salida; tú solo agregas observaciones si hacen falta.</p>'+
   '</section>';
 }
 function scheduleCard(item){
@@ -732,10 +719,10 @@ function workClaimDialog(review=false){
   const now=new Date(),date=[now.getFullYear(),String(now.getMonth()+1).padStart(2,"0"),String(now.getDate()).padStart(2,"0")].join("-");
   return '<dialog class="role-dialog" id="work-claim-dialog" aria-labelledby="work-claim-title"><div class="role-dialog-head"><div><strong id="work-claim-title">Registrar trabajo o asignación</strong><p>Se guardará a tu nombre y quedará pendiente de validación.</p></div><button type="button" data-action="close-work-claim" aria-label="Cerrar">×</button></div><form id="work-claim-form" class="role-assignment-form">'+
     '<label>Situación<select name="recordType" required><option value="proximo">Trabajo próximo</option><option value="en_curso">Trabajo en curso</option><option value="realizado">Trabajo realizado en fecha anterior</option></select></label>'+
-    '<label>Proyecto, evento o actividad<input name="project" maxlength="150" required></label><label>Cliente (opcional)<input name="client" maxlength="120"></label><label>Sucursal o lugar<input name="site" maxlength="150" required></label><label>Fecha de trabajo<input name="date" type="date" value="'+date+'" required></label><label>Tipo de actividad<input name="activityType" maxlength="100" placeholder="Montaje, volanteo, supervisión…"></label>'+
+    '<label>Proyecto o evento<input name="project" maxlength="150" required></label><label>Cliente (opcional)<input name="client" maxlength="120"></label><label>Sucursal o lugar<input name="site" maxlength="150" required></label><label>Fecha de trabajo<input name="date" type="date" value="'+date+'" required></label>'+
     '<label>Horario previsto · inicio<input name="plannedStart" type="time"></label><label>Horario previsto · fin<input name="plannedEnd" type="time"></label><label>Hora real declarada · entrada<input name="actualStart" type="time"></label><label>Hora real declarada · salida<input name="actualEnd" type="time"></label>'+
-    '<label class="role-wide">Descripción del trabajo<textarea name="description" rows="3" maxlength="600" required></textarea></label><label>Quién solicitó el trabajo<input name="requester" maxlength="140" required placeholder="Nombre del coordinador o persona"></label><label>Quién supervisó (opcional)<input name="supervisor" maxlength="140"></label><label>Medio de solicitud<select name="channel" required>'+["WhatsApp","Llamada","Verbal","Correo","Asignación interna","Otro"].map(x=>'<option>'+esc(x)+'</option>').join("")+'</select></label>'+
-    '<label>Tarifa acordada (si la conoces)<input name="declaredRate" type="number" min="0.01" step="0.01" placeholder="Si no la sabes, déjala vacía"></label><label>Horas extra declaradas<input name="overtimeHours" type="number" min="0" max="24" step="0.25" value="0"></label><label>Gastos adicionales declarados (MXN)<input name="expenses" type="number" min="0" max="50000" step="0.01" value="0"></label><label class="role-wide">Observaciones<textarea name="notes" rows="2" maxlength="500"></textarea></label><label class="role-wide">Evidencia de solicitud (imagen opcional)<input id="work-claim-evidence" type="file" accept="image/jpeg,image/png,image/webp"></label><div class="role-wide role-draft-warning">El registro no crea una asistencia verificada ni aprueba un pago.</div><div class="role-wide role-dialog-actions"><button type="submit" class="profile-button profile-button-primary">Guardar registro</button></div></form></dialog>';
+    '<label>Quién solicitó el trabajo<input name="requester" maxlength="140" required placeholder="Nombre del coordinador o persona"></label><label>Quién supervisó (opcional)<input name="supervisor" maxlength="140"></label><label>Medio de solicitud<select name="channel" required>'+["WhatsApp","Llamada","Verbal","Correo","Asignación interna","Otro"].map(x=>'<option>'+esc(x)+'</option>').join("")+'</select></label>'+
+    '<label>Tarifa acordada (si la conoces)<input name="declaredRate" type="number" min="0.01" step="0.01" placeholder="Si no la sabes, déjala vacía"></label><label>Horas extra declaradas<input name="overtimeHours" type="number" min="0" max="24" step="0.25" value="0"></label><label>Gastos adicionales declarados (MXN)<input name="expenses" type="number" min="0" max="50000" step="0.01" value="0"></label><label class="role-wide">Observaciones (opcional)<textarea name="notes" rows="2" maxlength="500" placeholder="Agrega solo un dato que coordinación deba saber"></textarea></label><label class="role-wide">Evidencia de solicitud (imagen opcional)<input id="work-claim-evidence" type="file" accept="image/jpeg,image/png,image/webp"></label><div class="role-wide role-draft-warning">El registro no crea una asistencia verificada ni aprueba un pago.</div><div class="role-wide role-dialog-actions"><button type="submit" class="profile-button profile-button-primary">Guardar registro</button></div></form></dialog>';
 }
 async function loadWorkClaims(){
   if(!state.user)return;
@@ -756,7 +743,7 @@ async function loadWorkClaims(){
     let review="";
     if(!isStaff&&["pendiente","aclaracion"].includes(x.status))review='<form class="work-claim-review" data-claim-id="'+esc(x.id)+'"><label>Decisión<select name="status"><option value="validado">Validar</option><option value="aclaracion">Requiere aclaración</option><option value="rechazado">Rechazar</option></select></label><label>Horas aprobadas<input name="approvedHours" type="number" min="0" max="36" step="0.25" value="'+(Number(hours)||"")+'"></label><label>Tarifa aprobada MXN/h<input name="approvedRate" type="number" min="0.01" step="0.01" value="'+(Number(rate)||"")+'"></label><label>Comentario<input name="validationNote" maxlength="400"></label><button class="profile-button profile-button-primary" type="submit">Guardar revisión</button></form>';
     const finish=isStaff&&x.recordType==="en_curso"&&!x.actualEnd?'<form class="work-claim-finish" data-claim-id="'+esc(x.id)+'"><label>Hora final declarada del trabajo<input name="actualEnd" type="time" required></label><button class="profile-button profile-button-outline" type="submit">Completar declaración</button><small>Esto no registra ni verifica tu asistencia.</small></form>':"";
-    return '<article class="work-claim-card"><div><strong>'+esc(x.project||"Trabajo")+'</strong><span class="role-time">'+esc(status)+'</span></div><p>'+esc(x.date||"")+' · '+esc(type)+' · '+esc(x.site||"")+'</p><p>Solicitó: '+esc(x.requester||"No indicado")+' · '+esc(x.channel||"")+'</p><p>'+esc(x.description||"")+esc(amount)+'</p>'+(Number(x.overtimeHours)>0?'<p>Horas extra declaradas: '+Number(x.overtimeHours).toFixed(2)+'</p>':"")+(Number(x.expenses)>0?'<p>Gastos declarados: $'+Number(x.expenses).toFixed(2)+' MXN (pendientes de revisión)</p>':"")+(x.validationNote?'<p>Revisión: '+esc(x.validationNote)+'</p>':"")+(x.evidenceImage?'<img class="assignment-history-image" src="'+esc(x.evidenceImage)+'" alt="Evidencia privada del trabajo '+esc(x.id)+'">':"")+finish+review+'</article>';
+    return '<article class="work-claim-card"><div><strong>'+esc(x.project||"Trabajo")+'</strong><span class="role-time">'+esc(status)+'</span></div><p>'+esc(x.date||"")+' · '+esc(type)+' · '+esc(x.site||"")+'</p><p>Solicitó: '+esc(x.requester||"No indicado")+' · '+esc(x.channel||"")+'</p>'+(x.notes?'<p>Observaciones: '+esc(x.notes)+'</p>':"")+esc(amount)+(Number(x.overtimeHours)>0?'<p>Horas extra declaradas: '+Number(x.overtimeHours).toFixed(2)+'</p>':"")+(Number(x.expenses)>0?'<p>Gastos declarados: $'+Number(x.expenses).toFixed(2)+' MXN (pendientes de revisión)</p>':"")+(x.validationNote?'<p>Revisión: '+esc(x.validationNote)+'</p>':"")+(x.evidenceImage?'<img class="assignment-history-image" src="'+esc(x.evidenceImage)+'" alt="Evidencia privada del trabajo '+esc(x.id)+'">':"")+finish+review+'</article>';
   }).join("");
 }
 async function workClaimStableId(uid,v){
@@ -1066,9 +1053,9 @@ app.addEventListener("submit",event=>{
       if(priorClaims.docs.some(item=>item.id===claimId))
         throw Error("Ya existe un registro equivalente de ese turno. Revísalo en Mis trabajos para evitar duplicar horas.");
       const payload={id:claimId,ownerUid,personId:state.roleData.staff.personId,personName:actorName,recordType,
-        project:clean(v.project).slice(0,150),client:clean(v.client).slice(0,120),site:clean(v.site).slice(0,150),date:clean(v.date),activityType:clean(v.activityType).slice(0,100),
+        project:clean(v.project).slice(0,150),client:clean(v.client).slice(0,120),site:clean(v.site).slice(0,150),date:clean(v.date),activityType:"",
         plannedStart:clean(v.plannedStart),plannedEnd:clean(v.plannedEnd),actualStart:clean(v.actualStart),actualEnd:clean(v.actualEnd),
-        description:clean(v.description).slice(0,600),requester:clean(v.requester).slice(0,140),supervisor:clean(v.supervisor).slice(0,140),channel:clean(v.channel),
+        description:"",requester:clean(v.requester).slice(0,140),supervisor:clean(v.supervisor).slice(0,140),channel:clean(v.channel),
         declaredRate:rate,overtimeHours,expenses,notes:clean(v.notes).slice(0,500),evidenceImage,status:"pendiente",validationNote:"",declaredHours:null,approvedHours:null,approvedRate:null,approvedAmount:null,
         createdBy:ownerUid,createdAt:serverTimestamp(),updatedBy:ownerUid,updatedAt:serverTimestamp(),lastHistoryId:"created"};
       if(payload.actualStart&&payload.actualEnd){
