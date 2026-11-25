@@ -155,3 +155,41 @@ El lector público del QR sirve para **comprobar la identidad**; la lista de coo
 - **No se modifican `firestore.rules` ni `storage.rules`** y tampoco registros, horarios históricos ni ID existente.
 - El registro real requiere la configuración ya vigente de Operaciones: miembro de Staff vinculado, ficha publicada y horario habilitado. Si faltan permisos muestra error sin atribuir éxito.
 - Pruebas automatizadas cubren propiedad de la jornada, prevención de duplicado, entrada/salida con timestamp de servidor, QR sin autorización y consulta por coordinador. Estas pruebas no demuestran todavía una sesión real con dispositivos o permisos del proyecto de producción; debe comprobarse con un usuario de prueba antes de usarlo como control único de asistencia.
+
+
+## NUEVO FLUJO ACTUAL — QR de identidad separado de QR de jornada (25 NOV 2026)
+
+Este apartado **sustituye** las referencias anteriores del README que incluían «Mi pase de lista» dentro de la credencial de identificación.
+
+### 1. Credencial digital = solo identificación
+- Mi perfil → **Ver mi credencial** conserva fotografía real de la cuenta, nombre, puesto, ID Dejavú y QR público de verificación hacia `verificar.html?id=...`.
+- **No contiene controles de entrada/salida**. Su QR de identificación **no registra asistencia** y el verificador ya no ofrece enlace a marcaje.
+- Los módulos anteriores `attendance-live.js` y `attendance-policy.mjs` quedan conservados por compatibilidad con el sistema de relojes, pero **no se importan ni se ejecutan** desde la credencial. Las pantallas originales de Jornadas siguen siendo la referencia del reloj oficial.
+
+### 2. QR separado por jornada o actividad en Staff
+- Staff → Mis jornadas → **Mostrar QR de jornada / actividad** genera desde la sesión del titular un URL QR específico para `uid + personId + eventId`; opcionalmente incluye una actividad identificada por `activityKey`.
+- Un mismo período laboral puede contener **varias actividades**. Escanear una actividad no crea otra jornada, ni separa los marcajes oficiales.
+- El QR cambia al **renovarlo**, incluye momento de emisión y se presenta por 90 segundos. Su caducidad de interfaz es una medida auxiliar: **no es un token firmado ni una prueba criptográfica de presencia**, por lo que debe comprobarse presencialmente al portador.
+- El QR de jornada **nunca contiene la credencial pública**, correo, datos fiscales, información bancaria, salarios, contraseñas ni tokens de acceso.
+- Generación: `qr-jornada.mjs` y `staff-shift-qr.js`. El QR se presenta como imagen o enlace sin necesidad de escritura privada en Storage.
+
+### 3. Escaneo por Coordinación o supervisor autorizado
+- Agencia / Administrador → **Escanear QR de jornada** → `/portal-agora/escanear/`.
+- Se exige inicio de sesión con Google y un usuario activo de `agora_users` con rol `coordinador` o `admin`, como exige la regla vigente `canEdit()`. El título laboral **Supervisor** por sí mismo **no otorga** permisos de lectura del cronograma ni de escritura de validaciones: Administración debe asignar de forma autorizada un rol que cumpla las reglas del servidor. **No se elevan roles desde el navegador**.
+- Lector de cámara con `BarcodeDetector` cuando está disponible y pegado manual del enlace como alternativa. Se rechazan códigos de identidad o de otros sitios.
+- El scanner consulta `agora_ops_control/schedule` y coteja `eventId`, `personId`, `people[].authUid` y las actividades publicadas. También comprueba `agora_ops_shift_access/{uid}_{eventId}` y su horario. **La identidad y la presencia deben confirmarse presencialmente** antes de pulsar el botón de validación.
+- La acción del coordinador crea un registro real, único y no sobrescrito en `agora_ops_incidents/{qr_sha256}`:
+  - `type=validacion_asistencia` y `status=entrada|salida`, o `type=validacion_actividad` y `status=actividad_verificada`.
+  - `ownerUid`, `personId`, `eventId`, `revision=1`, `updatedAt=serverTimestamp()`; en la nota se conserva el UID/identidad del operador que confirmó presencialmente.
+  - Se usan **exclusivamente las reglas existentes** para `agora_ops_incidents` (escritura `canEdit()`). El ID determinista evita crear una segunda entrada o salida QR por jornada.
+- **Importante:** este registro es una **validación presencial por QR**, NO un nuevo `agora_ops_clock`. El scanner **no puede alterar ni simular los marcajes personales oficiales**, porque las reglas vigentes limitan esos documentos al propio titular. El marcaje oficial personal puede continuar en Jornadas.
+
+### 4. Pase de lista con dos fuentes separadas
+- Agencia/Admin → Pase de lista muestra **Reloj entrada**, **Reloj salida**, **QR presencial** y **Estado**.
+- El reloj lee `agora_ops_clock` y el QR lee `agora_ops_incidents` del evento seleccionado; no se usan coordenadas ni pagos.
+- Una validación QR se ve claramente como **«QR verificado · Sin marcaje oficial»** si todavía no existe una entrada del reloj personal. La ausencia de reloj nunca se maquilla como marcaje oficial.
+
+### 5. Límite de seguridad y próxima mejora
+No confundir un QR breve generado en navegador con un token firmado por servidor ni con presencia biométrica. Para convertir el **escaneo del supervisor en marcaje oficial del reloj** se necesita una nueva autorización de servidor, vinculaciones por jornada, tokens antirreutilización, acceso restringido al supervisor por actividad y reglas/emulador. Esos cambios **no se desplegaron** porque el proyecto tiene reglas de producción con controles de respaldo y no se deben sobrescribir sin conciliación.
+
+**No se modifican Firestore Rules, Storage Rules, datos anteriores, usuarios ni permisos.** Verificar lectura y creación de un incidente QR mediante cuentas reales antes de utilizarlo como control laboral definitivo.
