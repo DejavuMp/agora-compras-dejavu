@@ -1,8 +1,8 @@
 /**
  * Publicación ADITIVA sobre reglas VIVAS de Firestore.
- * Se preservan BYTE A BYTE todas las reglas activas, incluidas modificaciones
- * posteriores al commit de referencia. El único cambio autorizado es insertar
- * el bloque aislado de asistencia antes del cierre explícito de reglas.
+ * Se preservan las reglas activas, excepto una restricción puntual y comprobada:
+ * Staff no puede crear validaciones administrativas de asistencia. El módulo
+ * de asistencia se inserta sin cambiar el resto del ruleset.
  *
  * Modo inicial: descargar reglas reales, respaldarlas y preparar el ruleset
  * reconciliado. Segunda etapa: revisar el SHA y ruleset de la versión activa.
@@ -33,6 +33,29 @@ if(process.env.GITHUB_REF!=="refs/heads/main"||
    process.env.GITHUB_EVENT_NAME!=="workflow_dispatch")
  throw Error("Publicación limitada a ejecución manual desde main.");
 const sha=s=>createHash("sha256").update(s,"utf8").digest("hex");
+function protectIncidentValidation(content){
+ const matches=[...content.matchAll(/match\s+\/agora_ops_incidents\/\{[^}]+\}\s*\{/g)];
+ if(matches.length!==1)
+  throw Error("No se reconoce una única regla de incidentes; conservar producción y detener.");
+ const start=matches[0].index;
+ const close=content.indexOf("\n    }\n",start);
+ const nextMatch=content.indexOf("\n    match ",start);
+ if(close<0||(nextMatch>=0&&nextMatch<close))
+  throw Error("No se reconoce el límite de la regla de incidentes; detener.");
+ const block=content.slice(start,close+7);
+ const create=/allow create: if ([\s\S]*?);/g;
+ let count=0;
+ const updated=block.replace(create,(whole,expr)=>{
+  count++;
+  if(expr.includes("(canEdit() || request.resource.data.type != 'validacion_asistencia')"))
+   return whole;
+  return "allow create: if ("+expr+") &&\n        (canEdit() || request.resource.data.type != 'validacion_asistencia');";
+ });
+ if(count===0)
+  throw Error("No se encontró autorización de creación de incidentes; detener.");
+ return content.slice(0,start)+updated+content.slice(close+7);
+}
+
 const candidate=readFileSync(stage?dir+"/firestore-repositorio.rules":"firestore.rules","utf8");
 const a=candidate.indexOf(marker),b=candidate.indexOf(ending,a);
 if(a<0||b<=a||candidate.indexOf(marker,a+1)!==-1||
@@ -78,6 +101,7 @@ const live=await readLive();
 if(!live.content.startsWith("rules_version = '2';")||
    live.content.length<1000||live.content.length>450000)
  throw Error("Contenido de reglas reales no reconocido; detener.");
+const protectedLive=protectIncidentValidation(live.content);
 
 if(stage){
  const state=JSON.parse(readFileSync(stateFile,"utf8"));
@@ -105,21 +129,21 @@ if(stage){
  writeFileSync(dir+"/ruleset-anterior.txt",live.name+"\n","utf8");
  writeFileSync(dir+"/firestore-repositorio.rules",candidate,"utf8");
  const occurrences=(value,needle)=>value.split(needle).length-1;
- const matches=occurrences(live.content,ending);
+ const matches=occurrences(protectedLive,ending);
  if(matches!==1)throw Error("Marcador de inserción no es único.");
- const index=live.content.indexOf(ending);
- const tail=live.content.slice(index);
+ const index=protectedLive.indexOf(ending);
+ const tail=protectedLive.slice(index);
  if(tail!==expectedTail)
   throw Error("El cierre de las reglas reales difiere del cierre autorizado.");
- const existing=live.content.indexOf(marker);
+ const existing=protectedLive.indexOf(marker);
  let reconciled,mode;
  if(existing!==-1){
   // Ejecuciones repetidas son seguras: nunca duplicar el módulo.
-  if(occurrences(live.content,marker)!==1 ||
-     live.content.slice(existing,index)!==block)
+  if(occurrences(protectedLive,marker)!==1 ||
+     protectedLive.slice(existing,index)!==block)
    throw Error("Asistencia ya existe pero difiere del bloque aprobado.");
-  reconciled=live.content;
-  mode="already";
+  reconciled=protectedLive;
+  mode=reconciled===live.content?"already":"deploy";
  }else{
   // Rechazar cualquier colisión con helpers o colecciones previas.
   const reserved=[
@@ -133,12 +157,12 @@ if(stage){
    "function attendanceValidated(",
    "function attendanceClockCompleted("
   ];
-  if(reserved.some(key=>live.content.includes(key)))
+  if(reserved.some(key=>protectedLive.includes(key)))
    throw Error("Nombres de asistencia ya utilizados por las reglas reales.");
-  // Única modificación autorizada: adición literal antes del cierre final.
-  reconciled=live.content.slice(0,index)+block+live.content.slice(index);
-  if(reconciled.slice(0,index)+reconciled.slice(index+block.length)!==live.content)
-   throw Error("La conciliación alteró alguna regla anterior.");
+  // La autorización existente se estrecha arriba; asistencia se inserta al cierre.
+  reconciled=protectedLive.slice(0,index)+block+protectedLive.slice(index);
+  if(reconciled.slice(0,index)+reconciled.slice(index+block.length)!==protectedLive)
+   throw Error("La conciliación alteró reglas fuera de la excepción autorizada.");
   mode="deploy";
  }
  const state={
@@ -146,13 +170,13 @@ if(stage){
   expectedHash:sha(reconciled),blockHash:sha(block),
   oldRuleBytes:Buffer.byteLength(live.content),
   newRuleBytes:Buffer.byteLength(reconciled),
-  strategy:"insert-only-before-explicit-deny-all"
+  strategy:"staff-validation-deny plus attendance-before-explicit-deny-all"
  };
  writeFileSync(expectedFile,reconciled,"utf8");
  writeFileSync(stateFile,JSON.stringify(state,null,2)+"\n","utf8");
  if(process.env.GITHUB_ENV)appendFileSync(process.env.GITHUB_ENV,
   "ATTENDANCE_DEPLOY_MODE="+mode+"\n");
  console.log("Respaldo realizado. Modo: "+mode+
-  ". Reglas originales intactas. Bytes anteriores: "+
+  ". Reglas históricas conservadas con bloqueo puntual a validación de Staff. Bytes anteriores: "+
   state.oldRuleBytes+"; bytes reconciliados: "+state.newRuleBytes+".");
 }
