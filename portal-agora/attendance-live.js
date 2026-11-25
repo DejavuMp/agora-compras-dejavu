@@ -143,10 +143,10 @@ async function mark(session,kind,index){
  const [clock,permit]=await Promise.all([
   safeRead(ref),safeRead(doc(session.db,"agora_ops_shift_access",clockKey(session.uid,shift.eventId)))
  ]);
- if(permit?.ownerUid!==session.uid||permit?.personId!==session.member.personId||
-    permit?.eventId!==shift.eventId)throw Error("Tu jornada todavía no está habilitada.");
  const real=attendanceState(permit,clock,new Date());
  if(kind==="entry"){
+  if(permit?.ownerUid!==session.uid||permit?.personId!==session.member.personId||
+     permit?.eventId!==shift.eventId)throw Error("Tu jornada todavía no está habilitada.");
   if(real.action!=="entry")throw Error("Ya registraste entrada o estás fuera del horario habilitado.");
   const checkbox=session.target.querySelector('[data-location-consent="'+index+'"]');
   if(!checkbox?.checked)throw Error("Confirma el uso puntual de ubicación para registrar entrada.");
