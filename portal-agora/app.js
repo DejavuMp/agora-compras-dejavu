@@ -934,18 +934,32 @@ app.addEventListener("submit",event=>{
   if(form.id==="assignment-form"){
     if(!["admin","coordinador"].includes(role())||!allowed(routeSpace))
       return notice("No tienes permiso de coordinación.","error");
-    try{
+    return run(async()=>{
       const data=Object.fromEntries(new FormData(form));
       data.activities=[...form.querySelectorAll('input[name="activity[]"]')].map(x=>x.value);
       data.capturedBy=name()+" · "+state.user.uid;
       const draft=validateAssignmentDraft(data);
-      const output=document.getElementById("assignment-preview");
-      if(!output)return;
-      output.value=assignmentDraftText(draft);
-      document.getElementById("assignment-result").hidden=false;
-      notice("Borrador preparado. No se ha guardado en Firebase.","ok");
-    }catch(error){notice(errorText(error),"error")}
-    return;
+      const file=form.querySelector("#assignment-evidence")?.files?.[0];
+      const evidenceImage=await compressAssignmentImage(file);
+      const requestId=crypto.randomUUID();
+      await setDoc(doc(db,"agora_ops_assignment_requests",requestId),{
+        ...draft,id:requestId,capturedBy:state.user.uid,
+        evidenceImage,status:"pendiente",linkedEventId:"",
+        createdAt:serverTimestamp(),updatedAt:serverTimestamp(),
+        updatedBy:state.user.uid
+      });
+      const preview=document.getElementById("assignment-preview");
+      if(preview)preview.value=assignmentDraftText(draft)
+        .replace("BORRADOR DE SOLICITUD (NO REGISTRADO)",
+          "SOLICITUD REGISTRADA · Folio "+requestId)
+        .replace("Estado: BORRADOR. No hay autorización, asignación ni archivo guardado en Firebase.",
+          "Estado: REGISTRADA EN FIREBASE. PENDIENTE DE ASIGNACIÓN.");
+      const panel=document.getElementById("assignment-result");
+      if(panel)panel.hidden=false;
+      form.reset();
+      form.querySelector("#assignment-activities")?.replaceChildren();
+      await showAssignmentHistory();
+    },"Solicitud guardada con folio; pendiente de asignación.");
   }
   if(form.hasAttribute("data-draft-activity")){
     const formData=new FormData(form);
