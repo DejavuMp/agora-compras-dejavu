@@ -1713,8 +1713,10 @@ match /agora_finance_requests/{requestId} {
         get(shiftClockPath(get(attendanceRosterPath(eventId,personId)).data.uid,eventId)).data.status == 'finalizada';
     }
     match /agora_ops_attendance_sheets/{eventId} {
+      // La lista revela solo metadatos mínimos ya delegados. Una jornada
+      // cerrada no permite leer roster/entradas ni crear nuevos registros.
       allow get, list: if canEdit() ||
-        (signedIn() && resource.data.active == true &&
+        (signedIn() &&
          request.auth.uid in resource.data.supervisorUids &&
          exists(identityLinkPath(request.auth.uid)) &&
          get(identityLinkPath(request.auth.uid)).data.active == true);
