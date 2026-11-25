@@ -141,7 +141,7 @@ function reconcileIdentityPhoneAccess(content,repositoryRules){
  if(registryClose<0||(registryNext>=0&&registryNext<registryClose))
   throw Error("No se reconoce el límite de agora_identity_registry.");
  const registryBlock=result.slice(registryStart,registryClose+7);
- const assignedList="allow list: if identityAssigned(resource.data);";
+ const assignedList="allow list: if identityCoordinator() && request.auth.uid in resource.data.coordinatorUids;";
  if(!registryBlock.includes(assignedList))
   result=result.slice(0,registryClose)+"\n      "+assignedList+result.slice(registryClose);
  return result;
