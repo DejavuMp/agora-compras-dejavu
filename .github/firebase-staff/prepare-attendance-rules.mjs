@@ -59,9 +59,9 @@ function reconcileOperationsRules(content){
  if(authHelpers.length!==1)
   throw Error("No se reconoce una única función de inicio de sesión; detener.");
  const authStart=authHelpers[0].index;
- const authEnd=incidentRules.indexOf("\n    function identitySignedIn()",authStart);
+ const authEnd=incidentRules.indexOf("\n    function ",authStart+1);
  if(authEnd<0)
-  throw Error("No se reconoce el límite de signedIn; detener.");
+  throw Error("No se reconoce la siguiente función después de signedIn; detener.");
  const authBlock=incidentRules.slice(authStart,authEnd);
  const unsafeClaim="request.auth.token.email_verified == true";
  const safeClaim="request.auth.token.get('email_verified',false) == true";
