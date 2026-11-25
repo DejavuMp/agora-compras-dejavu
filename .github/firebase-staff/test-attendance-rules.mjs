@@ -77,7 +77,7 @@ try{
  await yes("coordinación habilita jornada y delega supervisor",setDoc(sheet(coord),sheetData()));
  await yes("supervisor delegado consulta únicamente su jornada",getDoc(sheet(sup)));
  await yes("supervisor consulta sus jornadas delegadas",getDocs(query(
-  collection(sup,"agora_ops_attendance_sheets"),where("supervisorUids","array-contains","supAs"),where("active","==",true)
+  collection(sup,"agora_ops_attendance_sheets"),where("supervisorUids","array-contains","supAs")
  )));
  await no("otro usuario sin delegación no consulta jornada",getDoc(sheet(other)));
  await yes("coordinación publica roster mínimo",setDoc(roster(coord),rosterData()));
