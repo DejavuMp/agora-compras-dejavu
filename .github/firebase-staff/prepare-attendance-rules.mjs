@@ -193,7 +193,8 @@ const live=await readLive();
 if(!live.content.startsWith("rules_version = '2';")||
    live.content.length<1000||live.content.length>450000)
  throw Error("Contenido de reglas reales no reconocido; detener.");
-const protectedLive=reconcileIdentityPhoneAccess(\n reconcileOperationsRules(live.content),candidate);
+const protectedLive=reconcileIdentityPhoneAccess(
+ reconcileOperationsRules(live.content),candidate);
 
 if(stage){
  const state=JSON.parse(readFileSync(stateFile,"utf8"));
