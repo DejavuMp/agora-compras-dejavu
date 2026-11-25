@@ -79,6 +79,7 @@ function draw(session){
     state.action==="exit"?
      '<label class="credential-attendance-note">Nota de salida (opcional)'+
       '<textarea maxlength="240" rows="2" data-attendance-exit-note="'+index+'" placeholder="Actividad concluida, observaciones…"></textarea></label>'+
+     '<div class="credential-attendance-consent"><label><input type="checkbox" data-exit-location-consent="'+index+'"> Añadir ubicación puntual de salida (opcional).</label></div>'+
      '<button type="button" class="profile-button profile-button-primary" data-attendance-exit="'+index+'">Registrar mi salida</button>':
      '<p class="credential-attendance-hint">'+
       (state.status==="pendiente"?"Coordinación debe habilitar la jornada o aún no inicia el horario autorizado.":
@@ -156,15 +157,18 @@ async function mark(session,kind,index){
  }else{
   if(real.action!=="exit")throw Error("Primero debes registrar entrada o la jornada ya terminó.");
   const note=session.target.querySelector('[data-attendance-exit-note="'+index+'"]')?.value||"";
-  // Salida permitida sin GPS (regla existente), para no bloquear cierre.
-  // Si el dispositivo ofrece ubicación, se añade como verificación opcional.
+  // Salida permitida sin GPS por las reglas vigentes.
+  // Sólo solicitar ubicación cuando el titular la autoriza expresamente.
   let geo=null;
-  try{geo=await preciseLocation()}catch{
-    if(!confirm("No pudimos confirmar tu ubicación. ¿Registrar salida con hora oficial pero sin ubicación verificada?")){
-      session.message="Salida cancelada. No se ha registrado ninguna hora.";
-      const message=session.target.querySelector(".credential-attendance-message");
-      if(message)message.textContent=session.message;
-      return;
+  const exitConsent=session.target.querySelector('[data-exit-location-consent="'+index+'"]');
+  if(exitConsent?.checked){
+    try{geo=await preciseLocation()}catch{
+      if(!confirm("No pudimos confirmar tu ubicación. ¿Registrar salida con hora oficial pero sin ubicación verificada?")){
+        session.message="Salida cancelada. No se ha registrado ninguna hora.";
+        const message=session.target.querySelector(".credential-attendance-message");
+        if(message)message.textContent=session.message;
+        return;
+      }
     }
   }
   const t=serverTimestamp();
