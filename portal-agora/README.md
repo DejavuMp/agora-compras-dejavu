@@ -127,3 +127,31 @@ Esta etapa conecta las rutas existentes a las **colecciones reales**, con un sol
 Las reglas actuales **no** disponen de una colección para actividades dinámicas por jornada ni de un almacenamiento privado para evidencias (capturas, audio, correos). Implementar ambas con validación de UID, rol, autoría, folio y bloqueo de escalamiento de privilegios; pruebas en emulador Firebase; después verificar el estado de las reglas efectivas en producción y **no sobrescribirlas si difieren de la línea base**. Hasta esa publicación comprobada, mantener los borradores solo para copiar. No eliminar las herramientas antiguas mientras se sigan usando para marcar horarios o publicar asignaciones.
 
 Todo lo anterior es un primer paso real de integración **de lectura** y de navegación por rol; no debe describirse como publicación completa del sistema de solicitudes ni de tareas persistentes.
+
+
+## Credencial digital operativa: identificación y pase de lista (25 NOV 2026)
+
+La credencial existente de ÁGORA **no se sustituye por un QR de asistencia nuevo**. Sigue usando el ID único `DJV-AAAA-NNN`, nombre, puesto y foto real de la cuenta Google, además del QR hacia `/portal-agora/verificar.html?id=<credentialId>`. El QR permite que un tercero compruebe **vigencia, nombre, ID y puesto** mediante la proyección pública mínima `agora_identity_credentials/{credentialId}`; no habilita acciones privadas ni publica teléfono, banco, datos fiscales o de salud.
+
+### Marcaje del titular (desde Mi perfil → Ver mi credencial)
+
+Se añadió **Mi pase de lista · Entrada y salida** dentro de la credencial. Solo funciona después de iniciar sesión con la cuenta del titular, comprobar su UID, su ID acreditado y activo, la vinculación `agora_ops_members/{uid}` (`role=staff`, `active=true`), la ficha propia `agora_ops_staff/{uid}` y el permiso `agora_ops_shift_access/{uid}_{eventId}`.
+
+- **Registrar mi entrada:** solo cuando coordinación habilitó el período y se confirmó consentimiento de GPS puntual. Escribe el documento **oficial original** `agora_ops_clock/{uid}_{eventId}` con `startedAt`, `lastGeoAt` y `updatedAt` como horas de servidor; conserva los campos esperados por las reglas existentes.
+- **Registrar mi salida:** solo para reloj propio `en_curso`; conserva el inicio y actualiza `status=finalizada`, `endedAt`, `endNote` y `updatedAt` con hora de servidor. Puede cerrarse sin GPS si falla y el usuario confirma; no se bloquea por la caducidad posterior del permiso.
+- Si ya existe un reloj `finalizada`, no vuelve a presentar botón de entrada/salida: no hay doble marcaje ni duplicación.
+- El QR **nunca realiza el marcaje por sí mismo**. La página pública muestra `Registrar mi propia entrada o salida`, que abre el portal con `?asistencia=1` y exige al usuario autenticado su propio UID y jornada autorizada. Compartir una imagen o un QR de otra persona no basta para registrar asistencia.
+- Se conserva la opción de abrir el visor antiguo de Jornadas para revisar descansos, correcciones o historia.
+
+### Lista oficial para Coordinación y Administración
+
+Se añadió **Pase de lista · Entradas y salidas** a los espacios Agencia y Administrador, solo con `agora_users/{uid}` activo y rol `coordinador`/`admin`, más el control propio de acceso del portal. Consulta **el cronograma autorizado** y, por jornada seleccionada, lee `agora_ops_clock` filtrado por `eventId` para mostrar integrantes, horas de entrada y salida y estado. No muestra coordenadas, pagos, tarifas, contactos privados ni datos médicos.
+
+El lector público del QR sirve para **comprobar la identidad**; la lista de coordinación sirve para **ver los marcajes** y no escribe sobre el reloj de otra persona. Para un flujo futuro de **escaneo por supervisor que registre asistencia por tercero** hacen falta nuevas garantías del servidor: asociación del token con el UID, autorización explícita del supervisor, prevención de repetidos, vigencia de jornada, auditoría, protección frente a fotos de QR y pruebas de reglas. No se simula un marcaje de supervisor mientras no estén esos controles.
+
+### Implementación segura
+
+- Módulos nuevos: `attendance-policy.mjs`, `attendance-live.js`, `attendance-roster.js`.
+- **No se modifican `firestore.rules` ni `storage.rules`** y tampoco registros, horarios históricos ni ID existente.
+- El registro real requiere la configuración ya vigente de Operaciones: miembro de Staff vinculado, ficha publicada y horario habilitado. Si faltan permisos muestra error sin atribuir éxito.
+- Pruebas automatizadas cubren propiedad de la jornada, prevención de duplicado, entrada/salida con timestamp de servidor, QR sin autorización y consulta por coordinador. Estas pruebas no demuestran todavía una sesión real con dispositivos o permisos del proyecto de producción; debe comprobarse con un usuario de prueba antes de usarlo como control único de asistencia.

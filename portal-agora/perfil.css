@@ -946,3 +946,145 @@ body:not(.login-mode) footer{
 .role-more-jornadas>summary::-webkit-details-marker{display:none}
 .role-more-jornadas[open]>summary{border-bottom:1px solid #393d42}
 .role-more-jornadas .role-jornada-list{padding:14px;gap:10px}
+
+
+/* Credencial como identificación y pase de lista por titular autenticado. */
+.credential-attendance-panel{
+  border:1px solid #3e4248;border-radius:10px;
+  background:#202226;margin:15px 0 18px;overflow:hidden;
+}
+.credential-attendance-panel>summary{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  list-style:none;cursor:pointer;padding:15px 17px;
+  color:#f8f7f2;font-size:14px;font-weight:700;line-height:1.5;
+}
+.credential-attendance-panel>summary::-webkit-details-marker{display:none}
+.credential-attendance-panel>summary::after{
+  content:"⌄";color:#d8c292;font-size:20px;font-weight:400;
+}
+.credential-attendance-panel[open]>summary::after{transform:rotate(180deg)}
+.credential-attendance-panel[open]>summary{border-bottom:1px solid #3d4045}
+#credential-attendance{padding:15px 14px 16px}
+.credential-attendance-message{
+  padding:10px 12px;border-radius:8px;background:#292c30;
+  color:#e8e5df;font-size:12px;line-height:1.55;
+  margin-bottom:12px;
+}
+.credential-attendance-list{display:grid;gap:10px}
+.credential-attendance-shift{
+  border:1px solid #41454c;border-radius:10px;
+  background:#191b1f;padding:14px;display:grid;gap:12px;
+}
+.credential-attendance-shift-head{
+  display:flex;align-items:start;justify-content:space-between;
+  gap:9px;flex-wrap:wrap;
+}
+.credential-attendance-shift-head strong{
+  display:block;color:#f6f6f3;font-size:14px;margin-bottom:5px;
+}
+.credential-attendance-shift-head small{
+  display:block;color:#c1c3c7;font-size:12px;line-height:1.45;
+}
+.credential-attendance-pill{
+  display:inline-flex;align-items:center;gap:6px;
+  flex-shrink:0;border-radius:7px;padding:6px 9px;
+  background:#303237;border:1px solid #4c5056;
+  color:#e0e1e2;font-size:11px;font-weight:700;
+}
+.credential-attendance-pill.habilitada,
+.credential-attendance-pill.en_curso{
+  color:#c9edce;border-color:#496b4f;background:#24362a;
+}
+.credential-attendance-pill.finalizada{
+  color:#d1d9e8;border-color:#4e5b6b;background:#252c37;
+}
+.credential-attendance-shift .profile-button{
+  display:flex;width:100%;font-size:13px;min-height:45px;
+}
+.credential-attendance-consent label{
+  display:flex;align-items:flex-start;gap:9px;
+  color:#d4d7d6;font-size:12px;line-height:1.6;
+}
+.credential-attendance-consent input{
+  flex:0 0 17px;width:17px;height:17px;margin-top:1px;
+  accent-color:#e6e6e3;
+}
+.credential-attendance-note{
+  display:grid;gap:6px;color:#c9cbce;font-size:12px;
+}
+.credential-attendance-note textarea{
+  width:100%;min-height:60px;box-sizing:border-box;
+  border-radius:8px;padding:9px;
+  background:#121417;border:1px solid #555b61;
+  color:#f4f6f5;font:13px/1.5 Arial,sans-serif;
+  resize:vertical;
+}
+.credential-attendance-foot,.credential-attendance-hint,
+.credential-attendance-empty,.credential-attendance-time{
+  color:#bdc0c4;font-size:12px;line-height:1.6;
+  margin:4px 0 12px;
+}
+.credential-attendance-foot{
+  margin:14px 0 9px;border-top:1px solid #363a40;padding-top:12px;
+}
+.credential-attendance-legacy{
+  display:inline-block;color:#e3cfaa;font-size:12px;
+  font-weight:600;text-decoration:underline;
+  text-underline-offset:3px;line-height:1.4;
+}
+.credential-attendance-legacy:hover{color:#fff}
+@media(max-width:560px){
+ .credential-modal{padding:14px}
+ .credential-face{padding:20px 13px}
+ .credential-attendance-panel>summary{padding:14px 12px}
+ #credential-attendance{padding:11px}
+}
+
+
+/* Lista oficial de entrada y salida para coordinación. */
+.attendance-roster-select-label{
+ display:grid;gap:8px;color:#dfe0df;
+ font-weight:700;font-size:13px;
+}
+.attendance-roster-select-label select{
+ min-height:46px;width:100%;padding:10px 12px;
+ color:#f8f8f5;background:#15171a;
+ border:1px solid #5a5e64;border-radius:8px;font:inherit;
+}
+.attendance-roster-summary{
+ display:flex;justify-content:space-between;align-items:center;
+ flex-wrap:wrap;gap:9px;padding:16px 0 12px;
+ color:#f5f5f1;font-size:14px;
+}
+.attendance-roster-summary span{color:#b7bbc0;font-size:12px}
+.attendance-roster-table-scroll{width:100%;overflow-x:auto;margin-bottom:15px}
+.attendance-roster-table{width:100%;border-collapse:collapse;min-width:490px;font-size:13px}
+.attendance-roster-table th{
+ text-align:left;color:#c0c3c7;font-weight:600;
+ padding:11px 9px;background:#282b2f;
+ border-bottom:1px solid #42464d;
+}
+.attendance-roster-table td{
+ color:#f1f1ed;padding:12px 9px;
+ border-bottom:1px solid #35393f;
+}
+.attendance-roster-state{
+ display:inline-block;padding:5px 7px;
+ color:#d4e3d8;background:#27312b;
+ border-radius:7px;font-weight:700;font-size:11px;
+}
+#attendance-roster-results{
+ margin-top:15px;min-height:75px;
+}
+@media(max-width:600px){
+ .attendance-roster-summary{align-items:start;flex-direction:column}
+}
+
+.role-space-actions{
+ display:flex;align-items:center;flex-wrap:wrap;gap:9px;
+}
+.role-space-actions .profile-button{white-space:normal;font-size:12px}
+@media(max-width:600px){
+ .role-space-actions{display:grid;width:100%}
+ .role-space-actions .profile-button{width:100%}
+}
