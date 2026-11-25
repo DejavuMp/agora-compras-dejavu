@@ -73,10 +73,24 @@ function reconcileIdentityPhoneAccess(content,repositoryRules){
    changes++;
    if(action==="get"&&appendOwnGet&&!expr.includes("request.auth.uid == uid"))
     return "allow get: if ("+expr+") || (identitySignedIn() && request.auth.uid == uid);";
-   if(expr.includes("identitySignedIn()"))return whole;
-   if(!expr.includes("signedIn()"))
-    throw Error("La regla "+path+" "+action+" no usa el predicado esperado; detener.");
-   return "allow "+action+": if "+expr.replace(/\bsignedIn\(\)/g,"identitySignedIn()")+";";
+   let safeExpr=expr;
+   if(!safeExpr.includes("identitySignedIn()")){
+    if(!safeExpr.includes("signedIn()"))
+     throw Error("La regla "+path+" "+action+" no usa el predicado esperado; detener.");
+    safeExpr=safeExpr.replace(/\bsignedIn\(\)/g,"identitySignedIn()");
+   }
+   if(path==="/agora_identity_registrations/\\{uid\\}"&&action==="create"){
+    const unsafeEmail="request.resource.data.email == request.auth.token.email";
+    const safeEmail="request.resource.data.email == request.auth.token.get('email','')";
+    if(safeExpr.includes(unsafeEmail)){
+     if(safeExpr.split(unsafeEmail).length-1!==1)
+      throw Error("La validación del correo telefónico no es única; detener.");
+     safeExpr=safeExpr.replace(unsafeEmail,safeEmail);
+    }else if(!safeExpr.includes(safeEmail))
+     throw Error("La validación del correo de identidad difiere; detener.");
+   }
+   if(safeExpr===expr)return whole;
+   return "allow "+action+": if "+safeExpr+";";
   });
   for(const action of actions)
    if(!new RegExp("allow "+action+": if ").test(block))
