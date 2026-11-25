@@ -82,6 +82,8 @@ if(!live.content.startsWith("rules_version = '2';")||
 if(stage){
  const state=JSON.parse(readFileSync(stateFile,"utf8"));
  const expected=readFileSync(expectedFile,"utf8");
+ if(readFileSync("firestore.rules","utf8")!==expected)
+  throw Error("El archivo para deploy no coincide con el ruleset probado.");
  if(sha(expected)!==state.expectedHash)
   throw Error("El ruleset probado cambió después del respaldo.");
  if(verifying){
@@ -104,34 +106,41 @@ if(stage){
  writeFileSync(dir+"/firestore-repositorio.rules",candidate,"utf8");
  const occurrences=(value,needle)=>value.split(needle).length-1;
  const matches=occurrences(live.content,ending);
- if(matches!==1||occurrences(live.content,marker)!==0)
-  throw Error("Marcador de inserción no único o bloque de asistencia ya modificado en producción.");
- // Rechazar cualquier colisión que pueda conceder derechos inesperados.
- const reserved=[
-  "match /agora_ops_attendance_sheets/",
-  "match /agora_ops_assignment_requests/",
-  "function attendanceSupervisor(",
-  "function attendanceEntryCreate(",
-  "function attendanceSheetPath(",
-  "function attendanceRosterPath(",
-  "function attendanceEntryPath(",
-  "function attendanceValidated(",
-  "function attendanceClockCompleted("
- ];
- if(reserved.some(key=>live.content.includes(key))){
-  if(sha(live.content)!==sha(candidate))
-   throw Error("Las reglas reales ya contienen módulos de asistencia; conciliar manualmente.");
- }
+ if(matches!==1)throw Error("Marcador de inserción no es único.");
  const index=live.content.indexOf(ending);
  const tail=live.content.slice(index);
- // Exigir cierre equivalente al del repositorio. No reemplazar ni tocar
- // los bloques de reglas que ya están publicados.
  if(tail!==expectedTail)
-  throw Error("El cierre de las reglas reales es diferente; requiere revisión manual.");
- const reconciled=live.content.slice(0,index)+block+live.content.slice(index);
- if(reconciled.slice(0,index)+reconciled.slice(index+block.length)!==live.content)
-  throw Error("La conciliación alteró reglas anteriores: detener.");
- const mode=sha(reconciled)===sha(live.content)?"already":"deploy";
+  throw Error("El cierre de las reglas reales difiere del cierre autorizado.");
+ const existing=live.content.indexOf(marker);
+ let reconciled,mode;
+ if(existing!==-1){
+  // Ejecuciones repetidas son seguras: nunca duplicar el módulo.
+  if(occurrences(live.content,marker)!==1 ||
+     live.content.slice(existing,index)!==block)
+   throw Error("Asistencia ya existe pero difiere del bloque aprobado.");
+  reconciled=live.content;
+  mode="already";
+ }else{
+  // Rechazar cualquier colisión con helpers o colecciones previas.
+  const reserved=[
+   "match /agora_ops_attendance_sheets/",
+   "match /agora_ops_assignment_requests/",
+   "function attendanceSupervisor(",
+   "function attendanceEntryCreate(",
+   "function attendanceSheetPath(",
+   "function attendanceRosterPath(",
+   "function attendanceEntryPath(",
+   "function attendanceValidated(",
+   "function attendanceClockCompleted("
+  ];
+  if(reserved.some(key=>live.content.includes(key)))
+   throw Error("Nombres de asistencia ya utilizados por las reglas reales.");
+  // Única modificación autorizada: adición literal antes del cierre final.
+  reconciled=live.content.slice(0,index)+block+live.content.slice(index);
+  if(reconciled.slice(0,index)+reconciled.slice(index+block.length)!==live.content)
+   throw Error("La conciliación alteró alguna regla anterior.");
+  mode="deploy";
+ }
  const state={
   mode,baseHash:sha(live.content),baseRuleset:live.name,
   expectedHash:sha(reconciled),blockHash:sha(block),
