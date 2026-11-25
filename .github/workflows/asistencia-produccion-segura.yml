@@ -1,11 +1,7 @@
 name: "ÁGORA · Asistencia con respaldo y publicación segura"
+# El proveedor Google WIF autoriza exclusivamente activaciones manuales.
+# No intentar autenticarse desde eventos push: produce unauthorized_client.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "firestore.rules"
-      - ".github/firebase-staff/prepare-attendance-rules.mjs"
-      - ".github/workflows/asistencia-produccion-segura.yml"
   workflow_dispatch:
     inputs:
       project_confirmation:
@@ -20,7 +16,7 @@ permissions:
 jobs:
   rules-preflight:
     name: "Respaldar y publicar SOLO ampliación segura de asistencia"
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.project_confirmation == 'agora-dejavu-38b8c')
+    if: github.ref == 'refs/heads/main' && inputs.project_confirmation == 'agora-dejavu-38b8c'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
@@ -31,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - name: Confirmar identidad federada configurada
         env:
           WIF_PROVIDER: ${{ vars.DEJAVU_FIREBASE_WIF_PROVIDER }}
