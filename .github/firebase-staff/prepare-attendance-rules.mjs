@@ -68,7 +68,7 @@ function reconcileIdentityPhoneAccess(content,repositoryRules){
   if(close<0||(next>=0&&next<close))throw Error("No se reconoce el límite de "+path+"; detener.");
   const block=result.slice(start,close+7);
   let changes=0;
-  const updated=block.replace(/allow (get|create): if ([\\s\\S]*?);/g,(whole,action,expr)=>{
+  const updated=block.replace(/allow (get|create): if ([\s\S]*?);/g,(whole,action,expr)=>{
    if(!actions.includes(action))return whole;
    changes++;
    if(action==="get"&&appendOwnGet&&!expr.includes("request.auth.uid == uid"))
@@ -76,7 +76,7 @@ function reconcileIdentityPhoneAccess(content,repositoryRules){
    if(expr.includes("identitySignedIn()"))return whole;
    if(!expr.includes("signedIn()"))
     throw Error("La regla "+path+" "+action+" no usa el predicado esperado; detener.");
-   return "allow "+action+": if "+expr.replace(/\\bsignedIn\\(\\)/g,"identitySignedIn()")+";";
+   return "allow "+action+": if "+expr.replace(/\bsignedIn\(\)/g,"identitySignedIn()")+";";
   });
   for(const action of actions)
    if(!new RegExp("allow "+action+": if ").test(block))
