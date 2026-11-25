@@ -33,7 +33,7 @@ if(process.env.GITHUB_REF!=="refs/heads/main"||
    process.env.GITHUB_EVENT_NAME!=="workflow_dispatch")
  throw Error("Publicación limitada a ejecución manual desde main.");
 const sha=s=>createHash("sha256").update(s,"utf8").digest("hex");
-function protectIncidentValidation(content){
+function reconcileOperationsRules(content){
  const matches=[...content.matchAll(/match\s+\/agora_ops_incidents\/\{[^}]+\}\s*\{/g)];
  if(matches.length!==1)
   throw Error("No se reconoce una única regla de incidentes; conservar producción y detener.");
@@ -53,7 +53,24 @@ function protectIncidentValidation(content){
  });
  if(count===0)
   throw Error("No se encontró autorización de creación de incidentes; detener.");
- return content.slice(0,start)+updated+content.slice(close+7);
+ const incidentRules=content.slice(0,start)+updated+content.slice(close+7);
+ // Production has an older schema which omits a coordinator-only payment date
+ // already used by the Operations editor and covered by the emulator test.
+ const helpers=[...incidentRules.matchAll(/function opsValidReport\(\)\s*\{/g)];
+ if(helpers.length!==1)
+  throw Error("No se reconoce una única validación de reportes de Operaciones; detener.");
+ const helperStart=helpers[0].index;
+ const helperEnd=incidentRules.indexOf("\n    function opsOwnReport()",helperStart);
+ if(helperEnd<0)
+  throw Error("No se reconoce el límite del esquema de reportes; detener.");
+ const helper=incidentRules.slice(helperStart,helperEnd);
+ if(helper.includes("'paymentDueDate'")) return incidentRules;
+ const fieldList=/['"]returnNote['"]\s*,\s*['"]revision['"]\s*,\s*['"]updatedAt['"]\s*,\s*['"]type['"]\s*,\s*['"]status['"]/g;
+ if((helper.match(fieldList)||[]).length!==1)
+  throw Error("El esquema de reportes no coincide con la versión revisada; detener.");
+ const updatedHelper=helper.replace(fieldList,
+  "'returnNote','paymentDueDate','revision','updatedAt','type','status'");
+ return incidentRules.slice(0,helperStart)+updatedHelper+incidentRules.slice(helperEnd);
 }
 
 const candidate=readFileSync(stage?dir+"/firestore-repositorio.rules":"firestore.rules","utf8");
@@ -101,7 +118,7 @@ const live=await readLive();
 if(!live.content.startsWith("rules_version = '2';")||
    live.content.length<1000||live.content.length>450000)
  throw Error("Contenido de reglas reales no reconocido; detener.");
-const protectedLive=protectIncidentValidation(live.content);
+const protectedLive=reconcileOperationsRules(live.content);
 
 if(stage){
  const state=JSON.parse(readFileSync(stateFile,"utf8"));
