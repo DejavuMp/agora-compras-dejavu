@@ -160,7 +160,16 @@ function renderSheets(){
   options.map(x=>'<option value="'+esc(x.eventId)+'">'+
    esc(fmt(x.startsAt))+' · '+esc(x.title)+'</option>').join("");
  if(options.some(x=>x.eventId===prev))select.value=prev;
- else{state.sheet=null;$("scan-event-content").hidden=true}
+ else{
+  state.sheet=null;$("scan-event-content").hidden=true;
+  const now=Date.now();
+  const next=options.find(x=>{
+   const start=new Date(x.startsAt?.toDate?.()||x.startsAt).getTime();
+   const end=new Date(x.endsAt?.toDate?.()||x.endsAt).getTime();
+   return start<=now&&end>=now;
+  })||options.find(x=>new Date(x.startsAt?.toDate?.()||x.startsAt).getTime()>=now);
+  if(next)select.value=next.eventId;
+ }
  if(state.isCoordinator){
   const all=shiftCandidates(state.schedule);
   const enabled=new Set(state.sheets.map(s=>s.eventId));
@@ -227,27 +236,8 @@ function renderSheet(){
    (p.source==="provisional"?" · Provisional":"")+'</option>').join("");
  const entryNames=new Set(state.entries.map(x=>x.personId));
  $("scan-count").textContent=names.length+" personas · "+entryNames.size+" con registro";
- renderActivityChoices();
  renderEntries();renderApprovals();
  if(state.isCoordinator)renderSupervisorControl();
-}
-async function renderActivityChoices(){
- const person=rosterPeople().find(p=>p.personId===$("scan-person").value);
- const keys=person?.activityKeys||[];
- let more=[];
- if(person?.uid&&state.sheet){
-  try{
-   const tasks=await getDocsFromServer(query(
-     collection(db,"agora_ops_attendance_sheets",state.sheet.eventId,"activities"),
-     where("uid","==",person.uid)
-   ));
-   more=tasks.docs.map(d=>({id:d.id,name:d.data().name}));
-  }catch(e){console.warn("No se pudieron consultar actividades nuevas",e?.code||e)}
- }
- $("scan-activity-options").innerHTML='<option value="jornada">Jornada completa</option>'+
-  keys.map(x=>'<option value="'+esc(x)+'">Actividad '+esc(x)+'</option>').join("")+
-  more.filter(t=>!keys.includes(t.id)).map(t=>
-   '<option value="'+esc(t.id)+'">'+esc(t.name)+'</option>').join("");
 }
 function renderSupervisorControl(){
  const people=shiftPreview(state.schedule,state.sheet.eventId).people
@@ -396,14 +386,10 @@ async function manualEntry(){
  const person=rosterPeople().find(x=>x.personId===$("scan-person").value);
  if(!person)throw Error("Selecciona a la persona.");
  const action=$("scan-manual-action").value;
- const activityKey=action==="actividad"?$("scan-activity-options").value:"jornada";
- if(action==="actividad"&&activityKey==="jornada")
-  throw Error("Selecciona una actividad para registrar.");
- const reason=clean($("scan-manual-reason").value);
  const source=person.source==="provisional"?"provisional":"manual";
  const notes=clean($("scan-manual-notes").value);
  if(!confirm("¿Confirmas que verificaste presencialmente a "+person.name+"?"))return;
- await registerEntry({person,source,action,activityKey,reason,notes});
+ await registerEntry({person,source,action,notes});
 }
 async function provisionalEntry(){
  const name=clean($("scan-provisional-name").value);
@@ -548,6 +534,8 @@ async function loadView(user){
     await selectSheet(scan.eventId);
     await handleQR(location.href);
    }catch(e){console.warn("QR no disponible",errMessage(e))}
+  }else if($("scan-sheets").value){
+   await selectSheet($("scan-sheets").value);
   }
  }catch(e){
   state.allowed=false;showUI();notice(errMessage(e),"error");
@@ -568,7 +556,6 @@ $("scan-new-event").addEventListener("change",previewNewSupervisors);
 $("scan-configure").addEventListener("click",()=>act(configureSheet));
 $("scan-update-supervisors").addEventListener("click",()=>act(updateSupervisors));
 $("scan-toggle-active").addEventListener("click",()=>act(toggleSheet));
-$("scan-person").addEventListener("change",renderActivityChoices);
 $("scan-create-entry").addEventListener("click",()=>act(manualEntry));
 $("scan-register-provisional").addEventListener("click",()=>act(provisionalEntry));
 $("scan-open-camera").addEventListener("click",cameraStart);

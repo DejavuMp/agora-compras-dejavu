@@ -11,16 +11,9 @@ const sessions=new WeakMap();
 function build(session){
  const {target,shift}=session;
  if(!target.isConnected)return;
- const activities=(shift.activities||[]).filter(x=>x.key&&x.name&&
-   !/[/\\\s?#]/.test(x.key));
- const options=activities.map(a=>
-   '<option value="'+esc(a.key)+'">'+esc(a.name)+'</option>').join("");
  target.innerHTML='<div class="qr-shift-header">'+
    '<strong>'+esc(shift.title)+'</strong>'+
    '<small>'+esc(shift.site||"")+'</small></div>'+
-   '<label class="qr-shift-choice">QR para'+
-    '<select id="qr-shift-activity"><option value="">Jornada completa · Entrada o salida</option>'+
-      options+'</select></label>'+
    '<div class="qr-shift-preview">'+
     '<div id="qr-shift-image" class="qr-shift-image" aria-label="QR exclusivo de la jornada"></div>'+
     '<p id="qr-shift-status" role="status" aria-live="polite"></p></div>'+
@@ -28,8 +21,6 @@ function build(session){
     '<button type="button" class="profile-button profile-button-primary" data-shift-refresh>Renovar QR</button>'+
     '<button type="button" class="profile-button profile-button-outline" data-shift-copy>Copiar enlace del QR</button></div>'+
    '<p class="qr-shift-disclaimer">Este QR sirve para que Coordinación confirme tu presencia en la jornada o actividad. No sustituye tu identificación Dejavú ni registra asistencia por sí solo. El coordinador debe escanearlo y confirmar.</p>';
- const select=target.querySelector("select");
- select.addEventListener("change",()=>makeQr(session));
  target.querySelector("[data-shift-refresh]").addEventListener("click",()=>makeQr(session));
  target.querySelector("[data-shift-copy]").addEventListener("click",async()=>{
   if(!session.link)return;
@@ -44,7 +35,7 @@ function build(session){
 }
 function makeQr(session){
  const {target,shift}=session;
- const activityKey=target.querySelector("#qr-shift-activity")?.value||"";
+ const activityKey="";
  const container=target.querySelector("#qr-shift-image");
  const status=target.querySelector("#qr-shift-status");
  if(!container||!status)return;

@@ -96,7 +96,7 @@ test("credencial personal únicamente acredita identidad; las jornadas usan QR s
  assert.match(verify,/exclusivamente para identificación y vigencia/);
  assert.doesNotMatch(verify,/Registrar mi propia entrada o salida/);
  assert.match(app,/data-action="show-shift-qr"/);
- assert.match(app,/Abrir QR de mi jornada/);
+ assert.match(app,/Mostrar QR para asistencia/);
  assert.doesNotMatch(app,/Registrar entrada \/ salida/);
  assert.match(app,/data-action="view-attendance"/);
  assert.match(app,/escanear\//);

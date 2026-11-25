@@ -10,7 +10,7 @@
   <title>ÁGORA · Pase de lista</title>
   <link rel="icon" href="../assets/icono-administrador-hq.webp" type="image/webp">
   <link rel="stylesheet" href="../style.css">
-  <link rel="stylesheet" href="../perfil.css?v=20261125-work-claims-v1">
+  <link rel="stylesheet" href="../perfil.css?v=20261125-quick-attendance-v2">
   <script defer src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script type="module" src="../scan-jornada.js"></script>
 </head>
@@ -28,7 +28,7 @@
     <section class="qr-scan-page" aria-label="Pase de lista">
       <div class="profile-kicker">ÁGORA · OPERACIONES</div>
       <h1>Pasar lista</h1>
-      <p class="qr-scan-intro">Una jornada, un control de asistencia. Puedes escanear un QR, pasar lista manualmente o registrar personal provisional.</p>
+      <p class="qr-scan-intro">Elige la jornada que aparece seleccionada y registra asistencia escaneando el QR. Si alguien no tiene QR, usa pase de lista manual.</p>
       <div id="scan-status" class="qr-scan-status" role="status" aria-live="polite">Comprobando tu sesión…</div>
       <div id="scan-login" hidden class="qr-scan-access">
         <h2>Acceso a Operaciones</h2>
@@ -83,7 +83,7 @@
           </details>
           <div class="attendance-methods">
             <details open>
-              <summary><span>1</span> Escanear QR de jornada</summary>
+              <summary>Escanear QR de jornada</summary>
               <div class="attendance-method-content">
                 <p>Confirma la presencia del colaborador. El QR de identificación personal no funciona aquí.</p>
                 <div class="qr-scan-actions">
@@ -109,25 +109,20 @@
                 </section>
               </div>
             </details>
-            <details>
-              <summary><span>2</span> Pase de lista manual</summary>
+            <details open>
+              <summary>Pase de lista manual</summary>
               <div class="attendance-method-content">
                 <p>Para personal sin QR o sin teléfono. No necesita crear otra cuenta.</p>
                 <label for="scan-person">Colaborador</label>
                 <select id="scan-person"><option value="">Selecciona una persona…</option></select>
-                <label for="scan-manual-action">Registro</label>
+                <label for="scan-manual-action">Registrar</label>
                 <select id="scan-manual-action">
                   <option value="entrada">Entrada</option>
                   <option value="salida">Salida</option>
-                  <option value="actividad">Actividad completada</option>
                 </select>
-                <label for="scan-activity-options">Actividad de la misma jornada</label>
-                <select id="scan-activity-options"><option value="jornada">Jornada completa</option></select>
-                <label for="scan-manual-reason">Motivo del registro manual</label>
-                <input type="text" id="scan-manual-reason" maxlength="400" placeholder="Ej. No contaba con teléfono ni QR">
                 <label for="scan-manual-notes">Observaciones (opcional)</label>
-                <textarea id="scan-manual-notes" maxlength="400" rows="2" placeholder="Detalle breve"></textarea>
-                <button type="button" data-write id="scan-create-entry" class="profile-button profile-button-primary">Registrar asistencia manual</button>
+                <textarea id="scan-manual-notes" maxlength="400" rows="2" placeholder="Solo si hace falta"></textarea>
+                <button type="button" data-write id="scan-create-entry" class="profile-button profile-button-primary">Confirmar asistencia</button>
               </div>
             </details>
             <details>
