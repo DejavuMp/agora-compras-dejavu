@@ -663,6 +663,8 @@ async function showAssignmentHistory(){
         (a.linkedEventId?'<p><b>Jornada vinculada:</b> '+esc(a.linkedEventId)+'</p>':"")+
         image+
         (a.status==="pendiente"?'<div class="assignment-history-actions">'+
+          '<a class="profile-button profile-button-outline" href="'+
+            esc(href("../operaciones/?solicitud="+encodeURIComponent(a.id)))+'">Preparar jornada en Operaciones</a>'+
           assignmentEventPicker(a)+
           '<button type="button" class="profile-button profile-button-outline" data-action="confirm-assignment" data-request-id="'+esc(a.id)+'">Vincular jornada publicada</button>'+
           '<button type="button" class="profile-button profile-button-outline" data-action="cancel-assignment" data-request-id="'+esc(a.id)+'">Cancelar solicitud</button>'+

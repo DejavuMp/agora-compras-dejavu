@@ -5,6 +5,7 @@
  * Sin reglas desplegadas, la app permanece cerrada.
  */
 import "../firebase-init.js";
+import {assignmentPrefill} from "./assignment-prefill.mjs";
 import {projectStaffView} from "./ops-safe-view.mjs";
 import {availablePeople,personForLink} from "./access-link-model.mjs";
 import {createEventControl,eventPolicyEntries} from "./editor-jornadas-control.mjs";
@@ -189,6 +190,21 @@ async function ensureOwnPayProjection(){
   }catch(error){notice("Algunas previsiones de pago propias siguen pendientes: "+err(error),"pending");break}
  }
 }
+async function openLinkedAssignment(version){
+  const url=new URL(location.href),id=url.searchParams.get("solicitud");
+  if(!id||!/^[0-9a-f-]{36}$/i.test(id))return;
+  try{
+    const snap=await getDocFromServer(doc(fs,"agora_ops_assignment_requests",id));
+    if(version!==authVersion||role!=="coordinador"||!ready)return;
+    const draft=assignmentPrefill(snap.data());
+    if(!app?.openAssignmentDraft?.(draft)){notice("Cierra el editor actual y vuelve a abrir el enlace de la solicitud.","pending");return;}
+    url.searchParams.delete("solicitud");
+    history.replaceState(null,"",url.href);
+    notice("Borrador preparado desde la solicitud de jornada.","ok");
+  }catch(error){
+    if(version===authVersion)notice("No fue posible abrir la solicitud · "+err(error),"error");
+  }
+}
 function loadCoordinator(){
   role="coordinador";
   notice("Firebase · preparando datos","pending");
@@ -199,8 +215,10 @@ function loadCoordinator(){
     baseBoard={revision:snap.exists()?Number(d.revision||0):0,payload:snap.exists()?d.payload:boardOnly(blank())};
     initialized=true;
     if(snap.metadata.fromCache){notice("Firebase · esperando confirmación del servidor","pending");return;}
-    if(!ready){show();notice("Firebase · sincronizado","ok");}
+    const first=!ready;
+    if(first){show();notice("Firebase · sincronizado","ok");}
     emit();
+    if(first)void openLinkedAssignment(authVersion);
     if(!snap.metadata.fromCache)void ensureShiftPolicies();
     if(!snap.metadata.fromCache)void ensureOwnPayProjection();
   });
