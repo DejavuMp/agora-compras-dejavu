@@ -10,7 +10,7 @@
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script type="module" src="../firebase-init.js"></script>
-<script type="module" src="./app.js?v=20261126-hours-obligation"></script>
+<script type="module" src="./app.js?v=20261126-finance-ledger"></script>
 </head>
 <body>
 <div class="layout">
@@ -22,6 +22,7 @@
     <button class="nav-item active" data-view="dashboard"><span>▦</span> Resumen</button>
     <button class="nav-item" data-view="new"><span>＋</span> Nueva solicitud</button>
     <button class="nav-item" data-view="history"><span>▤</span> Solicitudes e historial</button>
+    <button class="nav-item" id="ledger-nav" data-view="ledger" hidden>Historial de obligaciones</button>
     <button class="nav-item" data-view="gastos"><span>◫</span> Comprobación de gastos</button>
   </nav>
   <div class="sidebar-foot"><a href="../">← Regresar a ÁGORA</a><span>Recursos y Finanzas · 2026</span></div>
@@ -81,8 +82,20 @@
  <div class="section-intro"><div><h2>Historial de solicitudes</h2><p>Revisa estados, montos autorizados, pagos y documentos generados.</p></div><button class="btn btn-outline" id="import-btn">↑ Importar respaldo</button><input id="import-file" type="file" accept=".json,application/json" hidden></div>
  <div class="panel"><div class="filters"><input id="search" type="search" placeholder="Buscar por folio, proyecto, beneficiario…"><select id="status-filter"><option value="">Todos los estados</option><option value="pendiente">Pendiente</option><option value="ajustes">Solicita cambios</option><option value="aprobada">Aprobada</option><option value="aprobada_parcial">Aprobada parcialmente</option><option value="pago_parcial">Pago parcial</option><option value="pagada">Pagada</option><option value="rechazada">Rechazada</option></select></div><div id="all-list"></div></div>
 </section>
+<section id="ledger" class="view" hidden>
+ <div class="section-intro"><div><h2>Historial de obligaciones</h2><p>Consulta el concepto, saldo y pagos por persona o proveedor. Los estados históricos de Operaciones quedan visibles para revisión.</p></div></div>
+ <div class="panel">
+  <div id="ledger-tools" class="panel-heading" hidden>
+   <label>Persona, ficha o proyecto <input type="search" id="ledger-search"></label>
+   <label>Concepto <select id="ledger-category"><option value="">Todos</option><option value="nomina">Personal</option><option value="proveedor">Proveedores</option><option value="materiales">Materiales</option><option value="productos">Productos</option><option value="otro">Otros</option></select></label>
+   <button id="ledger-refresh" type="button" class="btn btn-outline">Actualizar</button>
+  </div>
+  <div id="ledger-rows" aria-live="polite"></div>
+ </div>
+</section>
 <section id="gastos" class="view" hidden>
  <div class="section-intro"><div><h2>Comprobación de gastos</h2><p>Conservamos tu herramienta original. No se han movido ni modificado sus datos locales.</p></div></div>
+ <div class="panel"><h3>Anticipos entregados</h3><p>Consulta el folio y el importe para ubicar sus comprobantes en la herramienta de gastos.</p><div id="gastos-anticipos" aria-live="polite"></div></div>
  <div class="panel gastos-panel"><div class="big-icon">◫</div><h3>Dejavú · Comprobación de Gastos</h3><p>Una vez entregado un anticipo para comprar, conserva el folio de la solicitud y registra los tickets y evidencias en la aplicación que ya utilizas. Los pagos directos a proveedores no necesitan duplicarse como gastos de caja.</p><a class="btn btn-gold" href="https://gastosdvm.netlify.app/" target="_blank" rel="noopener noreferrer">Abrir herramienta existente ↗</a><p class="small-note">La sincronización automática de comprobaciones se realizará en una etapa posterior, después de respaldar y validar los registros actuales.</p></div>
 </section>
 </main>
