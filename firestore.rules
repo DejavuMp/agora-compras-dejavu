@@ -408,13 +408,55 @@ service cloud.firestore {
 // Reutiliza signedIn(), activeStaff(), canEdit(), isAdmin() de firestore.rules.
 // Nunca abre lectura ni aprobación anónimas de datos bancarios o nóminas.
 
+function financeHasHoursOrigin(data) {
+  return data.keys().hasAny(['hoursOrigin','paymentReferences']);
+}
+function financeHoursOriginCreate(requestId) {
+  let d = request.resource.data;
+  return !financeHasHoursOrigin(d) ? !requestId.matches('^horas~.*') :
+    isAdmin() && d.category == 'nomina' &&
+    d.hoursOrigin is map &&
+    d.hoursOrigin.keys().hasOnly(['eventId','personId','approvedMinutes']) &&
+    d.hoursOrigin.eventId.matches('^[A-Za-z0-9_-]{1,100}$') &&
+    d.hoursOrigin.personId.matches('^[A-Za-z0-9_-]{1,90}$') &&
+    d.hoursOrigin.approvedMinutes is int &&
+    requestId == 'horas~' + d.hoursOrigin.eventId + '~' + d.hoursOrigin.personId &&
+    d.paymentReferences == [] && financeMatchesHoursApproval(d.hoursOrigin, d.beneficiary);
+}
+function financeMatchesHoursApproval(origin, beneficiary) {
+  let approval = get(/databases/$(database)/documents/agora_ops_attendance_sheets/$(origin.eventId)/approvals/$(origin.personId)).data;
+  return approval.status == 'horas_validadas' &&
+    approval.eventId == origin.eventId && approval.personId == origin.personId &&
+    approval.approvedMinutes == origin.approvedMinutes &&
+    approval.personName == beneficiary;
+}
+function financeHoursPayment() {
+  let old = resource.data;
+  let next = request.resource.data;
+  let payment = next.payments[old.payments.size()];
+  return payment.reference is string &&
+    payment.reference.matches('^[A-Z0-9][A-Z0-9._ /-]{0,119}$') &&
+    !(payment.reference in old.paymentReferences) &&
+    payment.amount is number && payment.amount > 0 &&
+    math.round((old.paidAmount + payment.amount) * 100) == math.round(next.paidAmount * 100) &&
+    next.paymentReferences == old.paymentReferences.concat([payment.reference]) &&
+    next.payments == old.payments.concat([payment]);
+}
+function financeHoursHistory() {
+  let old = resource.data;
+  let next = request.resource.data;
+  return !financeHasHoursOrigin(old) ||
+    (next.category == old.category && next.beneficiary == old.beneficiary &&
+     next.history.size() == old.history.size() + 1 &&
+     next.history == old.history.concat([next.history[old.history.size()]]));
+}
 function financeBaseValid() {
   return request.resource.data.keys().hasOnly([
     'schema','id','folio','category','project','client','requester','dateNeeded',
     'priority','reason','paymentType','paymentMethod','beneficiary','beneficiaryEmail',
     'bank','account','notes','attachments','items','total','status','approvedAmount',
     'paidAmount','payments','decisionNote','decisionBy','history',
-    'createdBy','createdByEmail','createdAt','updatedAt','updatedBy'
+    'createdBy','createdByEmail','createdAt','updatedAt','updatedBy','hoursOrigin','paymentReferences'
   ]) &&
   request.resource.data.keys().hasAll([
     'schema','id','folio','category','project','requester','dateNeeded','reason',
@@ -422,7 +464,7 @@ function financeBaseValid() {
     'createdBy','createdAt','updatedAt','updatedBy','history'
   ]) &&
   request.resource.data.schema == 1 &&
-  request.resource.data.id is string && request.resource.data.id.size() <= 80 &&
+  request.resource.data.id is string && request.resource.data.id.size() <= (financeHasHoursOrigin(request.resource.data) ? 197 : 80) &&
   request.resource.data.folio is string && request.resource.data.folio.size() <= 35 &&
   request.resource.data.category in ['materiales','productos','proveedor','nomina','otro'] &&
   request.resource.data.project is string && request.resource.data.project.size() <= 130 &&
@@ -431,7 +473,7 @@ function financeBaseValid() {
   request.resource.data.dateNeeded is string &&
   request.resource.data.dateNeeded.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
   request.resource.data.reason is string && request.resource.data.reason.size() <= 2000 &&
-  request.resource.data.beneficiary is string && request.resource.data.beneficiary.size() <= 120 &&
+  request.resource.data.beneficiary is string && request.resource.data.beneficiary.size() <= (financeHasHoursOrigin(request.resource.data) ? 140 : 120) &&
   request.resource.data.beneficiaryEmail is string && request.resource.data.beneficiaryEmail.size() <= 180 &&
   request.resource.data.bank is string && request.resource.data.bank.size() <= 100 &&
   request.resource.data.account is string && request.resource.data.account.size() <= 32 &&
@@ -481,12 +523,14 @@ function financePay() {
   return resource.data.status in ['aprobada','aprobada_parcial','pago_parcial'] &&
     request.resource.data.status in ['pago_parcial','pagada'] &&
     request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-      'status','payments','paidAmount','history','updatedBy','updatedAt'
+      'status','payments','paidAmount','history','updatedBy','updatedAt','paymentReferences'
     ]) &&
     request.resource.data.history.size() == resource.data.history.size() + 1 &&
     request.resource.data.payments.size() == resource.data.payments.size() + 1 &&
     request.resource.data.paidAmount > resource.data.paidAmount &&
     request.resource.data.paidAmount <= resource.data.approvedAmount &&
+    (financeHasHoursOrigin(resource.data) ? financeHoursPayment() :
+      !financeHasHoursOrigin(request.resource.data)) &&
     (
       (request.resource.data.status == 'pagada' &&
        request.resource.data.paidAmount == resource.data.approvedAmount) ||
@@ -515,7 +559,7 @@ match /agora_finance_requests/{requestId} {
   allow get, list: if isAdmin() ||
     (activeStaff() && resource.data.createdBy == request.auth.uid);
   allow create: if canEdit() &&
-    financeBaseValid() &&
+    financeBaseValid() && financeHoursOriginCreate(requestId) &&
     request.resource.data.id == requestId &&
     request.resource.data.createdBy == request.auth.uid &&
     request.resource.data.createdByEmail == request.auth.token.email &&
@@ -526,7 +570,7 @@ match /agora_finance_requests/{requestId} {
     request.resource.data.payments.size() == 0 &&
     request.resource.data.history.size() == 1 &&
     request.resource.data.history[0].kind == 'solicitud';
-  allow update: if financeBaseValid() &&
+  allow update: if financeBaseValid() && financeHoursHistory() &&
     request.resource.data.id == resource.data.id &&
     request.resource.data.folio == resource.data.folio &&
     request.resource.data.createdBy == resource.data.createdBy &&
