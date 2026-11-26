@@ -412,6 +412,7 @@ function profile(){
           profileTool("agencia/","Coordinación","Agenda y solicitudes de asignación","▤"):"")+
         (allowed("administrador")?
           profileTool("../recursos/?vista=obligaciones","Finanzas","Obligaciones, pagos y conciliación","▤"):"")+
+        (allowed("staff")?profileTool("trabajos/","Mis trabajos y pagos","Formularios e historial personal","▤"):"")+
         (allowed("staff")?profileTool("campo/","ÁGORA Campo","Checklists y acuses provisionales","▤"):"")+
         '<a class="private-link" href="'+esc(href("mi-operacion/"))+'">'+
           '<span class="private-link-symbol" aria-hidden="true">◷</span>'+
@@ -583,6 +584,7 @@ function staffOperationsSpace(){
         (quickQr?'<button type="button" class="profile-button profile-button-outline" data-action="show-shift-qr" data-event-id="'+esc(quickQr.key)+'">Mostrar QR para asistencia</button>':"")+
         '<a class="profile-button profile-button-primary" href="'+esc(href("mi-operacion/"))+'">Mi operación</a>'+
         '<a class="profile-button profile-button-outline" href="'+esc(href("campo/"))+'">ÁGORA Campo</a>'+
+        '<a class="profile-button profile-button-outline" href="'+esc(href("trabajos/"))+'">Mis trabajos y pagos</a>'+
         (["admin","coordinador","supervisor"].includes(role())?'<a class="profile-button profile-button-outline" href="'+esc(href("escanear/"))+'">Pasar lista</a>':"")+'</div></header>'+
     roleNotice()+
     (staff?assigned.length?'<div class="role-jornada-list">'+assigned.slice(0,3).map(staffJornadaCard).join("")+'</div>'+

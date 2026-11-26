@@ -2224,6 +2224,93 @@ match /agora_finance_audit/{auditId} {
 
 
     // Todas las demás colecciones permanecen cerradas.
+
+    // Seguimiento personal de formularios y pagos. Los documentos financieros originales
+    // conservan sus reglas administrativas y los datos bancarios no se proyectan.
+    function ownOpsPerson() {
+      return opsStaff() && opsPersonId() is string;
+    }
+    match /agora_work_forms/{id} {
+      allow get, list: if canEdit() || opsStaff();
+      allow create: if canEdit() &&
+        request.resource.data.keys().hasOnly(['label','url','instructions','scope','scopeId','due','required','active','version','history','updatedAt']) &&
+        request.resource.data.version == 1 &&
+        request.resource.data.active == true &&
+        request.resource.data.label is string && request.resource.data.label.size() > 0 && request.resource.data.label.size() <= 80 &&
+        request.resource.data.url.matches('^https://[^\\s]+$') &&
+        request.resource.data.instructions is string && request.resource.data.instructions.size() <= 600 &&
+        request.resource.data.scope in ['event','person','project','group'] &&
+        request.resource.data.scopeId is string && request.resource.data.scopeId.size() > 0 && request.resource.data.scopeId.size() <= 120 &&
+        request.resource.data.due is string && request.resource.data.required is bool &&
+        request.resource.data.history.size() == 1 && request.resource.data.history[0].by == request.auth.uid &&
+        request.resource.data.updatedAt == request.time;
+      allow update: if canEdit() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['label','url','instructions','scope','scopeId','due','required','active','version','history','updatedAt']) &&
+        request.resource.data.version == resource.data.version + 1 &&
+        request.resource.data.history == resource.data.history.concat([request.resource.data.history[resource.data.history.size()]]) &&
+        request.resource.data.history[resource.data.history.size()].by == request.auth.uid &&
+        request.resource.data.url.matches('^https://[^\\s]+$') &&
+        request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+    match /agora_work_form_states/{id} {
+      allow get, list: if canEdit() || (ownOpsPerson() && resource.data.ownerUid == request.auth.uid);
+      allow create: if ownOpsPerson() && request.resource.data.keys().hasOnly([
+        'ownerUid','personId','eventId','linkId','state','note','evidence','linkVersion','linkUrl','verified','history','updatedAt'
+      ]) && request.resource.data.ownerUid == request.auth.uid &&
+        request.resource.data.personId == opsPersonId() &&
+        request.resource.data.linkId is string && request.resource.data.eventId is string &&
+        request.resource.data.state in ['pendiente','enviado','correccion','problema'] &&
+        request.resource.data.note is string && request.resource.data.note.size() <= 500 &&
+        request.resource.data.evidence is string && request.resource.data.evidence.size() <= 100000 &&
+        request.resource.data.verified == false &&
+        request.resource.data.history.size() == 1 &&
+        request.resource.data.history[0].by == request.auth.uid &&
+        request.resource.data.updatedAt == request.time;
+      allow update: if (
+        (ownOpsPerson() && resource.data.ownerUid == request.auth.uid &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+           'state','note','evidence','linkVersion','linkUrl','verified','history','updatedAt'
+         ]) && request.resource.data.verified == false) ||
+        (canEdit() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+           'state','note','verified','history','updatedAt'
+         ]) && request.resource.data.state == 'correccion' && request.resource.data.verified == false)
+      ) && request.resource.data.history.size() <= 40 &&
+        request.resource.data.history == resource.data.history.concat([request.resource.data.history[resource.data.history.size()]]) &&
+        request.resource.data.history[resource.data.history.size()].by == request.auth.uid &&
+        request.resource.data.state in ['pendiente','enviado','correccion','problema'] &&
+        request.resource.data.note is string && request.resource.data.note.size() <= 500 &&
+        request.resource.data.evidence is string && request.resource.data.evidence.size() <= 100000 &&
+        request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+    match /agora_staff_payment_views/{id} {
+      allow get, list: if isAdmin() || (ownOpsPerson() && resource.data.ownerUid == request.auth.uid);
+      allow create, update: if isAdmin() &&
+        request.resource.data.keys().hasOnly([
+          'ownerUid','personId','eventId','project','concept','date','approvedAmount',
+          'paidAmount','balance','status','lastPaidAt','reconciliation','sourceRevision','updatedAt'
+        ]) &&
+        request.resource.data.ownerUid is string &&
+        exists(/databases/$(database)/documents/agora_ops_members/$(request.resource.data.ownerUid)) &&
+        get(/databases/$(database)/documents/agora_ops_members/$(request.resource.data.ownerUid)).data.personId == request.resource.data.personId &&
+        request.resource.data.approvedAmount is number && request.resource.data.paidAmount is number &&
+        request.resource.data.balance is number && request.resource.data.reconciliation == true &&
+        request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+    match /agora_staff_payment_feedback/{id} {
+      allow get, list: if isAdmin() || (ownOpsPerson() && resource.data.ownerUid == request.auth.uid);
+      allow create: if ownOpsPerson() &&
+        request.resource.data.keys().hasOnly(['ownerUid','paymentId','response','note','createdAt','status']) &&
+        request.resource.data.ownerUid == request.auth.uid &&
+        get(/databases/$(database)/documents/agora_staff_payment_views/$(request.resource.data.paymentId)).data.ownerUid == request.auth.uid &&
+        request.resource.data.response in ['recibido','no_recibido','incorrecto','aclaracion'] &&
+        request.resource.data.note is string && request.resource.data.note.size() <= 500 &&
+        request.resource.data.createdAt == request.time && request.resource.data.status == 'pendiente';
+      allow update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
