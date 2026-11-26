@@ -150,6 +150,24 @@ try{
   hoursPayment(paid.history,[partial,{...last,amount:999}],['REF-QA-1','REF-QA-2'],1500,'pagada')));
  await yes('Finanzas liquida el saldo ficticio con otra referencia',updateDoc(hoursRef(admin),
   hoursPayment(paid.history,[partial,last],['REF-QA-1','REF-QA-2'],1500,'pagada')));
+ await environment.withSecurityRulesDisabled(async ctx=>{
+  await setDoc(doc(ctx.firestore(),'agora_ops_logs','legado-qa'),{eventId,personId,revision:2,paymentStatus:'pagado'});
+ });
+ const auditRef=(db,n)=>doc(db,'agora_finance_audit','01234567-1234-1234-1234-'+String(n).padStart(12,'0'));
+ const audit={kind:'legado',requestId:hoursId,legacyId:'legado-qa',legacyRevision:2,decision:'pago_previo',
+  reference:'RECIBO-QA',evidenceUrl:'',note:'Registro histórico cotejado',createdBy:'admin',createdAt:serverTimestamp()};
+ await no('Coordinación no crea revisiones de Finanzas',setDoc(auditRef(coord,1),{...audit,createdBy:'coord'}));
+ await no('No se concilia una revisión antigua del legado',setDoc(auditRef(admin,2),{...audit,legacyRevision:1}));
+ await no('No se concilian folios y jornadas distintos',setDoc(auditRef(admin,3),{...audit,requestId:id}));
+ await yes('Administración registra una decisión de conciliación',setDoc(auditRef(admin,4),audit));
+ await no('Coordinación no lee la bitácora de conciliación',getDoc(auditRef(coord,4)));
+ await no('Administración no altera la revisión original',updateDoc(auditRef(admin,4),{note:'Otra nota'}));
+ const expense={...audit,kind:'comprobante',requestId:id,legacyId:'',legacyRevision:0,
+  decision:'evidencia_recibida',evidenceUrl:'https://example.invalid/qa'};
+ await yes('Administración vincula comprobante de un anticipo entregado',setDoc(auditRef(admin,5),expense));
+ await no('Se rechaza evidencia que no sea HTTPS',setDoc(auditRef(admin,6),{...expense,evidenceUrl:'http://example.invalid/qa'}));
+ await no('Se rechaza un comprobante con importe inventado',setDoc(auditRef(admin,7),{...expense,paidAmount:5}));
+ await no('Se rechaza comprobante con folio inexistente',setDoc(auditRef(admin,8),{...expense,requestId:'inexistente'}));
  console.log('PRUEBAS FINANZAS SUPERADAS: '+passed);
 }catch(error){console.error('Fallaron pruebas de seguridad financiera');throw error}
 finally{await environment.cleanup();}

@@ -581,6 +581,39 @@ match /agora_finance_requests/{requestId} {
 }
 
 
+
+function financeAuditMatchesLegacy(d, source) {
+  let legacy = get(/databases/$(database)/documents/agora_ops_logs/$(d.legacyId)).data;
+  return source.keys().hasAny(['hoursOrigin']) &&
+    legacy.personId == source.hoursOrigin.personId &&
+    legacy.eventId == source.hoursOrigin.eventId &&
+    legacy.get('revision', 0) == d.legacyRevision;
+}
+function financeAuditValid() {
+  let d = request.resource.data;
+  let source = get(/databases/$(database)/documents/agora_finance_requests/$(d.requestId)).data;
+  return d.keys().hasOnly(['kind','requestId','legacyId','legacyRevision','decision',
+     'reference','evidenceUrl','note','createdAt','createdBy']) &&
+   d.requestId is string && d.requestId.size() > 0 && d.requestId.size() <= 197 &&
+   d.createdBy == request.auth.uid && d.createdAt == request.time &&
+   d.note is string && d.note.size() >= 5 && d.note.size() <= 600 &&
+   d.reference is string && d.reference.size() > 0 && d.reference.size() <= 180 &&
+   d.evidenceUrl is string && d.evidenceUrl.size() <= 600 &&
+   (d.evidenceUrl == '' || d.evidenceUrl.matches('^https://[^\\s]+$')) &&
+   ((d.kind == 'legado' && d.legacyId is string && d.legacyId.size() > 0 &&
+     d.legacyId.size() <= 180 && d.legacyRevision is int &&
+     d.decision in ['independiente','pago_previo','requiere_ajuste'] &&
+     financeAuditMatchesLegacy(d, source)) ||
+    (d.kind == 'comprobante' && d.legacyId == '' && d.legacyRevision == 0 &&
+     d.decision == 'evidencia_recibida' && source.paidAmount > 0 &&
+     (source.paymentType == 'entrega' || source.category == 'proveedor')));
+}
+match /agora_finance_audit/{auditId} {
+  allow get, list: if isAdmin();
+  allow create: if isAdmin() && auditId.matches('^[a-f0-9-]{36}$') && financeAuditValid();
+  allow update, delete: if false;
+}
+
     // ÁGORA · Centro de Operaciones V4 (aislado de Compras y Finanzas).
     // Agenda con tarifas sólo para coordinación; el staff recibe una copia
     // reducida de sus propios turnos. Ningún documento es público.
