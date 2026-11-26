@@ -32,10 +32,22 @@ test("inicio autenticado es Mi perfil, sin herramientas, accesos rápidos ni QR 
   assert.match(home,/credentialDialog\(\)/);
   assert.doesNotMatch(home,/<div id="credential-qr"|<div class="credential-qr"/);
   assert.doesNotMatch(app,/SITE_URLS|quickAccess\(|siteTile\(|sites\(\)|https:\/\/dejavump\.github\.io\/agora-(?:compras|operaciones)/);
-  assert.doesNotMatch(app,/Compras y producción|Recursos y pagos|Mis jornadas \/ Visor|Mis herramientas/);
+  assert.doesNotMatch(home,/Compras y producción|Recursos y Finanzas|Mis jornadas \/ Visor|Mis herramientas/);
   assert.match(css,/\.profile-layout/);
   assert.match(css,/\.profile-space-list/);
   assert.match(css,/--profile-bg:#101113/);
+});
+
+test("las herramientas operativas se muestran dentro de los espacios autorizados",async()=>{
+  const app=await read("app.js");
+  const staff=app.slice(app.indexOf("function staffOperationsSpace()"),app.indexOf("function coordinationOperationsSpace("));
+  const coordination=app.slice(app.indexOf("function coordinationOperationsSpace("),app.indexOf("function emptySpace("));
+  assert.doesNotMatch(staff,/Compras y producción|Recursos y Finanzas/);
+  assert.match(coordination,/const edit=\["admin","coordinador"\].includes\(role\(\)\)/);
+  assert.match(coordination,/Herramientas de la agencia/);
+  assert.match(coordination,/Compras y producción/);
+  assert.match(coordination,/Archivos y evidencias/);
+  assert.match(coordination,/Solicitudes de recursos/);
 });
 
 test("fotografía real, respaldo por iniciales y navegación basada en iconos",async()=>{

@@ -105,3 +105,22 @@ export function assignmentDraftText(value){
   "Estado: BORRADOR. No hay autorización, asignación ni archivo guardado en Firebase."
  ].join("\n");
 }
+
+const agendaDay=new Intl.DateTimeFormat("sv-SE",{timeZone:"America/Mexico_City",dateStyle:"short"});
+export function assignmentEventOptions(schedule,date){
+ const events=(Array.isArray(schedule?.payload?.events)?schedule.payload.events:[]).filter(liveEvent);
+ const shifts=events.flatMap(event=>(Array.isArray(event.staff)?event.staff:[]).filter(Boolean).map(slot=>({
+  eventId:String(event.id),personId:slot.personId,start:instant(slot.start??event.start),
+  end:instant(slot.end??event.end)
+ })).filter(slot=>slot.personId&&slot.end>slot.start));
+ return events.filter(event=>event.id&&Number.isFinite(instant(event.start))&&agendaDay.format(instant(event.start))===date)
+  .sort((a,b)=>instant(a.start)-instant(b.start)).map(event=>{
+   const id=String(event.id);
+   const own=shifts.filter(slot=>slot.eventId===id);
+   const conflictCount=new Set(own.filter(slot=>shifts.some(other=>other.eventId!==id&&
+    slot.personId===other.personId&&slot.start<other.end&&other.start<slot.end))
+    .map(slot=>slot.personId)).size;
+   return {id,title:text(event.title||event.project||"Jornada",180),start:instant(event.start),
+    staffCount:new Set(own.map(slot=>slot.personId)).size,conflictCount};
+  });
+}
