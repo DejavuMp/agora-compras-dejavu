@@ -16,7 +16,21 @@
 <p>Checklists de campo para consultar y marcar en este dispositivo.</p>
 <p id="connection" role="status"></p>
 <label>Protocolo <select id="protocol"></select></label>
-<section><h2 id="name"></h2><div id="checklist"></div><p id="progress" aria-live="polite"></p></section>
+<label>Folio de actividad <input id="activity-folio" maxlength="100" autocomplete="off" placeholder="Usa el folio de Operaciones"></label>
+<section id="protocol-sheet"><h2 id="name"></h2><div id="checklist"></div><p id="progress" aria-live="polite"></p></section>
 <div class="actions"><a id="open-draft" href="../../operaciones/">Preparar jornada en Operaciones</a><button type="button" id="print">Imprimir o guardar PDF</button><a href="../../archivos/">Abrir evidencias</a></div>
-<p id="local-status" role="status">Los avances de este checklist se guardan en este dispositivo.</p>
+<section id="delivery-sheet">
+<h2>Acuse provisional de entrega</h2>
+<p>Completa el formato y guárdalo como PDF. El borrador vive en esta pestaña.</p>
+<form id="delivery-form">
+<label>Sucursal o destino <input name="destination" maxlength="150" required></label>
+<label>Fecha de entrega <input name="date" type="date" required></label>
+<div id="materials"></div>
+<button type="button" id="add-material">Agregar material</button>
+<label>Observaciones <textarea name="notes" rows="3" maxlength="700"></textarea></label>
+<button>Preparar acuse</button>
+</form>
+<div id="receipt-preview" hidden><pre id="receipt"></pre><button type="button" id="print-receipt">Imprimir o guardar acuse en PDF</button></div>
+</section>
+<p id="local-status" role="status">Ingresa el folio para guardar el avance del checklist en este dispositivo.</p>
 </main></body></html>
