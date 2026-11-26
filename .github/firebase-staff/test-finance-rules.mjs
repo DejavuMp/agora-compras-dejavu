@@ -101,6 +101,55 @@ try{
   updatedBy:'admin',updatedAt:serverTimestamp()
  }));
  await no('no se permite borrar solicitudes con historial',import('firebase/firestore').then(m=>m.deleteDoc(ref(admin))));
+ const eventId='jornada-qa',personId='persona-qa';
+ const hoursId='horas~'+eventId+'~'+personId;
+ const hoursRef=db=>doc(db,COLL,hoursId);
+ await environment.withSecurityRulesDisabled(async ctx=>{
+  await setDoc(doc(ctx.firestore(),'agora_ops_attendance_sheets',eventId,'approvals',personId),{
+   status:'horas_validadas',eventId,personId,approvedMinutes:240,personName:'Beneficiario ficticio'
+  });
+ });
+ const linked={...baseRequest(hoursId),folio:'RF-QA-HORAS',category:'nomina',
+  createdBy:'admin',updatedBy:'admin',createdByEmail:'admin@example.invalid',
+  hoursOrigin:{eventId,personId,approvedMinutes:240},paymentReferences:[]};
+ await no('perfil Consulta no puede crear obligación vinculada',setDoc(hoursRef(consult),linked));
+ await no('coordinación no crea obligación vinculada',setDoc(hoursRef(coord),{
+  ...linked,createdBy:'coord',updatedBy:'coord',createdByEmail:'coordinacion@example.invalid'
+ }));
+ await no('administración no puede alterar los minutos validados',setDoc(hoursRef(admin),{
+  ...linked,hoursOrigin:{eventId,personId,approvedMinutes:241}
+ }));
+ await no('un segundo folio para la misma validación se bloquea',setDoc(doc(admin,COLL,'horas-alternas'),{
+  ...linked,id:'horas-alternas'
+ }));
+ await no('el espacio de folios de horas requiere una validación',setDoc(hoursRef(admin),{
+  ...baseRequest(hoursId),folio:'RF-QA-HORAS',createdBy:'admin',updatedBy:'admin',createdByEmail:'admin@example.invalid'
+ }));
+ await yes('Finanzas crea la obligación vinculada y pendiente',setDoc(hoursRef(admin),linked));
+ await no('un reintento no puede reemplazar la obligación',setDoc(hoursRef(admin),linked));
+ await no('coordinación no lee la obligación financiera',getDoc(hoursRef(coord)));
+ const hoursHistory=[baseHistory,{kind:'evento',by:'admin@example.invalid',at:'2026-11-16T10:00:00.000Z',note:'Importe autorizado'}];
+ await yes('Finanzas autoriza el importe vinculado',updateDoc(hoursRef(admin),{
+  status:'aprobada',approvedAmount:1500,decisionBy:'admin@example.invalid',
+  history:hoursHistory,updatedBy:'admin',updatedAt:serverTimestamp()
+ }));
+ function hoursPayment(prior,payments,refs,paid,status){
+  return {payments,paymentReferences:refs,paidAmount:paid,status,
+   history:[...prior,{kind:'evento',by:'admin@example.invalid',at:'2026-11-16T10:00:00.000Z',note:'Pago QA'}],
+   updatedBy:'admin',updatedAt:serverTimestamp()};
+ }
+ const partial={...first,reference:'REF-QA-1'};
+ const last={...second,reference:'REF-QA-2'};
+ await no('no se puede reescribir historial al registrar pago',updateDoc(hoursRef(admin),
+  hoursPayment([{...baseHistory,note:'Retocado'},hoursHistory[1]],[partial],['REF-QA-1'],500,'pago_parcial')));
+ const paid=hoursPayment(hoursHistory,[partial],['REF-QA-1'],500,'pago_parcial');
+ await yes('Finanzas registra un pago parcial ficticio',updateDoc(hoursRef(admin),paid));
+ await no('la misma referencia no puede utilizarse otra vez',updateDoc(hoursRef(admin),
+  hoursPayment(paid.history,[partial,{...last,reference:'REF-QA-1'}],['REF-QA-1','REF-QA-1'],1500,'pagada')));
+ await no('el pago agregado debe coincidir con saldo registrado',updateDoc(hoursRef(admin),
+  hoursPayment(paid.history,[partial,{...last,amount:999}],['REF-QA-1','REF-QA-2'],1500,'pagada')));
+ await yes('Finanzas liquida el saldo ficticio con otra referencia',updateDoc(hoursRef(admin),
+  hoursPayment(paid.history,[partial,last],['REF-QA-1','REF-QA-2'],1500,'pagada')));
  console.log('PRUEBAS FINANZAS SUPERADAS: '+passed);
 }catch(error){console.error('Fallaron pruebas de seguridad financiera');throw error}
 finally{await environment.cleanup();}

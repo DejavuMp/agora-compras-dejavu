@@ -31,7 +31,7 @@ const localDate=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezon
 const dateOnly=v=>v?String(v).slice(0,10):'';
 const asDate=v=>v?.toDate?.()?.toLocaleString('es-MX')||String(v||'');
 const el=(tag,cls='',txt='')=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt)e.textContent=txt;return e;};
-const state={view:'dashboard',records:[],selected:'',user:null,role:'',fb:null,cloud:false,loading:false,mode:'local',editingId:'',forceLocal:false};
+const state={view:'dashboard',records:[],selected:'',user:null,role:'',fb:null,cloud:false,loading:false,mode:'local',editingId:'',hoursOrigin:null,forceLocal:false};
 let idbPromise;
 function dbOpen(){
  if(idbPromise)return idbPromise;
@@ -77,6 +77,7 @@ async function loadRecords(){
  }finally{state.loading=false;render();}
 }
 async function refreshCloudUser(user){
+ if(state.hoursOrigin)clearRequestForm();
  state.user=user;state.role='';state.cloud=false;
  if(user&&!state.forceLocal){
   try{
@@ -91,6 +92,7 @@ async function refreshCloudUser(user){
  }
  await loadRecords();
  if(location.search.includes('id='))openQueryDetail();
+ else await openValidatedHours();
 }
 async function activateFirebase(){
  const fb=window.AGORA_FIREBASE;if(!fb?.initialized)return;
@@ -103,6 +105,7 @@ async function activateFirebase(){
 async function toggleLocalMode(){
  state.forceLocal=!state.forceLocal;
  if(state.forceLocal){
+  if(state.hoursOrigin)clearRequestForm();
   state.cloud=false;
   await loadRecords();
   if(!state.editingId)view('new');
@@ -136,6 +139,58 @@ function view(name){
  $('#sidebar').classList.remove('open');
  if(name==='new')$('#request-form').querySelector('[name="project"]').focus();
  render();
+}
+async function openValidatedHours(){
+ const params=new URLSearchParams(location.search);
+ const eventId=params.get('jornada'),personId=params.get('asignacion');
+ if(!eventId||!personId)return;
+ if(!/^[A-Za-z0-9_-]{1,100}$/.test(eventId)||!/^[A-Za-z0-9_-]{1,90}$/.test(personId)){
+  banner('El enlace de horas validadas no es válido.','error');return;
+ }
+ if(!state.cloud||state.role!=='admin'){
+  banner('Esta obligación requiere ingresar a Finanzas con una cuenta de Administración.','error');return;
+ }
+ const user=state.user,fs=state.fb.firestore;
+ const id='horas~'+eventId+'~'+personId;
+ if(state.records.some(row=>row.id===id)){openDetail(id);return;}
+ try{
+  const sheet=dbSdk.doc(fs,'agora_ops_attendance_sheets',eventId);
+  const [jornada,approved,schedule]=await Promise.all([
+   dbSdk.getDocFromServer(sheet),
+   dbSdk.getDocFromServer(dbSdk.doc(sheet,'approvals',personId)),
+   dbSdk.getDocFromServer(dbSdk.doc(fs,'agora_ops_control','schedule'))
+  ]);
+  if(state.user!==user||!state.cloud||state.role!=='admin')return;
+  const hours=approved.data(),shift=jornada.data(),catalog=schedule.data()?.payload;
+  if(!shift||hours?.status!=='horas_validadas'||hours.eventId!==eventId||
+    hours.personId!==personId||!Number.isInteger(hours.approvedMinutes)||hours.approvedMinutes<1)
+   throw Error('No se encontraron horas validadas para esta jornada y asignación.');
+  const event=catalog?.events?.find(item=>String(item.id)===eventId);
+  const person=catalog?.people?.find(item=>String(item.id)===personId);
+  const minutes=hours.approvedMinutes;
+  const amount=Number(person?.hourRate)>0?round(minutes*Number(person.hourRate)/60):
+   Number(person?.dayRate)>0?round(person.dayRate):'';
+  clearRequestForm();
+  state.hoursOrigin={eventId,personId,approvedMinutes:minutes};
+  const form=$('#request-form');
+  const fields={category:'nomina',project:event?.project||event?.campaign||shift.title,
+   requester:user.displayName||user.email,paymentType:'directo',beneficiary:hours.personName,
+   reason:'Horas validadas de '+shift.title+' ('+minutes+' min).'};
+  for(const [key,value] of Object.entries(fields))form.elements.namedItem(key).value=String(value||'').slice(0,key==='requester'?100:key==='project'?130:2000);
+  form.elements.namedItem('beneficiary').readOnly=true;
+  form.elements.namedItem('category').disabled=true;
+  $('#line-items').replaceChildren();
+  addLine('Horas validadas · '+minutes+' min',1,amount);
+  view('new');
+  banner(amount===''?'Indica el importe según el tabulador autorizado.':
+   'Importe sugerido con el tabulador de Operaciones. Revisa el importe antes de guardar.', 'success');
+ }catch(error){banner('No se pudo abrir la validación: '+readable(error),'error');}
+}
+function clearHoursOrigin(){
+ state.hoursOrigin=null;
+ const form=$('#request-form');
+ form.elements.namedItem('beneficiary').readOnly=false;
+ form.elements.namedItem('category').disabled=false;
 }
 function emptyHtml(){return '<div class="empty"><div style="font-size:34px">▤</div><strong>No hay solicitudes para mostrar</strong><p>Crea una solicitud para controlar importes, autorizaciones y pagos desde un mismo expediente.</p><button class="btn btn-gold" data-view="new">+ Nueva solicitud</button></div>';}
 function card(r){
@@ -183,20 +238,23 @@ function getFormData(){
  const total=round(items.reduce((a,x)=>a+round(x.quantity*x.unitPrice),0));
  if(total<=0)throw Error('El total de la solicitud debe ser mayor a $0.');
  if(items.length>50)throw Error('Máximo 50 conceptos por solicitud.');
- const category=String(fd.get('category')||'');
+ const linkedEdit=state.records.some(row=>row.id===state.editingId&&row.hoursOrigin);
+ const category=state.hoursOrigin||linkedEdit?'nomina':String(fd.get('category')||'');
  const paymentMethod=String(fd.get('paymentMethod')||'');
  const account=String(fd.get('account')||'').trim().replace(/[\s-]/g,'');
  if(account&&!/^[0-9]{10,18}$/.test(account))throw Error('La cuenta debe contener solo 10 a 18 dígitos. Revisa CLABE o número de cuenta.');
  if(paymentMethod==='transferencia'&&!account)showToast('Aviso: no agregaste CLABE ni cuenta; puedes completarlo después en una nueva solicitud.');
- const id=crypto.randomUUID?.()||('r'+Date.now()+Math.random().toString(36).slice(2));
+ const id=state.hoursOrigin?'horas~'+state.hoursOrigin.eventId+'~'+state.hoursOrigin.personId:
+  crypto.randomUUID?.()||('r'+Date.now()+Math.random().toString(36).slice(2));
  const folio='RF-'+new Date().getFullYear()+'-'+Date.now().toString(36).slice(-6).toUpperCase();
  const date=iso(),creator=state.cloud?state.user.uid:'local';
- return {schema:1,id,folio,category,project:String(fd.get('project')||'').trim(),client:String(fd.get('client')||'').trim(),requester:String(fd.get('requester')||'').trim(),dateNeeded:String(fd.get('dateNeeded')||''),priority:String(fd.get('priority')||'normal'),reason:String(fd.get('reason')||'').trim(),paymentType:String(fd.get('paymentType')||'entrega'),paymentMethod,beneficiary:String(fd.get('beneficiary')||'').trim(),beneficiaryEmail:String(fd.get('beneficiaryEmail')||'').trim(),bank:String(fd.get('bank')||'').trim(),account,notes:String(fd.get('notes')||'').trim(),attachments:validHttps(fd.get('attachments')),items,total,status:'pendiente',approvedAmount:0,paidAmount:0,payments:[],decisionNote:'',decisionBy:'',history:[{kind:'solicitud',by:state.user?.email||'Operador local',at:date,note:'Solicitud creada'}],createdBy:creator,createdByEmail:state.user?.email||'',createdAt:state.cloud?dbSdk.serverTimestamp():date,updatedAt:state.cloud?dbSdk.serverTimestamp():date,updatedBy:creator};
+ return {schema:1,id,folio,category,...(state.hoursOrigin?{hoursOrigin:state.hoursOrigin,paymentReferences:[]}:{}),project:String(fd.get('project')||'').trim(),client:String(fd.get('client')||'').trim(),requester:String(fd.get('requester')||'').trim(),dateNeeded:String(fd.get('dateNeeded')||''),priority:String(fd.get('priority')||'normal'),reason:String(fd.get('reason')||'').trim(),paymentType:String(fd.get('paymentType')||'entrega'),paymentMethod,beneficiary:String(fd.get('beneficiary')||'').trim(),beneficiaryEmail:String(fd.get('beneficiaryEmail')||'').trim(),bank:String(fd.get('bank')||'').trim(),account,notes:String(fd.get('notes')||'').trim(),attachments:validHttps(fd.get('attachments')),items,total,status:'pendiente',approvedAmount:0,paidAmount:0,payments:[],decisionNote:'',decisionBy:'',history:[{kind:'solicitud',by:state.user?.email||'Operador local',at:date,note:'Solicitud creada'}],createdBy:creator,createdByEmail:state.user?.email||'',createdAt:state.cloud?dbSdk.serverTimestamp():date,updatedAt:state.cloud?dbSdk.serverTimestamp():date,updatedBy:creator};
 }
 async function saveRequest(e){
  e.preventDefault();
  if(state.cloud&&state.role==='consulta')return showToast('Tu perfil no puede crear solicitudes.');
  try{
+  if(state.hoursOrigin&&(!state.cloud||state.role!=='admin'))throw Error('Ingresa a Finanzas para guardar la obligación vinculada.');
   const row=getFormData();$('#submit-request').disabled=true;
   let savedId=row.id,folio=row.folio;
   if(state.editingId){
@@ -212,7 +270,24 @@ async function saveRequest(e){
    if(state.cloud)await dbSdk.updateDoc(dbSdk.doc(state.fb.firestore,COLLECTION,savedId),patch);
    else await dbPut({...existing,...patch});
   }else{
-   if(state.cloud)await dbSdk.setDoc(dbSdk.doc(state.fb.firestore,COLLECTION,row.id),row);
+   if(row.hoursOrigin){
+    const ref=dbSdk.doc(state.fb.firestore,COLLECTION,row.id);
+    const saved=await dbSdk.runTransaction(state.fb.firestore,async tx=>{
+     const existing=await tx.get(ref);
+     if(existing.exists())return {folio:existing.data().folio,created:false};
+     tx.set(ref,row);
+     return {folio:row.folio,created:true};
+    });
+    folio=saved.folio;
+    if(!saved.created){
+     clearRequestForm();await loadRecords();openDetail(row.id);
+     showToast('La obligación ya estaba registrada.');return;
+    }
+    const url=new URL(location.href);
+    url.search='';
+    url.searchParams.set('id',savedId);
+    history.replaceState(null,'',url);
+   }else if(state.cloud)await dbSdk.setDoc(dbSdk.doc(state.fb.firestore,COLLECTION,row.id),row);
    else await dbPut(row);
   }
   state.editingId='';$('#submit-request').textContent='Guardar solicitud →';
@@ -298,12 +373,14 @@ function detailHtml(r){
  '<div class="detail-card detail-full"><b>Justificación</b><span>'+esc(r.reason||'—')+'</span></div>'+
  '<div class="detail-card detail-full"><b>Conceptos</b><table class="detail-table"><thead><tr><th>Concepto</th><th>Cantidad</th><th>Precio unit.</th><th>Subtotal</th></tr></thead><tbody>'+r.items.map(i=>'<tr><td>'+esc(i.description)+'</td><td>'+esc(i.quantity)+'</td><td>'+money(i.unitPrice)+'</td><td>'+money(i.quantity*i.unitPrice)+'</td></tr>').join('')+'</tbody></table></div>'+links+
  '<div class="detail-card detail-full"><b>Historial de movimientos</b>'+(r.history||[]).map(h=>'<div class="history-line">'+esc(asDate(h.at))+' · '+esc(h.by)+' · '+esc(h.note)+'</div>').join('')+'</div></div>';
+ if(r.hoursOrigin)result+='<div class="decision"><h4>Horas validadas en Operaciones</h4><p>'+
+  esc(r.hoursOrigin.approvedMinutes)+' min · Jornada '+esc(r.hoursOrigin.eventId)+'</p></div>';
  if(r.payments?.length)result+='<div class="decision"><h4>Pagos registrados</h4>'+r.payments.map(p=>'<p>'+esc(p.date)+' · '+money(p.amount)+' · '+esc(p.method)+' · Ref. '+esc(p.reference||'Sin referencia')+'</p>').join('')+'</div>';
  if(canManage()&&['pendiente','ajustes'].includes(r.status)){
   result+='<form id="decision-form" class="decision"><h4>Registrar decisión'+(!state.cloud?' (manual / local)':'')+'</h4><select name="decision"><option value="aprobada">Autorizar importe completo</option><option value="aprobada_parcial">Autorizar parcialmente</option><option value="ajustes">Solicitar cambios</option><option value="rechazada">Rechazar</option></select><input name="approved" type="number" step="0.01" min="0" max="'+esc(r.total)+'" placeholder="Monto autorizado para autorización parcial"><textarea name="comment" rows="2" maxlength="1000" placeholder="Comentarios / motivo de la decisión"></textarea><button class="btn btn-gold" type="submit">Registrar decisión</button><p>Las decisiones tomadas en modo local son registros manuales, no autorizaciones emitidas por terceros.</p></form>';
  }
  if(canManage()&&available(r)){
-  result+='<form id="payment-form" class="decision"><h4>Registrar entrega o pago</h4><input name="amount" type="number" step=".01" min=".01" max="'+esc(outstanding)+'" placeholder="Importe entregado (máximo '+money(outstanding)+')" required><input name="date" type="date" required value="'+localDate()+'"><select name="method"><option value="transferencia">Transferencia</option><option value="efectivo">Efectivo</option><option value="otro">Otro</option></select><input name="reference" maxlength="120" placeholder="Referencia bancaria o comprobante"><button class="btn btn-gold" type="submit">Guardar pago</button></form>';
+  result+='<form id="payment-form" class="decision"><h4>Registrar entrega o pago</h4><input name="amount" type="number" step=".01" min=".01" max="'+esc(outstanding)+'" placeholder="Importe entregado (máximo '+money(outstanding)+')" required><input name="date" type="date" required value="'+localDate()+'"><select name="method"><option value="transferencia">Transferencia</option><option value="efectivo">Efectivo</option><option value="otro">Otro</option></select><input name="reference" maxlength="120" '+(r.hoursOrigin?'required ':'')+'placeholder="Referencia bancaria o comprobante"><button class="btn btn-gold" type="submit">Guardar pago</button></form>';
  }
  result+='<p class="small-note" style="margin-top:17px;font-size:11px;color:#837664">La persona destinataria puede responder desde el enlace sin entrar a ÁGORA. Por ahora la respuesta se envía mediante correo o WhatsApp; no cambia el estado del expediente automáticamente. Administración valida y registra la decisión. No incluyas archivos bancarios en grupos abiertos.</p>';
  return result;
@@ -338,9 +415,17 @@ async function pay(e){
   const amount=round(f.get('amount')),left=round(r.approvedAmount-r.paidAmount);
   if(!(amount>0&&amount<=left))throw Error('El pago debe ser mayor a cero y no exceder el saldo autorizado.');
   const payment={id:crypto.randomUUID?.()||String(Date.now()),amount,date:String(f.get('date')||localDate()),method:String(f.get('method')||''),reference:String(f.get('reference')||'').trim().slice(0,120)};
+  if(r.hoursOrigin){
+   if(!state.cloud||state.role!=='admin')throw Error('Ingresa a Finanzas para registrar este pago.');
+   payment.reference=payment.reference.toUpperCase();
+   if(!/^[A-Z0-9][A-Z0-9._ /-]{0,119}$/.test(payment.reference))
+    throw Error('Indica una referencia de comprobante con letras, números o separadores.');
+   if(r.paymentReferences.includes(payment.reference))throw Error('Esta referencia ya fue registrada en la obligación.');
+  }
   const paidAmount=round(Number(r.paidAmount||0)+amount);
   const status=paidAmount>=r.approvedAmount?'pagada':'pago_parcial';
-  await updateRecord(r,{payments:[...(r.payments||[]),payment],paidAmount,status},'Pago registrado: '+money(amount)+' · '+payment.method);
+  await updateRecord(r,{payments:[...(r.payments||[]),payment],paidAmount,status,
+   ...(r.hoursOrigin?{paymentReferences:[...r.paymentReferences,payment.reference]}:{})},'Pago registrado: '+money(amount)+' · '+payment.method);
   showToast('Pago registrado correctamente.');
  }catch(error){showToast(readable(error));}
 }
@@ -445,6 +530,7 @@ function previewDoc(r){
  const host=docHost(r);$('#modal-body').innerHTML='<div class="action-bar"><button class="btn btn-outline" data-action="back">← Volver al expediente</button><button class="btn btn-gold" data-action="pdf">↓ PDF</button><button class="btn btn-outline" data-action="png">↓ PNG</button></div><div class="doc-preview">'+host.innerHTML+'</div>';removeDoc(host);
 }
 function clearRequestForm(){
+ clearHoursOrigin();
  state.editingId='';$('#submit-request').textContent='Guardar solicitud →';
  const form=$('#request-form');
  for(const e of form.querySelectorAll('input,textarea')){if(!e.closest('#line-items'))e.value='';}
@@ -454,12 +540,15 @@ function clearRequestForm(){
 }
 function editRequest(r){
  if(!canEditRequest(r))return showToast('Solo el creador puede corregir una solicitud pendiente.');
+ clearHoursOrigin();
  modalClose();view('new');
  state.editingId=r.id;
  const form=$('#request-form');
  const keys=['category','project','client','requester','dateNeeded','priority','reason','paymentType','paymentMethod','beneficiary','beneficiaryEmail','bank','account','notes'];
  for(const name of keys){const field=form.elements.namedItem(name);if(field)field.value=r[name]||'';}
  form.elements.namedItem('attachments').value=(r.attachments||[]).join('\n');
+ form.elements.namedItem('beneficiary').readOnly=Boolean(r.hoursOrigin);
+ form.elements.namedItem('category').disabled=Boolean(r.hoursOrigin);
  $('#line-items').innerHTML='';for(const i of r.items||[])addLine(i.description,i.quantity,i.unitPrice);
  $('#submit-request').textContent='Guardar cambios →';
  $('#page-title').textContent='Editar '+r.folio;
@@ -560,7 +649,7 @@ function setup(){
   }catch(error){showToast(readable(error));}
  });
  $('#request-form').addEventListener('submit',saveRequest);
- $('#request-form').addEventListener('reset',()=>setTimeout(()=>{state.editingId='';$('#submit-request').textContent='Guardar solicitud →';$('#line-items').innerHTML='';addLine();$('#request-form').querySelector('[name="dateNeeded"]').value=localDate();},0));
+ $('#request-form').addEventListener('reset',()=>setTimeout(()=>{clearHoursOrigin();state.editingId='';$('#submit-request').textContent='Guardar solicitud →';$('#line-items').innerHTML='';addLine();$('#request-form').querySelector('[name="dateNeeded"]').value=localDate();},0));
  $('#line-items').addEventListener('input',calc);
  $('#search').addEventListener('input',render);
  $('#status-filter').addEventListener('change',render);

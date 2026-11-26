@@ -333,8 +333,15 @@ function renderApprovals(){
   '<div class="attendance-row"><div><strong>'+esc(a.personName)+'</strong>'+
    '<small>'+a.approvedMinutes+' min validados · '+esc(a.source)+'</small></div>'+
    '<button type="button" class="profile-button profile-button-outline" data-hours-receipt="'+
-   esc(a.personId)+'">Recibo de horas</button></div>').join(""):
+   esc(a.personId)+'">Recibo de horas</button>'+
+   '<a class="profile-button profile-button-outline" href="'+esc(hoursFinanceLink(a))+'">Abrir en Finanzas</a></div>').join(""):
   '<p class="role-empty">Aún no hay horas validadas para pago.</p>';
+}
+function hoursFinanceLink(approval){
+ const url=new URL("../recursos/",root);
+ url.searchParams.set("jornada",approval.eventId);
+ url.searchParams.set("asignacion",approval.personId);
+ return url.href;
 }
 function fillApproval(){
  const person=rosterPeople().find(p=>p.personId===$("scan-review-person").value);

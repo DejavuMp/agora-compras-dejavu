@@ -4,41 +4,17 @@ import assert from 'node:assert/strict';
 import {readFileSync,rmSync} from 'node:fs';
 const workflow=readFileSync('.github/workflows/dejavu-staff-firebase-rules.yml','utf8');
 assert.match(workflow,/name: respaldo-reglas-agora-antes-dejavu-staff[\s\S]*?include-hidden-files: true[\s\S]*?if-no-files-found: error/,'El respaldo real es obligatorio');
-const supervisedAttendance=execFileSync('git',['show','030fe5c192f598a7eb1db690a8979bd1362aa07d:firestore.rules'],{encoding:'utf8'});
 const candidate=readFileSync('firestore.rules','utf8');
-const baseline=readFileSync('.github/firebase-staff/production-before-supervisor-attendance.rules','utf8');
-const clockDeny='      // La asistencia nueva la registra coordinación mediante hojas delegadas de asistencia.\n      // Los marcajes legados siguen siendo consultables, pero ya no se escriben desde la cuenta Staff.\n      allow create, update: if false;\n';
-const breakDeny='      // Descansos oficiales también se registran por el responsable en el flujo delegado.\n      allow create, update: if false;\n';
-function replaceActions(source,sectionStart,sectionEnd,replacement){
-  const a=source.indexOf(sectionStart),b=source.indexOf(sectionEnd,a);
-  assert.ok(a>=0&&b>a&&source.indexOf(sectionStart,a+1)<0,'sección única '+sectionStart);
-  const begin=source.indexOf('      allow create:',a),finish=source.indexOf('      allow delete: if false;',begin);
-  assert.ok(begin>=0&&finish>=begin&&finish<b,'acciones limitadas a la regla');
-  return source.slice(0,begin)+replacement+source.slice(finish);
-}
-function replaceRegion(source,startMarker,endMarker,replacement){
- const start=source.indexOf(startMarker),end=source.indexOf(endMarker,start);
- assert.ok(start>=0&&end>start&&source.indexOf(startMarker,start+1)<0,"sección única "+startMarker);
- return source.slice(0,start)+replacement+source.slice(end);
-}
-function copyRegion(source,startMarker,endMarker){
- const start=source.indexOf(startMarker),end=source.indexOf(endMarker,start);
- assert.ok(start>=0&&end>start&&source.indexOf(startMarker,start+1)<0,"sección fuente única "+startMarker);
- return source.slice(start,end);
-}
-function includeAttendanceChanges(expected,source){
- const helperStart="    function attendanceSheetPath(eventId) {";
- const assignmentStart="    // Solicitudes de jornadas de Coordinación";
- expected=replaceRegion(expected,helperStart,assignmentStart,copyRegion(source,helperStart,assignmentStart));
- const sheetsStart="    match /agora_ops_attendance_sheets/{eventId} {";
- const claimsStart="    // Autorregistros laborales privados";
- return replaceRegion(expected,sheetsStart,claimsStart,copyRegion(source,sheetsStart,claimsStart));
-}
-let expected=replaceActions(baseline,'    match /agora_ops_clock/{id} {','    // Descansos certificados:',clockDeny);
-expected=replaceActions(expected,'    match /agora_ops_breaks/{id} {','    match /agora_ops_trips/{id} {',breakDeny);
-expected=includeAttendanceChanges(expected,candidate);
-assert.equal(candidate.trim(),expected.trim(),'candidato sólo cambia las reglas de pase de lista remota y marcaje delegado');
-const drift=baseline.replace('allow read, write: if false;','allow read, write: if true;');
+const prior=execFileSync('git',['show','78a74fe760eb9181e1473c95c8ef914e8c693047:firestore.rules'],{encoding:'utf8'});
+const operations='    // ÁGORA · Centro de Operaciones V4';
+const mask=(source,start)=>{
+ const first=source.indexOf(start),last=source.indexOf(operations,first);
+ assert.ok(first>=0&&last>first,'Ubicar la sección de Finanzas');
+ return source.slice(0,first)+source.slice(last);
+};
+assert.equal(mask(prior,'function financeBaseValid()'),mask(candidate,'function financeHasHoursOrigin(data)'),
+ 'La publicación solo modifica reglas de Finanzas');
+const drift=prior+'\n// deriva ajena\n';
 const dir='.github/firebase-staff/.preflight',rulesBackup=dir+'/antes-dejavu.rules',refBackup=dir+'/ruleset-name.txt';
 process.env.FIREBASE_PROJECT_ID='agora-dejavu-38b8c';process.env.FIREBASE_ACCESS_TOKEN='qa-token-not-real';
 const originalFetch=globalThis.fetch;let attempts=0;
@@ -49,4 +25,8 @@ async function verify(label,live,shouldPass){
  assert.equal(Boolean(thrown),!shouldPass,label+': resultado');if(!shouldPass)assert.match(thrown.message,/REGLAS DISTINTAS EN PRODUCCIÓN/,label+': deriva detenida');
  assert.equal(readFileSync(rulesBackup,'utf8'),live,label+': respaldo íntegro');assert.equal(readFileSync(refBackup,'utf8'),rulesetName+'\n',label+': ruleset guardado');console.log('OK '+label);
 }
-try{await verify('producción exacta, base aprobada',baseline,true);await verify('pase supervisado vigente',supervisedAttendance,true);await verify('deriva sobre el pase supervisado rechazada',supervisedAttendance+'\n// deriva ajena\n',false);await verify('candidato ya desplegado',candidate,true);await verify('deriva ajena rechazada',drift,false);}finally{globalThis.fetch=originalFetch;rmSync(dir,{recursive:true,force:true});}
+try{
+ await verify('versión de asistencia desplegada',prior,true);
+ await verify('candidato ya desplegado',candidate,true);
+ await verify('deriva ajena rechazada',drift,false);
+}finally{globalThis.fetch=originalFetch;rmSync(dir,{recursive:true,force:true});}
