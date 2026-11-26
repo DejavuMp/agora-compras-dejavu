@@ -51,12 +51,21 @@ export function coordinationJornadas(schedule,now=new Date(),max=80){
    project:text(e.project||e.campaign,140),
    site:text(e.venueName||e.siteName||e.location||"Por confirmar",180),
    start,end,day:dayKey(start),status:text(e.status||"programada",30),
+   responsibleCoordinator:text(e.responsibleCoordinator,140),
+   recordedBy:text(e.assignedByName,140),
    staffCount:Array.isArray(e.staff)?e.staff.length:0,
    activitiesCount:Array.isArray(e.activities)?e.activities.length:
     Array.isArray(e.staff)?e.staff.filter(a=>a?.activity).length:0
   });
  }
  return list.sort((a,b)=>a.start-b.start).slice(0,Math.max(1,Math.min(Number(max)||80,100)));
+}
+const agendaText=value=>text(value).normalize("NFD").replace(/\p{Diacritic}/gu,"").toLocaleLowerCase("es-MX");
+export function filterCoordinatorAgenda(rows,query){
+ const match=agendaText(query);
+ if(!match)return rows;
+ return rows.filter(item=>[item.responsibleCoordinator,item.recordedBy,item.title,item.project]
+  .some(value=>agendaText(value).includes(match)));
 }
 export function operationTotals(list,now=new Date()){
  const day=dayKey(now),future=instant(now);
