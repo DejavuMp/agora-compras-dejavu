@@ -13,7 +13,7 @@ function ownHistory(staff){
 }
 const $=id=>document.getElementById(id),safe=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const note=text=>$("status").textContent=text;
-let user,member,staff,links=[],states=[],payments=[],manager=false,admin=false,editingLink="";
+let user,member,staff,links=[],states=[],payments=[],feedback=[],manager=false,admin=false,editingLink="";
 const date=t=>t?.toDate?.()?.toLocaleString("es-MX")||"";
 async function load(){
  if(!user)return;
@@ -21,8 +21,8 @@ async function load(){
  member=m.data();staff=s.data();admin=u.data()?.active===true&&u.data()?.role==="admin";
  manager=admin||u.data()?.active===true&&u.data()?.role==="coordinador";
  $("manager").hidden=!manager;$("admin").hidden=!admin;
- const [l,t,p]=await Promise.all([getDocs(query(collection(db,"agora_work_forms"))),manager?getDocs(collection(db,"agora_work_form_states")):getDocs(query(collection(db,"agora_work_form_states"),where("ownerUid","==",user.uid))),manager?Promise.resolve(null):getDocs(query(collection(db,"agora_staff_payment_views"),where("ownerUid","==",user.uid)))]);
- links=l.docs.map(d=>({id:d.id,...d.data()}));states=t.docs.map(d=>({id:d.id,...d.data()}));payments=p?.docs.map(d=>({id:d.id,...d.data()}))||[];
+ const [l,t,p,f]=await Promise.all([getDocs(query(collection(db,"agora_work_forms"))),manager?getDocs(collection(db,"agora_work_form_states")):getDocs(query(collection(db,"agora_work_form_states"),where("ownerUid","==",user.uid))),manager?Promise.resolve(null):getDocs(query(collection(db,"agora_staff_payment_views"),where("ownerUid","==",user.uid))),admin?getDocs(collection(db,"agora_staff_payment_feedback")):Promise.resolve(null)]);
+ links=l.docs.map(d=>({id:d.id,...d.data()}));states=t.docs.map(d=>({id:d.id,...d.data()}));payments=p?.docs.map(d=>({id:d.id,...d.data()}))||[];feedback=f?.docs.map(d=>({id:d.id,...d.data()}))||[];
  render();note("Información actualizada.");
 }
 function matching(link,job){
@@ -50,8 +50,8 @@ function renderPayments(){
 }
 function renderManager(){
  if(!manager)return;
- $("links").innerHTML=links.map(l=>'<article><strong>'+safe(l.label)+'</strong><p>'+safe(l.scope)+' · '+safe(l.scopeId)+' · versión '+l.version+' · '+(l.active?"Activo":"Inactivo")+'</p><button data-toggle="'+safe(l.id)+'">'+(l.active?"Desactivar":"Activar")+'</button></article>').join("");
- $("tracking").innerHTML=states.filter(s=>["enviado","problema","correccion"].includes(s.state)).slice(0,60).map(s=>'<article><strong>'+safe(s.eventId)+'</strong><p>'+safe(s.state)+' · '+safe(s.ownerUid)+' · '+safe(s.note||"")+'</p><button data-correction="'+safe(s.id)+'">Solicitar corrección</button></article>').join("")||"<p>Sin avisos que requieran atención.</p>";
+ $("links").innerHTML=links.map(l=>'<article><strong>'+safe(l.label)+'</strong><p>'+safe(l.scope)+' · '+safe(l.scopeId)+' · versión '+l.version+' · '+(l.active?"Activo":"Inactivo")+'</p><button data-edit="'+safe(l.id)+'">Sustituir enlace</button> <button data-toggle="'+safe(l.id)+'">'+(l.active?"Desactivar":"Activar")+'</button></article>').join("");
+ $("tracking").innerHTML=(admin?feedback.filter(x=>x.status==="pendiente").map(x=>'<article><strong>Aclaración de pago</strong><p>Referencia: '+safe(x.paymentId)+' · Cuenta: '+safe(x.ownerUid)+' · '+safe(x.response)+' · '+safe(x.note||"") +'</p></article>').join(""):"")+states.filter(s=>["enviado","problema","correccion"].includes(s.state)).slice(0,60).map(s=>'<article><strong>'+safe(s.eventId)+'</strong><p>'+safe(s.state)+' · '+safe(s.ownerUid)+' · '+safe(s.note||"")+'</p><button data-correction="'+safe(s.id)+'">Solicitar corrección</button></article>').join("")||"<p>Sin avisos que requieran atención.</p>";
 }
 function render(){renderJobs();renderPayments();renderManager()}
 async function imageData(file){
