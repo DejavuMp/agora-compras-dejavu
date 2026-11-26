@@ -7,7 +7,7 @@ if(project!=='agora-dejavu-38b8c')throw Error('Proyecto Firebase distinto al aut
 if(!token)throw Error('No hay credencial temporal para consultar reglas vigentes');
 const candidate=readFileSync('firestore.rules','utf8');
 const previousBlob='31e1fc94ec19750528adf780295d5ba59ba4fd53';
-const candidateBlob='6c764068f5ff3ff4ac9c9ad09efe7c6e856252de';
+const candidateBlob='ccb5e93353ec96f89f97fab9e05c9b12caab7ebb';
 const gitBlob=text=>createHash('sha1').update('blob '+Buffer.byteLength(text)+'\0').update(text).digest('hex');
 const normalize=text=>String(text).replace(/\r\n?/g,'\n').trim();
 if(gitBlob(candidate)!==candidateBlob)throw Error('El candidato no coincide con las reglas de Finanzas revisadas.');
