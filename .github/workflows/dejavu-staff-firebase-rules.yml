@@ -71,6 +71,8 @@ jobs:
         run: npx firebase emulators:exec --only firestore --project demo-dejavu-fichas-staff --non-interactive 'node .github/firebase-staff/test-rules.mjs'
       - name: Probar Finanzas - crear solicitudes, roles, autorizar y pagar
         run: npx firebase emulators:exec --only firestore --project demo-agora-finanzas --non-interactive 'node .github/firebase-staff/test-finance-rules.mjs'
+      - name: Comprobar permisos individuales de trabajos y pagos
+        run: npx firebase emulators:exec --only firestore --project demo-agora-work --non-interactive 'node .github/firebase-staff/test-work-rules.mjs'
       - name: Probar Operaciones - roles, cronograma, horas y sueldos
         run: npx firebase emulators:exec --only firestore --project demo-agora-ops --non-interactive 'node .github/firebase-staff/test-ops-rules.mjs'
 

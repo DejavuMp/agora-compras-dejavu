@@ -6,8 +6,8 @@ const token=process.env.FIREBASE_ACCESS_TOKEN;
 if(project!=='agora-dejavu-38b8c')throw Error('Proyecto Firebase distinto al autorizado');
 if(!token)throw Error('No hay credencial temporal para consultar reglas vigentes');
 const candidate=readFileSync('firestore.rules','utf8');
-const previousBlob='11cab8db138330c7d38bca1c2b45e1b3a8b83875';
-const candidateBlob='31e1fc94ec19750528adf780295d5ba59ba4fd53';
+const previousBlob='31e1fc94ec19750528adf780295d5ba59ba4fd53';
+const candidateBlob='6c764068f5ff3ff4ac9c9ad09efe7c6e856252de';
 const gitBlob=text=>createHash('sha1').update('blob '+Buffer.byteLength(text)+'\0').update(text).digest('hex');
 const normalize=text=>String(text).replace(/\r\n?/g,'\n').trim();
 if(gitBlob(candidate)!==candidateBlob)throw Error('El candidato no coincide con las reglas de Finanzas revisadas.');
@@ -30,6 +30,6 @@ if(process.argv.includes('--verify')){
 const dir='.github/firebase-staff/.preflight';
 mkdirSync(dir,{recursive:true});writeFileSync(dir+'/antes-dejavu.rules',live,'utf8');writeFileSync(dir+'/ruleset-name.txt',release.rulesetName+'\n','utf8');
 if(normalize(live)===normalize(candidate))console.log('Producción ya contiene exactamente las reglas aprobadas.');
-else if(gitBlob(live)===previousBlob)console.log('Producción coincide con las reglas publicadas de Finanzas; se habilita la bitácora de conciliación.');
+else if(gitBlob(live)===previousBlob)console.log('Producción coincide con las reglas publicadas de Finanzas; se habilitan Mis trabajos y pagos.');
 else throw Error('REGLAS DISTINTAS EN PRODUCCIÓN. Se guardó respaldo. Se detiene para NO sobrescribir permisos existentes.');
 console.log('Verificación previa completada. Proyecto: '+project);
