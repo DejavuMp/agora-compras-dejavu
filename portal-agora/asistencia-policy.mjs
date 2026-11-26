@@ -9,6 +9,11 @@ const time=value=>{
  const t=raw instanceof Date?raw.getTime():new Date(raw).getTime();
  return Number.isFinite(t)?t:NaN;
 };
+export function isLocalAttendanceTime(sheet,now=Date.now()){
+ const startsAt=time(sheet?.startsAt),endsAt=time(sheet?.endsAt),at=time(now);
+ const margin=30*60_000;
+ return endsAt>startsAt&&at>=startsAt-margin&&at<=endsAt+margin;
+}
 export function shiftCandidates(schedule,now=new Date()){
  const list=Array.isArray(schedule?.payload?.events)?schedule.payload.events:[];
  const today=now.getTime();

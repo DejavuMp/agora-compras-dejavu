@@ -13,8 +13,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 import {
  shiftCandidates,shiftPreview,entryDraft,entryDocId,
- freshProvisionalId,calculateNetMinutes,approvalDraft,payrollSummary,validatedHoursReceipt
-} from "./asistencia-policy.mjs?v=20261126-hours-receipt";
+ freshProvisionalId,calculateNetMinutes,approvalDraft,payrollSummary,validatedHoursReceipt,isLocalAttendanceTime
+} from "./asistencia-policy.mjs?v=20261126-local-window";
 import {parseShiftQr} from "./qr-jornada.mjs";
 
 const root=new URL("./",import.meta.url);
@@ -229,7 +229,8 @@ function renderSheet(){
  if(!sheet)return;
  $("scan-event-title").textContent=sheet.title;
  $("scan-event-meta").textContent=fmt(sheet.startsAt)+" – "+fmt(sheet.endsAt)+" · "+sheet.site;
- $("scan-active-status").textContent=sheet.active?"Lista habilitada":"Lista cerrada";
+ $("scan-active-status").textContent=!sheet.active?"Lista cerrada":
+  sheet.validationMode!=="remoto"&&!isLocalAttendanceTime(sheet)?"Fuera del horario de asistencia":"Lista habilitada";
  $("scan-create-entry").disabled=!sheet.active||sheet.validationMode==="remoto";
  $("scan-manual-method").hidden=sheet.validationMode==="remoto";
  $("scan-register-provisional").disabled=!sheet.active||sheet.validationMode==="remoto";
@@ -438,6 +439,7 @@ function randomProvisional(){
 async function registerEntry({person,source,action,activityKey="jornada",reason,notes}){
  if(!state.sheet||!state.allowed||!liveAccount())throw Error("Inicia sesión en una jornada autorizada.");
  if(!state.sheet.active)throw Error("Esta lista está cerrada.");
+ if(!isLocalAttendanceTime(state.sheet))throw Error("El pase presencial está fuera del horario de esta jornada.");
  const stamp=serverTimestamp();
  const location=await preciseLocation();
  const capturedAt=serverTimestamp();

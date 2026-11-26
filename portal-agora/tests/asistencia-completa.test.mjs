@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import {
  shiftPreview,shiftCandidates,minimalRoster,entryDocId,
- freshProvisionalId,entryDraft,calculateNetMinutes,approvalDraft,payrollSummary,validatedHoursReceipt
+ freshProvisionalId,entryDraft,calculateNetMinutes,approvalDraft,payrollSummary,validatedHoursReceipt,isLocalAttendanceTime
 } from "../asistencia-policy.mjs";
 const start=new Date("2026-11-25T09:00:00-06:00");
 const end=new Date("2026-11-25T18:00:00-06:00");
@@ -112,4 +112,14 @@ test("interfaces y permisos no mezclan funciones o sitios",async()=>{
  assert.match(rules,/match \/approvals\/\{personId\}/);
  assert.match(css,/\.attendance-methods/);
  assert.match(css,/\.attendance-task-list/);
+});
+
+test("el pase presencial respeta la ventana de treinta minutos de Firestore",()=>{
+ const sheet={startsAt:start,endsAt:end};
+ const halfHour=30*60_000;
+ assert.equal(isLocalAttendanceTime(sheet,+start-halfHour-1),false);
+ assert.equal(isLocalAttendanceTime(sheet,+start-halfHour),true);
+ assert.equal(isLocalAttendanceTime(sheet,+end+halfHour),true);
+ assert.equal(isLocalAttendanceTime(sheet,+end+halfHour+1),false);
+ assert.equal(isLocalAttendanceTime({},+start),false);
 });
