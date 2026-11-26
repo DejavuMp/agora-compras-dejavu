@@ -2,11 +2,11 @@ import {auth,db} from "./firebase.js";
 import {
   onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signInWithRedirect,signInWithEmailAndPassword,signOut
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
-import {doc,getDoc,getDocs,collection,query,orderBy,limit,setDoc,updateDoc,serverTimestamp,where,writeBatch}
+import {doc,getDoc,getDocFromServer,getDocs,collection,query,orderBy,limit,setDoc,updateDoc,serverTimestamp,where,writeBatch}
   from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 import {saveProfile,saveFinancial} from "../identidad/firebase-identity.js";
 import {projectTodayAssignments} from "../identidad/domain.mjs";
-import {ownJornadas,coordinationJornadas,operationTotals,validateAssignmentDraft,assignmentDraftText,REQUEST_CHANNELS} from "./roles-operacion.mjs";
+import {ownJornadas,coordinationJornadas,operationTotals,validateAssignmentDraft,assignmentDraftText,REQUEST_CHANNELS,assignmentEventOptions} from "./roles-operacion.mjs?v=20261126-coordination";
 import {showShiftQr} from "./staff-shift-qr.js";
 import {renderStaffTasks,readStaffTasks} from "./staff-activities.js";
 import {mountRoster} from "./attendance-roster.js?v=20261126-remote-attendance";
@@ -628,11 +628,18 @@ async function showAssignmentHistory(){
   const box=document.getElementById("assignment-history");
   if(!box)return;
   box.textContent="Consultando solicitudes privadas…";
-  const snaps=await getDocs(query(
-    collection(db,"agora_ops_assignment_requests"),orderBy("createdAt","desc"),limit(12)
-  ));
-  if(!snaps.size){box.textContent="Aún no hay solicitudes guardadas.";return}
-  box.innerHTML=snaps.docs.map(d=>{
+  const requests=collection(db,"agora_ops_assignment_requests");
+  const [pending,recent,schedule]=await Promise.all([
+    getDocs(query(requests,where("status","==","pendiente"),limit(30))),
+    getDocs(query(requests,orderBy("createdAt","desc"),limit(12))),
+    getDocFromServer(doc(db,"agora_ops_control","schedule"))
+  ]);
+  state.roleData={...state.roleData,schedule:schedule.data()};
+  const rows=[...new Map([...pending.docs,...recent.docs].map(d=>[d.id,d])).values()];
+  rows.sort((a,b)=>Number(b.data().status==="pendiente")-Number(a.data().status==="pendiente")||
+    (b.data().createdAt?.toMillis?.()||0)-(a.data().createdAt?.toMillis?.()||0));
+  if(!rows.length){box.textContent="Aún no hay solicitudes guardadas.";return}
+  box.innerHTML=rows.map(d=>{
     const a=d.data(),image=typeof a.evidenceImage==="string"&&
       /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(a.evidenceImage)?
         '<img class="assignment-history-image" src="'+esc(a.evidenceImage)+
@@ -656,26 +663,38 @@ async function showAssignmentHistory(){
         (a.linkedEventId?'<p><b>Jornada vinculada:</b> '+esc(a.linkedEventId)+'</p>':"")+
         image+
         (a.status==="pendiente"?'<div class="assignment-history-actions">'+
+          assignmentEventPicker(a)+
           '<button type="button" class="profile-button profile-button-outline" data-action="confirm-assignment" data-request-id="'+esc(a.id)+'">Vincular jornada publicada</button>'+
           '<button type="button" class="profile-button profile-button-outline" data-action="cancel-assignment" data-request-id="'+esc(a.id)+'">Cancelar solicitud</button>'+
           '</div>':"")+'</div></details>';
   }).join("");
 }
-function requestStatusChange(requestId,nextStatus){
+function assignmentEventPicker(request){
+  const options=assignmentEventOptions(state.roleData?.schedule,request.date);
+  const clock=new Intl.DateTimeFormat("es-MX",{timeZone:"America/Mexico_City",hour:"2-digit",minute:"2-digit"});
+  return '<label>Jornada del cronograma<select data-assignment-event><option value="">Selecciona una jornada…</option>'+
+    options.map(event=>'<option value="'+esc(event.id)+'"'+(event.conflictCount?' disabled':'')+'>'+
+      esc(clock.format(event.start)+' · '+event.title+' · '+event.staffCount+' asignados'+
+       (event.conflictCount?' · '+event.conflictCount+' con empalme':''))+'</option>').join("")+
+    '</select></label>'+(options.length?'':'<small>Publica una jornada en Operaciones para esa fecha.</small>');
+}
+function requestStatusChange(requestId,nextStatus,eventId){
   if(!["admin","coordinador"].includes(role())||!allowed(routeSpace))return;
-  const schedule=state.roleData?.schedule?.payload?.events||[];
-  let eventId="";
-  if(nextStatus==="confirmada"){
-    eventId=clean(prompt("Escribe el ID de la jornada publicada en Operaciones:",""));
-    if(!eventId)return;
-    if(!schedule.some(e=>String(e.id)===eventId&&e.status!=="cancelado"&&e.status!=="borrador"))
-      return notice("La jornada no existe o no está publicada. Primero regístrala en Operaciones.","error");
-  }else if(!confirm("¿Cancelar esta solicitud? Quedará en el historial."))return;
+  if(nextStatus==="confirmada"&&!eventId)return notice("Selecciona una jornada publicada.","error");
+  if(nextStatus==="cancelada"&&!confirm("¿Cancelar esta solicitud? Quedará en el historial."))return;
   return run(async()=>{
-    await updateDoc(doc(db,"agora_ops_assignment_requests",requestId),{
-      status:nextStatus,linkedEventId:eventId,
-      updatedBy:state.user.uid,updatedAt:serverTimestamp()
-    });
+    const ref=doc(db,"agora_ops_assignment_requests",requestId);
+    if(nextStatus==="confirmada"){
+      const [request,schedule]=await Promise.all([
+        getDocFromServer(ref),getDocFromServer(doc(db,"agora_ops_control","schedule"))
+      ]);
+      if(request.data()?.status!=="pendiente")throw Error("La solicitud ya fue revisada. Actualiza la lista.");
+      const selected=assignmentEventOptions(schedule.data(),request.data().date).find(event=>event.id===eventId);
+      if(!selected)throw Error("La jornada ya no está publicada para esa fecha.");
+      if(selected.conflictCount)throw Error("Resuelve los empalmes de personal en Operaciones antes de vincular la jornada.");
+    }
+    await updateDoc(ref,{status:nextStatus,linkedEventId:eventId,
+      updatedBy:state.user.uid,updatedAt:serverTimestamp()});
     await showAssignmentHistory();
   },"Solicitud actualizada; se conserva el historial.");
 }
@@ -713,9 +732,6 @@ function assignmentDialog(){
     '<div id="assignment-result" hidden><h3>Solicitud guardada · Pendiente de asignación</h3>'+
       '<textarea id="assignment-preview" rows="12" readonly aria-label="Texto del borrador"></textarea>'+
       '<button type="button" data-action="copy-assignment" class="profile-button profile-button-outline">Copiar texto</button></div>'+
-    '<div class="assignment-history-header"><strong>Historial de solicitudes</strong>'+
-      '<button type="button" class="profile-button profile-button-outline" data-action="load-assignment-requests">Actualizar historial</button></div>'+
-    '<div id="assignment-history" class="assignment-history"></div>'+
   '</dialog>';
 }
 function workClaimDialog(review=false){
@@ -779,6 +795,14 @@ function coordinationOperationsSpace(admin=false){
         '<a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/"))+'">Editar agenda vigente</a>'+
         '<a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/control-jornadas.html"))+'">Control de asistencia</a></div>'+
       '<p class="role-transition">El cronograma original continúa como fuente oficial. Los trabajos autorregistrados se revisan aparte y no alteran marcajes existentes.</p>'+
+      '<section class="work-claims"><div class="assignment-history-header"><h3>Solicitudes de jornada</h3>'+
+        '<button type="button" class="profile-button profile-button-outline" data-action="load-assignment-requests">Actualizar solicitudes</button></div>'+
+        '<div id="assignment-history" class="assignment-history" aria-live="polite"></div></section>'+
+      '<nav class="role-legacy-links" aria-label="Herramientas de la agencia">'+
+        '<a class="profile-button profile-button-outline" href="'+esc(href("../"))+'">Compras y producción</a>'+
+        '<a class="profile-button profile-button-outline" href="'+esc(href("../archivos/"))+'">Archivos y evidencias</a>'+
+        '<a class="profile-button profile-button-outline" href="'+esc(href("../recursos/"))+'">'+
+          (admin?"Recursos y Finanzas":"Solicitudes de recursos")+'</a></nav>'+
       workClaimDialog(true)+
       assignmentDialog()+
       '<dialog id="attendance-roster-dialog" class="role-dialog" aria-labelledby="attendance-roster-title">'+
@@ -799,6 +823,8 @@ function emptySpace(){
       '<img src="'+esc(iconSrc(meta.icon))+'" alt="" width="90" height="90">'+
       '<div><div class="profile-kicker">ÁGORA · Operaciones</div><h1>'+esc(meta.title)+'</h1></div></div>'+
     body+'</section>';
+  const history=document.getElementById("assignment-history");
+  if(history)showAssignmentHistory().catch(e=>{history.textContent=errorText(e)});
   loadWorkClaims().catch(e=>{console.error(e);notice(errorText(e),"error")});
   if(routeSpace==="staff"&&state.user)loadOwnRemoteRequests(db,state.user.uid,document.getElementById("my-remote-attendance-requests"));
 }
@@ -941,14 +967,14 @@ app.addEventListener("click",event=>{
     return run(showAssignmentHistory);
   }
   if(task==="confirm-assignment"||task==="cancel-assignment"){
+    const eventId=target.closest(".assignment-history-actions")?.querySelector("[data-assignment-event]")?.value||"";
     return requestStatusChange(clean(target.dataset.requestId),
-      task==="confirm-assignment"?"confirmada":"cancelada");
+      task==="confirm-assignment"?"confirmada":"cancelada",task==="confirm-assignment"?eventId:"");
   }
   if(task==="new-assignment"){
     if(!["admin","coordinador"].includes(role())||!allowed(routeSpace))return;
     const dlg=document.getElementById("assignment-dialog");
     if(dlg?.showModal)dlg.showModal();else dlg?.setAttribute("open","");
-    run(showAssignmentHistory);
     return;
   }
   if(task==="close-assignment"){

@@ -89,3 +89,17 @@ test("se exige el origen de la solicitud",()=>{
  }
  assert.deepEqual(REQUEST_CHANNELS,["WhatsApp","Llamada","Correo","Presencial","Otro"]);
 });
+
+test("el selector de jornada excluye borradores y detecta empalmes entre coordinadores",async()=>{
+ const {assignmentEventOptions}=await import("../roles-operacion.mjs");
+ const payload={events:[
+  {id:"primera",title:"Solicitud externa",status:"programada",start:"2026-11-26T09:00:00-06:00",end:"2026-11-26T11:00:00-06:00",staff:[{personId:"uno"}]},
+  {id:"otra",title:"Otro coordinador",status:"confirmada",start:"2026-11-26T10:00:00-06:00",end:"2026-11-26T12:00:00-06:00",staff:[{personId:"uno"}]},
+  {id:"contigua",status:"programada",start:"2026-11-26T12:00:00-06:00",end:"2026-11-26T13:00:00-06:00",staff:[{personId:"uno"}]},
+  {id:"borrador",status:"borrador",start:"2026-11-26T12:00:00-06:00",end:"2026-11-26T13:00:00-06:00",staff:[{personId:"uno"}]},
+  {id:"cancelada",status:"cancelado",start:"2026-11-26T12:00:00-06:00",end:"2026-11-26T13:00:00-06:00",staff:[{personId:"uno"}]}
+ ]};
+ const options=assignmentEventOptions({payload},"2026-11-26");
+ assert.deepEqual(options.map(x=>[x.id,x.conflictCount]),[["primera",1],["otra",1],["contigua",0]]);
+ assert.deepEqual(assignmentEventOptions({payload},"2026-11-27"),[]);
+});
