@@ -62,3 +62,18 @@ const inline=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
 assert.ok(inline,'JS de pantalla externa');
 new Script(inline,{filename:'aprobar-inline.js'});
 console.log('OK: exportación, impresión, enlace sin datos bancarios, correo y revisión externa.');
+
+const {financeLedger,ledgerTotals}=await import("../finance-ledger.mjs");
+const rows=financeLedger([
+ {id:'A',category:'nomina',hoursOrigin:{eventId:'jor',personId:'uno'},beneficiary:'Ana',project:'Montaje',reason:'Horas',status:'pago_parcial',total:550,approvedAmount:550,paidAmount:150,payments:[{date:'2026-11-26',reference:'QA-1',amount:150}]},
+ {id:'B',category:'nomina',hoursOrigin:{eventId:'jor',personId:'dos'},beneficiary:'Ana',status:'aprobada',total:200,approvedAmount:200,paidAmount:0},
+ {id:'C',category:'proveedor',beneficiary:'Proveedor QA',status:'pendiente',total:500,paidAmount:0}
+],[{id:'legado',eventId:'jor',personId:'uno',paymentStatus:'pagado',approvedAmount:550,activity:'Horas'},{id:'sinfolio',personId:'uno',paymentStatus:'pagado',approvedAmount:22}],
+ {people:[{id:'uno',name:'Ana'}],events:[{id:'jor',title:'Montaje'}]});
+assert.equal(rows.find(r=>r.id==='A').reconciliation,true);
+assert.equal(rows.find(r=>r.id==='B').reconciliation,false);
+assert.equal(rows.find(r=>r.id==='sinfolio').reconciliation,false);
+assert.deepEqual(rows.find(r=>r.id==='A').payments,[{date:'2026-11-26',reference:'QA-1',amount:15000}]);
+assert.deepEqual(ledgerTotals(rows),{pending:50000,approvedBalance:20000,needsReconciliation:40000,paid:15000});
+assert.match(app,/function ledgerAccess\(\)\{return state\.cloud&&state\.role==='admin'/);
+console.log('OK: trazabilidad, homonimia, parcialidades y conciliación sin duplicar saldos.');

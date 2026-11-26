@@ -804,7 +804,9 @@ function coordinationOperationsSpace(admin=false){
         '<a class="profile-button profile-button-outline" href="'+esc(href("../"))+'">Compras y producción</a>'+
         '<a class="profile-button profile-button-outline" href="'+esc(href("../archivos/"))+'">Archivos y evidencias</a>'+
         '<a class="profile-button profile-button-outline" href="'+esc(href("../recursos/"))+'">'+
-          (admin?"Recursos y Finanzas":"Solicitudes de recursos")+'</a></nav>'+
+          (admin?"Recursos y Finanzas":"Solicitudes de recursos")+'</a>'+
+        (admin?'<a class="profile-button profile-button-outline" href="'+esc(href("../recursos/?vista=obligaciones"))+'">Historial de obligaciones</a>':'')+
+        '</nav>'+
       workClaimDialog(true)+
       assignmentDialog()+
       '<dialog id="attendance-roster-dialog" class="role-dialog" aria-labelledby="attendance-roster-title">'+

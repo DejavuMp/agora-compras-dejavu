@@ -1,3 +1,4 @@
+import {financeLedger,ledgerTotals} from "./finance-ledger.mjs";
 // Arranque independiente de Firebase: el módulo local funciona incluso sin CDN.
 // Los SDK se importan únicamente cuando la conexión Firebase está disponible.
 let authSdk=null, dbSdk=null, firebaseSdkLoading=null;
@@ -33,6 +34,7 @@ const asDate=v=>v?.toDate?.()?.toLocaleString('es-MX')||String(v||'');
 const el=(tag,cls='',txt='')=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt)e.textContent=txt;return e;};
 const state={view:'dashboard',records:[],selected:'',user:null,role:'',fb:null,cloud:false,loading:false,mode:'local',editingId:'',hoursOrigin:null,forceLocal:false};
 let idbPromise;
+let ledgerSnapshot=null,ledgerVersion=0,ledgerError='';
 function dbOpen(){
  if(idbPromise)return idbPromise;
  idbPromise=new Promise((resolve,reject)=>{
@@ -78,6 +80,7 @@ async function loadRecords(){
 }
 async function refreshCloudUser(user){
  if(state.hoursOrigin)clearRequestForm();
+ ledgerVersion++;ledgerSnapshot=null;ledgerError='';
  state.user=user;state.role='';state.cloud=false;
  if(user&&!state.forceLocal){
   try{
@@ -92,6 +95,7 @@ async function refreshCloudUser(user){
  }
  await loadRecords();
  if(location.search.includes('id='))openQueryDetail();
+ else if(new URLSearchParams(location.search).get('vista')==='obligaciones'&&ledgerAccess())view('ledger');
  else await openValidatedHours();
 }
 async function activateFirebase(){
@@ -135,10 +139,11 @@ function view(name){
  state.view=name;
  $$('.view').forEach(e=>e.hidden=e.id!==name);
  $$('[data-view]').forEach(e=>e.classList.toggle('active',e.classList.contains('nav-item')&&e.dataset.view===name));
- $('#page-title').textContent={dashboard:'Resumen de recursos',new:'Nueva solicitud',history:'Solicitudes e historial',gastos:'Comprobación de gastos'}[name]||'Recursos y Finanzas';
+ $('#page-title').textContent={dashboard:'Resumen de recursos',new:'Nueva solicitud',history:'Solicitudes e historial',gastos:'Comprobación de gastos',ledger:'Historial de obligaciones'}[name]||'Recursos y Finanzas';
  $('#sidebar').classList.remove('open');
  if(name==='new')$('#request-form').querySelector('[name="project"]').focus();
  render();
+ if(name==='ledger'&&!ledgerSnapshot)void loadLedger();
 }
 async function openValidatedHours(){
  const params=new URLSearchParams(location.search);
@@ -211,6 +216,66 @@ function render(){
  $('#login-btn').textContent=state.user?'Salir de Google':'Conectar Google';
  $('#work-local-btn').textContent=state.forceLocal?'Reintentar nube':'Trabajar localmente';
  $('#submit-request').disabled=state.cloud&&state.role==='consulta';
+ $('#ledger-nav').hidden=!ledgerAccess();
+ if(state.view==='ledger')renderLedger();
+ if(state.view==='gastos')renderExpenseAdvances();
+}
+function ledgerAccess(){return state.cloud&&state.role==='admin';}
+async function loadLedger(){
+ if(!ledgerAccess())return;
+ const version=++ledgerVersion,fs=state.fb.firestore;
+ ledgerError='';
+ $('#ledger-rows').textContent='Consultando Operaciones…';
+ try{
+  const [logs,schedule]=await Promise.all([
+   dbSdk.getDocsFromServer(dbSdk.collection(fs,'agora_ops_logs')),
+   dbSdk.getDocFromServer(dbSdk.doc(fs,'agora_ops_control','schedule'))
+  ]);
+  if(version!==ledgerVersion||!ledgerAccess())return;
+  ledgerSnapshot={logs:logs.docs.map(d=>({...d.data(),id:d.id})),schedule:schedule.data()?.payload};
+ }catch(error){
+  if(version!==ledgerVersion)return;
+  ledgerError='No se pudo consultar Operaciones. '+readable(error);
+ }
+ renderLedger();
+}
+const legacyStatus={capturado:'Capturado',revision:'Requiere revisión',solicitado:'Solicitado',
+ validado:'Validado en Operaciones',programado:'Programado en Operaciones',pagado:'Marcado pagado en Operaciones'};
+function renderLedger(){
+ const body=$('#ledger-rows'),tools=$('#ledger-tools');
+ tools.hidden=!ledgerAccess();
+ if(!ledgerAccess()){body.textContent='Disponible para Administración con sesión de Firebase.';return;}
+ if(!ledgerSnapshot){body.textContent=ledgerError||'Consultando Operaciones…';return;}
+ const q=$('#ledger-search').value.trim().toLocaleLowerCase('es-MX');
+ const category=$('#ledger-category').value;
+ const viewRows=financeLedger(state.records,ledgerSnapshot.logs,ledgerSnapshot.schedule)
+  .filter(r=>(!category||r.category===category)&&
+    (!q||[r.beneficiary,r.personId,r.project,r.reason,r.folio,r.eventId].some(x=>String(x||'').toLocaleLowerCase('es-MX').includes(q))));
+ const total=ledgerTotals(viewRows),labelAmount=c=>c===null||c===undefined?'—':money(c/100);
+ const intro='<p class="small-note">Por autorizar '+labelAmount(total.pending)+' · Saldo autorizado '+labelAmount(total.approvedBalance)+
+  ' · Saldo por conciliar '+labelAmount(total.needsReconciliation)+' · Pagos registrados en Finanzas '+labelAmount(total.paid)+'</p>';
+ body.innerHTML=intro+(viewRows.length?viewRows.map(r=>{
+  const legacy=r.source==='operaciones';
+  const payments=r.payments.map(p=>'<li>'+esc(p.date)+' · '+labelAmount(p.amount)+' · '+esc(p.reference||'Sin referencia')+'</li>').join('');
+  return '<details class="request-card"><summary><strong>'+esc(r.beneficiary)+'</strong> · '+esc(r.project||'Sin proyecto')+
+   ' · '+esc(r.date||'Sin fecha')+' · '+esc((legacy?legacyStatus:STATUS)[r.status]||r.status)+'</summary>'+
+   '<p>'+esc(r.reason||'Sin concepto registrado')+'</p>'+
+   '<p>'+esc(r.personId?'Ficha '+r.personId:'')+(r.eventId?' · Jornada '+esc(r.eventId):'')+'</p>'+
+   (r.reconciliation?'<p><strong>Requiere conciliación.</strong> Existe un registro de Operaciones y una obligación para la misma persona y jornada.</p>':'')+
+   (legacy?'<p>Histórico de Operaciones · Importe aprobado '+labelAmount(r.approved)+' · Solicitado '+labelAmount(r.requested)+'</p>':
+    '<p>Folio '+esc(r.folio)+' · Solicitado '+labelAmount(r.requested)+' · Autorizado '+labelAmount(r.approved)+
+     ' · Pagado '+labelAmount(r.paid)+' · Saldo '+labelAmount(r.balance)+'</p>'+
+     (payments?'<ul>'+payments+'</ul>':'')+
+     '<button type="button" class="btn btn-outline" data-open="'+esc(r.id)+'">Ver expediente</button>')+'</details>';
+ }).join(''):'<p>No hay registros que coincidan.</p>');
+}
+function renderExpenseAdvances(){
+ const box=$('#gastos-anticipos');
+ const rows=state.records.filter(r=>r.paymentType==='entrega'&&Number(r.paidAmount)>0);
+ box.innerHTML=rows.length?rows.map(r=>'<article class="request-card"><div><strong>'+esc(r.folio)+'</strong> · '+
+  esc(r.project)+'</div><div>'+esc(r.beneficiary)+' · '+money(r.paidAmount)+' entregados</div>'+
+  '<button type="button" class="btn btn-outline" data-open="'+esc(r.id)+'">Ver expediente</button></article>').join(''):
+  '<p>No hay anticipos entregados en las solicitudes disponibles.</p>';
 }
 function addLine(description='',quantity=1,unitPrice=''){
  const row=el('div','line-row');
@@ -652,6 +717,9 @@ function setup(){
  $('#request-form').addEventListener('submit',saveRequest);
  $('#request-form').addEventListener('reset',()=>setTimeout(()=>{clearHoursOrigin();state.editingId='';$('#submit-request').textContent='Guardar solicitud →';$('#line-items').innerHTML='';addLine();$('#request-form').querySelector('[name="dateNeeded"]').value=localDate();},0));
  $('#line-items').addEventListener('input',calc);
+ $('#ledger-search').addEventListener('input',renderLedger);
+ $('#ledger-category').addEventListener('change',renderLedger);
+ $('#ledger-refresh').addEventListener('click',async()=>{await loadRecords();await loadLedger();});
  $('#search').addEventListener('input',render);
  $('#status-filter').addEventListener('change',render);
  $('#import-file').addEventListener('change',async e=>{const file=e.target.files?.[0];if(file)await importBackup(file);e.target.value='';});
