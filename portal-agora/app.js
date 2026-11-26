@@ -356,6 +356,13 @@ function pageShell(){
       '<p>'+esc(job())+'</p>'+
     '</div></div>';
 }
+function profileTool(path,label,detail,symbol){
+  return '<a class="private-link" href="'+esc(href(path))+'">'+
+    '<span class="private-link-symbol" aria-hidden="true">'+symbol+'</span>'+
+    '<span><strong>'+label+'</strong><small>'+detail+'</small></span>'+
+    '<span class="private-link-arrow" aria-hidden="true">↗</span></a>';
+}
+
 function profile(){
   const fields=[
     ["ID Dejavú",id()||"No registrado"],
@@ -398,9 +405,14 @@ function profile(){
       '</section>'+
     '</div>'+
     '<section class="profile-private-links" aria-labelledby="own-sections-heading">'+
-      '<div class="profile-section-top"><h2 id="own-sections-heading">Mi información</h2>'+
-        '<p>Consulta tus actividades y expediente sin salir de ÁGORA.</p></div>'+
+      '<div class="profile-section-top"><h2 id="own-sections-heading">Accesos rápidos</h2></div>'+
       '<div class="profile-private-grid">'+
+        (allowed("staff")?profileTool("staff/","Mis jornadas","Asignaciones y QR de asistencia","◷"):"")+
+        (allowed("agencia")&&["admin","coordinador"].includes(role())?
+          profileTool("agencia/","Coordinación","Agenda y solicitudes de asignación","▤"):"")+
+        (allowed("administrador")?
+          profileTool("../recursos/?vista=obligaciones","Finanzas","Obligaciones, pagos y conciliación","▤"):"")+
+        (allowed("staff")?profileTool("campo/","ÁGORA Campo","Checklists y acuses provisionales","▤"):"")+
         '<a class="private-link" href="'+esc(href("mi-operacion/"))+'">'+
           '<span class="private-link-symbol" aria-hidden="true">◷</span>'+
           '<span><strong>Mi operación</strong><small>Mis actividades de hoy</small></span>'+
@@ -536,6 +548,11 @@ function roleNotice(){
     '<p>El ID Dejavú está acreditado, pero falta verificar tu vinculación con Operaciones o los permisos del módulo. No se ha modificado ningún registro.</p>'+
     '<button class="profile-button profile-button-outline" data-action="retry" type="button">Volver a consultar</button></div>';
 }
+function fieldShiftLink(item){
+  if(!item.key||item.key.length>100)return "";
+  return '<a class="profile-button profile-button-outline" href="'+esc(href("campo/"))+
+    '" data-field-shift="'+esc(item.key)+'">Abrir en ÁGORA Campo</a>';
+}
 function staffJornadaCard(item){
   return '<article class="role-jornada">'+
     '<div class="role-jornada-head"><div><small>'+esc(roleDate(item.start))+'</small>'+
@@ -551,7 +568,7 @@ function staffJornadaCard(item){
     '<button type="button" class="profile-button profile-button-primary" data-action="show-shift-qr" data-event-id="'+esc(item.key)+'">Mostrar QR para asistencia</button>'+
     '<div class="remote-request-buttons"><button type="button" class="profile-button profile-button-outline" data-action="remote-attendance-request" data-attendance-action="entrada" data-event-id="'+esc(item.key)+'">Pedir entrada remota</button>'+
     '<button type="button" class="profile-button profile-button-outline" data-action="remote-attendance-request" data-attendance-action="salida" data-event-id="'+esc(item.key)+'">Pedir salida remota</button></div>'+
-    '</article>';
+    fieldShiftLink(item)+'</article>';
 }
 function staffOperationsSpace(){
   const staff=state.roleData?.staff;
@@ -593,7 +610,7 @@ function scheduleCard(item){
       '<div><dt>Coordinador responsable</dt><dd>'+esc(item.responsibleCoordinator||"Por asignar")+'</dd></div>'+
       (item.recordedBy?'<div><dt>Capturó</dt><dd>'+esc(item.recordedBy)+'</dd></div>':'')+
       '<div><dt>Actividades registradas</dt><dd>'+item.activitiesCount+'</dd></div>'+
-      '<div><dt>Estado</dt><dd>'+esc(item.status)+'</dd></div></dl></article>';
+      '<div><dt>Estado</dt><dd>'+esc(item.status)+'</dd></div></dl>'+fieldShiftLink(item)+'</article>';
 }
 
 async function compressAssignmentImage(file){
@@ -900,6 +917,11 @@ async function google(){
   }
 }
 app.addEventListener("click",event=>{
+  const fieldLink=event.target.closest("[data-field-shift]");
+  if(fieldLink&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){
+    try{sessionStorage.setItem("agora-campo-jornada",fieldLink.dataset.fieldShift)}
+    catch{ /* Campo puede recibir la referencia manualmente. */ }
+  }
   const target=event.target.closest("[data-action]");
   if(!target)return;
   const task=target.dataset.action;
