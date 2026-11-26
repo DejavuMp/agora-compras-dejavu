@@ -89,6 +89,11 @@ deliveryForm.addEventListener("submit",event=>{
 byId("print-receipt").addEventListener("click",()=>printSheet("delivery"));
 window.addEventListener("online",online);
 window.addEventListener("offline",online);
+try{
+ const shift=sessionStorage.getItem("agora-campo-jornada");
+ if(shift&&shift.length<=folio.maxLength)folio.value=shift;
+ sessionStorage.removeItem("agora-campo-jornada");
+}catch{ /* La referencia puede ingresarse manualmente. */ }
 online();refresh();
 if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{
  status.textContent="El navegador no pudo preparar la apertura sin conexión.";
