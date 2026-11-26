@@ -2237,13 +2237,7 @@ match /agora_finance_audit/{auditId} {
         request.resource.data.version == 1 &&
         request.resource.data.active == true &&
         request.resource.data.label is string && request.resource.data.label.size() > 0 && request.resource.data.label.size() <= 80 &&
-        request.resource.data.url.matches('^https://[^\\s]+
-      allow read, write: if false;
-    }
-  }
-}
-
-) &&
+        request.resource.data.url.matches('^https://[^\\s]+$') &&
         request.resource.data.instructions is string && request.resource.data.instructions.size() <= 600 &&
         request.resource.data.scope in ['event','person','project','group'] &&
         request.resource.data.scopeId is string && request.resource.data.scopeId.size() > 0 && request.resource.data.scopeId.size() <= 120 &&
@@ -2255,13 +2249,7 @@ match /agora_finance_audit/{auditId} {
         request.resource.data.version == resource.data.version + 1 &&
         request.resource.data.history == resource.data.history.concat([request.resource.data.history[resource.data.history.size()]]) &&
         request.resource.data.history[resource.data.history.size()].by == request.auth.uid &&
-        request.resource.data.url.matches('^https://[^\\s]+
-      allow read, write: if false;
-    }
-  }
-}
-
-) &&
+        request.resource.data.url.matches('^https://[^\\s]+$') &&
         request.resource.data.updatedAt == request.time;
       allow delete: if false;
     }
