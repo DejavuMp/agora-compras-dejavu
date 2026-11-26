@@ -5,14 +5,14 @@ import {readFileSync,rmSync} from 'node:fs';
 const workflow=readFileSync('.github/workflows/dejavu-staff-firebase-rules.yml','utf8');
 assert.match(workflow,/name: respaldo-reglas-agora-antes-dejavu-staff[\s\S]*?include-hidden-files: true[\s\S]*?if-no-files-found: error/,'El respaldo real es obligatorio');
 const candidate=readFileSync('firestore.rules','utf8');
-const prior=execFileSync('git',['show','78a74fe760eb9181e1473c95c8ef914e8c693047:firestore.rules'],{encoding:'utf8'});
+const prior=execFileSync('git',['show','56817ade04fb81a1248a80f536cba5a8d94d8f0f:firestore.rules'],{encoding:'utf8'});
 const operations='    // ÁGORA · Centro de Operaciones V4';
 const mask=(source,start)=>{
  const first=source.indexOf(start),last=source.indexOf(operations,first);
  assert.ok(first>=0&&last>first,'Ubicar la sección de Finanzas');
  return source.slice(0,first)+source.slice(last);
 };
-assert.equal(mask(prior,'function financeBaseValid()'),mask(candidate,'function financeHasHoursOrigin(data)'),
+assert.equal(mask(prior,'function financeHasHoursOrigin(data)'),mask(candidate,'function financeHasHoursOrigin(data)'),
  'La publicación solo modifica reglas de Finanzas');
 const drift=prior+'\n// deriva ajena\n';
 const dir='.github/firebase-staff/.preflight',rulesBackup=dir+'/antes-dejavu.rules',refBackup=dir+'/ruleset-name.txt';
@@ -26,7 +26,7 @@ async function verify(label,live,shouldPass){
  assert.equal(readFileSync(rulesBackup,'utf8'),live,label+': respaldo íntegro');assert.equal(readFileSync(refBackup,'utf8'),rulesetName+'\n',label+': ruleset guardado');console.log('OK '+label);
 }
 try{
- await verify('versión de asistencia desplegada',prior,true);
+ await verify('versión de Finanzas desplegada',prior,true);
  await verify('candidato ya desplegado',candidate,true);
  await verify('deriva ajena rechazada',drift,false);
 }finally{globalThis.fetch=originalFetch;rmSync(dir,{recursive:true,force:true});}

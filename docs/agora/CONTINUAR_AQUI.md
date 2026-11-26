@@ -31,3 +31,5 @@ Cerrar el circuito de asignación → jornada → asistencia → validación →
 - **Comprobaciones.** El módulo muestra anticipos efectivamente entregados con folio, beneficiario e importe y conserva el acceso a la herramienta existente. La comprobación y su conciliación permanecen en esa herramienta.
 - **Coordinación responsable.** El editor de Operaciones permite indicar a nombre de qué coordinador se realiza una jornada. Agencia y Administración distinguen responsable de capturista y filtran las jornadas por coordinador o proyecto.
 - Pendiente de sesión final agrupada: producción autenticada de historial y folios, comprobaciones y decisión sobre saldos legados identificados.
+
+- **Bitácora de conciliación.** Administración documenta la decisión con referencia y evidencia por folio. Solo los registros históricos revisados como independientes dejan de señalar el saldo como observado. Los pagos previos y ajustes quedan visibles para revisión con su evidencia. Comprobación de gastos y proveedores pueden adjuntar una referencia a un folio pagado. La bitácora no modifica obligaciones, importes ni pagos. Reservar la verificación autenticada para la sesión agrupada.

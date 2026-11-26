@@ -19,6 +19,7 @@ async function ensureFirebaseSdk(){
 }
 
 const COLLECTION='agora_finance_requests';
+const AUDIT_COLLECTION='agora_finance_audit';
 const LOGO_URL=new URL('../archivos/dejavu-logo-oficial.png',import.meta.url).href;
 const DB_NAME='AGORA_RECURSOS_LOCAL_V1';
 const STATUS={pendiente:'Por autorizar',ajustes:'Solicita cambios',aprobada:'Aprobada',aprobada_parcial:'Aprobada parcial',pago_parcial:'Pago parcial',pagada:'Pagada',rechazada:'Rechazada'};
@@ -143,7 +144,7 @@ function view(name){
  $('#sidebar').classList.remove('open');
  if(name==='new')$('#request-form').querySelector('[name="project"]').focus();
  render();
- if(name==='ledger'&&!ledgerSnapshot)void loadLedger();
+ if(['ledger','gastos'].includes(name)&&!ledgerSnapshot)void loadLedger();
 }
 async function openValidatedHours(){
  const params=new URLSearchParams(location.search);
@@ -163,7 +164,8 @@ async function openValidatedHours(){
   const [jornada,approved,schedule]=await Promise.all([
    dbSdk.getDocFromServer(sheet),
    dbSdk.getDocFromServer(dbSdk.doc(sheet,'approvals',personId)),
-   dbSdk.getDocFromServer(dbSdk.doc(fs,'agora_ops_control','schedule'))
+   dbSdk.getDocFromServer(dbSdk.doc(fs,'agora_ops_control','schedule')),
+   dbSdk.getDocsFromServer(dbSdk.collection(fs,AUDIT_COLLECTION)).catch(()=>null)
   ]);
   if(state.user!==user||!state.cloud||state.role!=='admin')return;
   const hours=approved.data(),shift=jornada.data(),catalog=schedule.data()?.payload;
@@ -227,17 +229,19 @@ async function loadLedger(){
  ledgerError='';
  $('#ledger-rows').textContent='Consultando Operaciones…';
  try{
-  const [logs,schedule]=await Promise.all([
+  const [logs,schedule,audit]=await Promise.all([
    dbSdk.getDocsFromServer(dbSdk.collection(fs,'agora_ops_logs')),
    dbSdk.getDocFromServer(dbSdk.doc(fs,'agora_ops_control','schedule'))
   ]);
   if(version!==ledgerVersion||!ledgerAccess())return;
-  ledgerSnapshot={logs:logs.docs.map(d=>({...d.data(),id:d.id})),schedule:schedule.data()?.payload};
+  ledgerSnapshot={logs:logs.docs.map(d=>({...d.data(),id:d.id})),schedule:schedule.data()?.payload,
+   audit:audit?.docs.map(d=>d.data())??null};
  }catch(error){
   if(version!==ledgerVersion)return;
   ledgerError='No se pudo consultar Operaciones. '+readable(error);
  }
  renderLedger();
+ if(state.view==='gastos')renderExpenseAdvances();
 }
 const legacyStatus={capturado:'Capturado',revision:'Requiere revisión',solicitado:'Solicitado',
  validado:'Validado en Operaciones',programado:'Programado en Operaciones',pagado:'Marcado pagado en Operaciones'};
@@ -248,11 +252,11 @@ function renderLedger(){
  if(!ledgerSnapshot){body.textContent=ledgerError||'Consultando Operaciones…';return;}
  const q=$('#ledger-search').value.trim().toLocaleLowerCase('es-MX');
  const category=$('#ledger-category').value;
- const viewRows=financeLedger(state.records,ledgerSnapshot.logs,ledgerSnapshot.schedule)
+ const viewRows=financeLedger(state.records,ledgerSnapshot.logs,ledgerSnapshot.schedule,ledgerSnapshot.audit||[])
   .filter(r=>(!category||r.category===category)&&
     (!q||[r.beneficiary,r.personId,r.project,r.reason,r.folio,r.eventId].some(x=>String(x||'').toLocaleLowerCase('es-MX').includes(q))));
  const total=ledgerTotals(viewRows),labelAmount=c=>c===null||c===undefined?'—':money(c/100);
- const intro='<p class="small-note">Por autorizar '+labelAmount(total.pending)+' · Saldo autorizado '+labelAmount(total.approvedBalance)+
+ const intro=(ledgerSnapshot.audit===null?'<p role="status">La revisión de conciliación no está disponible en este momento.</p>':'')+'<p class="small-note">Por autorizar '+labelAmount(total.pending)+' · Saldo autorizado '+labelAmount(total.approvedBalance)+
   ' · Saldo por conciliar '+labelAmount(total.needsReconciliation)+' · Pagos registrados en Finanzas '+labelAmount(total.paid)+'</p>';
  body.innerHTML=intro+(viewRows.length?viewRows.map(r=>{
   const legacy=r.source==='operaciones';
@@ -266,15 +270,69 @@ function renderLedger(){
     '<p>Folio '+esc(r.folio)+' · Solicitado '+labelAmount(r.requested)+' · Autorizado '+labelAmount(r.approved)+
      ' · Pagado '+labelAmount(r.paid)+' · Saldo '+labelAmount(r.balance)+'</p>'+
      (payments?'<ul>'+payments+'</ul>':'')+
+     
+     (ledgerSnapshot.audit===null?'':r.legacyMatches.map(item=>legacyAuditForm(r.id,item)).join(''))+
+     (ledgerSnapshot.audit===null?'':expenseAuditHtml(state.records.find(x=>x.id===r.id)))+
      '<button type="button" class="btn btn-outline" data-open="'+esc(r.id)+'">Ver expediente</button>')+'</details>';
  }).join(''):'<p>No hay registros que coincidan.</p>');
+}
+const auditName={independiente:'Obligación independiente',pago_previo:'Pago previo documentado',
+ requiere_ajuste:'Requiere ajuste',evidencia_recibida:'Evidencia recibida'};
+function auditLine(row){
+ const link=/^https:\/\//i.test(row.evidenceUrl||'')?
+  ' <a href="'+esc(row.evidenceUrl)+'" target="_blank" rel="noopener noreferrer">Ver evidencia</a>':'';
+ return '<p>'+esc(auditName[row.decision])+' · '+esc(row.reference)+' · '+esc(asDate(row.createdAt))+
+  '<br>'+esc(row.note)+link+'</p>';
+}
+function auditForm(requestId,kind,legacyId='',revision=0){
+ const action=kind==='legado'?'<label>Resultado <select name="decision"><option value="">Selecciona…</option>'+
+  ['independiente','pago_previo','requiere_ajuste'].map(k=>'<option value="'+k+'">'+auditName[k]+'</option>').join('')+
+  '</select></label>':'';
+ return '<form class="decision" data-finance-audit="'+kind+'" data-request="'+esc(requestId)+
+  '" data-legacy="'+esc(legacyId)+'" data-revision="'+esc(revision)+'">'+action+
+  '<label>Referencia <input name="reference" maxlength="180" required></label>'+
+  '<label>Enlace HTTPS a evidencia <input name="evidenceUrl" type="url" maxlength="600"></label>'+
+  '<label>Nota de revisión <textarea name="note" required minlength="5" maxlength="600" rows="2"></textarea></label>'+
+  '<button class="btn btn-outline" type="submit">Guardar '+(kind==='legado'?'decisión':'comprobante')+'</button></form>';
+}
+function legacyAuditForm(requestId,item){
+ return '<details><summary>Conciliar registro de Operaciones '+esc(item.id)+'</summary>'+
+  '<p>'+esc(legacyStatus[item.status]||item.status)+' · '+esc(item.activity||'Sin concepto registrado')+
+  (item.approvedAmount!=null?' · Aprobado '+money(item.approvedAmount):'')+'</p>'+
+  item.history.map(auditLine).join('')+auditForm(requestId,'legado',item.id,item.revision)+'</details>';
+}
+function expenseAuditHtml(r){
+ if(!r||!ledgerAccess()||!ledgerSnapshot?.audit||Number(r.paidAmount)<=0||
+    (r.paymentType!=='entrega'&&r.category!=='proveedor'))return '';
+ const rows=ledgerSnapshot.audit.filter(item=>item.kind==='comprobante'&&item.requestId===r.id);
+ return '<details><summary>Comprobantes del folio '+esc(r.folio)+'</summary>'+
+  rows.map(auditLine).join('')+auditForm(r.id,'comprobante')+'</details>';
+}
+async function saveAudit(form){
+ if(!ledgerAccess())return;
+ const {financeAudit:kind,request:requestId,legacy:legacyId,revision}=form.dataset;
+ const data=new FormData(form);
+ const decision=kind==='comprobante'?'evidencia_recibida':String(data.get('decision')||'');
+ const reference=String(data.get('reference')||'').trim(),note=String(data.get('note')||'').trim();
+ const links=validHttps(data.get('evidenceUrl'));
+ if(!auditName[decision]||!reference||note.length<5||links.length>1)
+  throw Error('Selecciona el resultado e indica una referencia y una nota de revisión.');
+ const submit=form.querySelector('button[type="submit"]');
+ submit.disabled=true;
+ try{
+  const ref=dbSdk.doc(state.fb.firestore,AUDIT_COLLECTION,crypto.randomUUID());
+  await dbSdk.setDoc(ref,{kind,requestId,legacyId,legacyRevision:Number(revision),decision,
+   reference,note,evidenceUrl:links[0]||'',createdBy:state.user.uid,createdAt:dbSdk.serverTimestamp()});
+  await loadLedger();showToast('Revisión guardada en el historial del folio.');
+ }finally{submit.disabled=false;}
 }
 function renderExpenseAdvances(){
  const box=$('#gastos-anticipos');
  const rows=state.records.filter(r=>r.paymentType==='entrega'&&Number(r.paidAmount)>0);
  box.innerHTML=rows.length?rows.map(r=>'<article class="request-card"><div><strong>'+esc(r.folio)+'</strong> · '+
   esc(r.project)+'</div><div>'+esc(r.beneficiary)+' · '+money(r.paidAmount)+' entregados</div>'+
-  '<button type="button" class="btn btn-outline" data-open="'+esc(r.id)+'">Ver expediente</button></article>').join(''):
+  '<button type="button" class="btn btn-outline" data-open="'+esc(r.id)+'">Ver expediente</button>'+
+  expenseAuditHtml(r)+'</article>').join(''):
   '<p>No hay anticipos entregados en las solicitudes disponibles.</p>';
 }
 function addLine(description='',quantity=1,unitPrice=''){
@@ -713,6 +771,12 @@ function setup(){
    if(action==='preview')previewDoc(r);
    if(action==='back')openDetail(r.id);
   }catch(error){showToast(readable(error));}
+ });
+ document.addEventListener('submit',event=>{
+  const form=event.target.closest('form[data-finance-audit]');
+  if(!form)return;
+  event.preventDefault();
+  saveAudit(form).catch(error=>showToast(readable(error)));
  });
  $('#request-form').addEventListener('submit',saveRequest);
  $('#request-form').addEventListener('reset',()=>setTimeout(()=>{clearHoursOrigin();state.editingId='';$('#submit-request').textContent='Guardar solicitud →';$('#line-items').innerHTML='';addLine();$('#request-form').querySelector('[name="dateNeeded"]').value=localDate();},0));
