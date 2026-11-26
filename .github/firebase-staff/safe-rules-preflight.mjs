@@ -8,6 +8,8 @@ if(project!==expectedProject)throw Error('Proyecto Firebase distinto al autoriza
 if(!token)throw Error('No hay credencial temporal para consultar reglas vigentes');
 const candidate=readFileSync('firestore.rules','utf8');
 const baseline=readFileSync('.github/firebase-staff/production-before-supervisor-attendance.rules','utf8');
+// Firestore rules activated by run 45709572614 (commit 030fe5c).
+const supervisedAttendanceGitBlob='b3a5c2aeae11cd3851351fdde9b143c729de2e77';
 const baselineGitBlob='865e1a3f89baa4411e787f342674d915f543b8a0';
 function gitBlob(s){return createHash('sha1').update('blob '+Buffer.byteLength(s)+'\0').update(s).digest('hex')}
 if(gitBlob(baseline)!==baselineGitBlob)throw Error('La base aprobada de producción fue alterada; despliegue cancelado.');
@@ -53,9 +55,16 @@ const release=await getJson('projects/'+project+'/releases/cloud.firestore');
 if(!/^projects\/[a-zA-Z0-9._-]+\/rulesets\/[a-zA-Z0-9._-]+$/.test(release.rulesetName||''))throw Error('No se pudo identificar la versión actual de las reglas; despliegue cancelado');
 const ruleSet=await getJson(release.rulesetName),files=ruleSet.source?.files;
 if(!Array.isArray(files)||files.length!==1||typeof files[0]?.content!=='string')throw Error('Las reglas actuales no están en un solo archivo; no se reemplazan automáticamente');
-const live=files[0].content,dir='.github/firebase-staff/.preflight';
+const live=files[0].content;
+if(process.argv.includes('--verify')){
+  if(normalize(live)!==normalize(candidate))throw Error('Las reglas activas no coinciden con el candidato de asistencia.');
+  console.log('Firestore en producción coincide con el candidato publicado: '+release.rulesetName);
+  process.exit(0);
+}
+const dir='.github/firebase-staff/.preflight';
 mkdirSync(dir,{recursive:true});writeFileSync(dir+'/antes-dejavu.rules',live,'utf8');writeFileSync(dir+'/ruleset-name.txt',release.rulesetName+'\n','utf8');
 if(normalize(live)===normalize(candidate))console.log('Producción ya contiene exactamente la política aprobada; no se requiere cambiar reglas.');
+else if(gitBlob(live)===supervisedAttendanceGitBlob)console.log('Producción coincide con el pase de lista supervisado publicado; se habilita la validación remota.');
 else if(normalize(live)===normalize(baseline))console.log('Producción coincide exactamente con el respaldo aprobado; sólo se deshabilita la escritura de asistencia desde Staff.');
 else throw Error('REGLAS DISTINTAS EN PRODUCCIÓN. Se guardó respaldo. Se detiene para NO sobrescribir permisos existentes.');
 console.log('Verificación previa completada. Proyecto: '+project);

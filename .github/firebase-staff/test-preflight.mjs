@@ -1,8 +1,10 @@
 /** Simulates the production-rules preflight; never calls Firebase. */
+import {execFileSync} from 'node:child_process';
 import assert from 'node:assert/strict';
 import {readFileSync,rmSync} from 'node:fs';
 const workflow=readFileSync('.github/workflows/dejavu-staff-firebase-rules.yml','utf8');
 assert.match(workflow,/name: respaldo-reglas-agora-antes-dejavu-staff[\s\S]*?include-hidden-files: true[\s\S]*?if-no-files-found: error/,'El respaldo real es obligatorio');
+const supervisedAttendance=execFileSync('git',['show','030fe5c192f598a7eb1db690a8979bd1362aa07d:firestore.rules'],{encoding:'utf8'});
 const candidate=readFileSync('firestore.rules','utf8');
 const baseline=readFileSync('.github/firebase-staff/production-before-supervisor-attendance.rules','utf8');
 const clockDeny='      // La asistencia nueva la registra coordinación mediante hojas delegadas de asistencia.\n      // Los marcajes legados siguen siendo consultables, pero ya no se escriben desde la cuenta Staff.\n      allow create, update: if false;\n';
@@ -47,4 +49,4 @@ async function verify(label,live,shouldPass){
  assert.equal(Boolean(thrown),!shouldPass,label+': resultado');if(!shouldPass)assert.match(thrown.message,/REGLAS DISTINTAS EN PRODUCCIÓN/,label+': deriva detenida');
  assert.equal(readFileSync(rulesBackup,'utf8'),live,label+': respaldo íntegro');assert.equal(readFileSync(refBackup,'utf8'),rulesetName+'\n',label+': ruleset guardado');console.log('OK '+label);
 }
-try{await verify('producción exacta, base aprobada',baseline,true);await verify('candidato ya desplegado',candidate,true);await verify('deriva ajena rechazada',drift,false);}finally{globalThis.fetch=originalFetch;rmSync(dir,{recursive:true,force:true});}
+try{await verify('producción exacta, base aprobada',baseline,true);await verify('pase supervisado vigente',supervisedAttendance,true);await verify('deriva sobre el pase supervisado rechazada',supervisedAttendance+'\n// deriva ajena\n',false);await verify('candidato ya desplegado',candidate,true);await verify('deriva ajena rechazada',drift,false);}finally{globalThis.fetch=originalFetch;rmSync(dir,{recursive:true,force:true});}

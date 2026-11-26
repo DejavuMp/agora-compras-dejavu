@@ -9,7 +9,7 @@ import {projectTodayAssignments} from "../identidad/domain.mjs";
 import {ownJornadas,coordinationJornadas,operationTotals,validateAssignmentDraft,assignmentDraftText,REQUEST_CHANNELS} from "./roles-operacion.mjs";
 import {showShiftQr} from "./staff-shift-qr.js";
 import {renderStaffTasks,readStaffTasks} from "./staff-activities.js";
-import {mountRoster} from "./attendance-roster.js";
+import {mountRoster} from "./attendance-roster.js?v=20261126-remote-attendance";
 import {requestRemoteAttendance,loadOwnRemoteRequests} from "./remote-attendance.js";
 
 // Una sola identidad Firebase para todas las vistas. Sin módulos operativos.
