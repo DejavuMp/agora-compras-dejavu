@@ -36,6 +36,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -138,3 +140,7 @@ jobs:
         run: npm install --global firebase-tools
       - name: Activar SOLO reglas de Firestore; sin desplegar Hosting, Storage ni Functions
         run: firebase deploy --only firestore:rules --project agora-dejavu-38b8c --non-interactive
+      - name: Verificar las reglas activas tras la publicación
+        env:
+          FIREBASE_ACCESS_TOKEN: ${{ steps.google_auth.outputs.access_token }}
+        run: node .github/firebase-staff/safe-rules-preflight.mjs --verify
