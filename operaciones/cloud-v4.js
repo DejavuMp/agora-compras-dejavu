@@ -6,6 +6,7 @@
  */
 import "../firebase-init.js";
 import {assignmentPrefill} from "./assignment-prefill.mjs";
+import {protocolDraft} from "../portal-agora/campo/protocolos.mjs";
 import {projectStaffView} from "./ops-safe-view.mjs";
 import {availablePeople,personForLink} from "./access-link-model.mjs";
 import {createEventControl,eventPolicyEntries} from "./editor-jornadas-control.mjs";
@@ -205,6 +206,16 @@ async function openLinkedAssignment(version){
     if(version===authVersion)notice("No fue posible abrir la solicitud · "+err(error),"error");
   }
 }
+function openLinkedProtocol(){
+  const url=new URL(location.href),id=url.searchParams.get("protocolo");
+  if(!id||url.searchParams.has("solicitud")||role!=="coordinador"||!ready)return;
+  try{
+    if(!app?.openAssignmentDraft?.(protocolDraft(id)))return;
+    url.searchParams.delete("protocolo");
+    history.replaceState(null,"",url.href);
+    notice("Borrador preparado desde el protocolo. Confirma fecha, sede y asignaciones antes de publicar.","ok");
+  }catch(error){notice(err(error),"error");}
+}
 function loadCoordinator(){
   role="coordinador";
   notice("Firebase · preparando datos","pending");
@@ -218,7 +229,10 @@ function loadCoordinator(){
     const first=!ready;
     if(first){show();notice("Firebase · sincronizado","ok");}
     emit();
-    if(first)void openLinkedAssignment(authVersion);
+    if(first){
+      openLinkedProtocol();
+      void openLinkedAssignment(authVersion);
+    }
     if(!snap.metadata.fromCache)void ensureShiftPolicies();
     if(!snap.metadata.fromCache)void ensureOwnPayProjection();
   });

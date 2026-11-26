@@ -565,6 +565,7 @@ function staffOperationsSpace(){
         '<button type="button" class="profile-button profile-button-primary" data-action="new-work-claim">+ Registrar trabajo o asignación</button>'+
         (quickQr?'<button type="button" class="profile-button profile-button-outline" data-action="show-shift-qr" data-event-id="'+esc(quickQr.key)+'">Mostrar QR para asistencia</button>':"")+
         '<a class="profile-button profile-button-primary" href="'+esc(href("mi-operacion/"))+'">Mi operación</a>'+
+        '<a class="profile-button profile-button-outline" href="'+esc(href("campo/"))+'">ÁGORA Campo</a>'+
         (["admin","coordinador","supervisor"].includes(role())?'<a class="profile-button profile-button-outline" href="'+esc(href("escanear/"))+'">Pasar lista</a>':"")+'</div></header>'+
     roleNotice()+
     (staff?assigned.length?'<div class="role-jornada-list">'+assigned.slice(0,3).map(staffJornadaCard).join("")+'</div>'+
@@ -809,6 +810,7 @@ function coordinationOperationsSpace(admin=false){
         '<button type="button" class="profile-button profile-button-outline" data-action="load-assignment-requests">Actualizar solicitudes</button></div>'+
         '<div id="assignment-history" class="assignment-history" aria-live="polite"></div></section>'+
       '<nav class="role-legacy-links" aria-label="Herramientas de la agencia">'+
+        '<a class="profile-button profile-button-outline" href="'+esc(href("campo/"))+'">Protocolos y Campo</a>'+
         '<a class="profile-button profile-button-outline" href="'+esc(href("../"))+'">Compras y producción</a>'+
         '<a class="profile-button profile-button-outline" href="'+esc(href("../archivos/"))+'">Archivos y evidencias</a>'+
         '<a class="profile-button profile-button-outline" href="'+esc(href("../recursos/"))+'">'+
