@@ -304,6 +304,7 @@ function visibleLink(r){if(!state.cloud||r.createdBy==='local')return '';const u
 // Enlace autocontenido de respuesta externa. Nunca exporta cuentas, CLABE ni notas bancarias.
 // NO modifica automáticamente la solicitud, para evitar permisos públicos de escritura.
 function approvalReplyLink(r){
+ if(r.hoursOrigin)throw Error('Las obligaciones de horas se autorizan dentro de Finanzas.');
  const data={v:1,f:String(r.folio||'').slice(0,35),p:String(r.project||'').slice(0,130),
   c:String(CATEGORIES[r.category]||r.category||'').slice(0,100),t:round(r.total),
   d:String(r.dateNeeded||'').slice(0,10)};
@@ -364,7 +365,7 @@ function detailHtml(r){
  const safeLinks=(r.attachments||[]).filter(u=>typeof u==='string'&&/^https:\/\//i.test(u));
  const links=safeLinks.length?'<div class="detail-card detail-full"><b>Documentos de soporte</b>'+safeLinks.map(u=>'<div><a target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">'+esc(u)+'</a></div>').join('')+'</div>':'';
  let result='<div class="detail-head"><div><small>'+esc(r.folio)+'</small><h3>'+esc(r.project)+'</h3><span>'+esc(CATEGORIES[r.category]||r.category)+'</span></div>'+badge(r.status)+'</div>';
- result+='<div class="action-bar">'+(canEditRequest(r)?'<button class="btn btn-outline" data-action="edit">✎ Editar solicitud</button>':'')+'<button class="btn btn-gold" data-action="pdf">↓ PDF</button><button class="btn btn-outline" data-action="png">↓ Imagen PNG</button><button class="btn btn-outline" data-action="print">⎙ Imprimir</button><button class="btn btn-outline" data-action="preview">Vista previa</button><button class="btn btn-outline" data-action="share">Copiar WhatsApp</button><button class="btn btn-outline" data-action="whatsapp">Abrir WhatsApp</button><button class="btn btn-outline" data-action="copy-email">Copiar texto correo</button><button class="btn btn-outline" data-action="copy-email-bank">Copiar correo + cuenta</button><button class="btn btn-outline" data-action="email">Abrir correo</button><button class="btn btn-outline" data-action="approval-link">Copiar enlace para autorizar</button></div>';
+ result+='<div class="action-bar">'+(canEditRequest(r)?'<button class="btn btn-outline" data-action="edit">✎ Editar solicitud</button>':'')+'<button class="btn btn-gold" data-action="pdf">↓ PDF</button><button class="btn btn-outline" data-action="png">↓ Imagen PNG</button><button class="btn btn-outline" data-action="print">⎙ Imprimir</button><button class="btn btn-outline" data-action="preview">Vista previa</button><button class="btn btn-outline" data-action="share">Copiar WhatsApp</button><button class="btn btn-outline" data-action="whatsapp">Abrir WhatsApp</button><button class="btn btn-outline" data-action="copy-email">Copiar texto correo</button><button class="btn btn-outline" data-action="copy-email-bank">Copiar correo + cuenta</button><button class="btn btn-outline" data-action="email">Abrir correo</button>'+(r.hoursOrigin?'':'<button class="btn btn-outline" data-action="approval-link">Copiar enlace para autorizar</button>')+'</div>';
  result+='<div class="detail-grid">'+[
  ['Solicitado',money(r.total)],['Autorizado',money(r.approvedAmount)],['Pagado',money(r.paidAmount)],['Por pagar',money(outstanding)],
  ['Solicitante',r.requester||'—'],['Beneficiario',r.beneficiary||'—'],['Fecha requerida',r.dateNeeded||'—'],['Modalidad',r.paymentType==='directo'?'Pago directo':'Entrega de recursos'],
@@ -382,7 +383,7 @@ function detailHtml(r){
  if(canManage()&&available(r)){
   result+='<form id="payment-form" class="decision"><h4>Registrar entrega o pago</h4><input name="amount" type="number" step=".01" min=".01" max="'+esc(outstanding)+'" placeholder="Importe entregado (máximo '+money(outstanding)+')" required><input name="date" type="date" required value="'+localDate()+'"><select name="method"><option value="transferencia">Transferencia</option><option value="efectivo">Efectivo</option><option value="otro">Otro</option></select><input name="reference" maxlength="120" '+(r.hoursOrigin?'required ':'')+'placeholder="Referencia bancaria o comprobante"><button class="btn btn-gold" type="submit">Guardar pago</button></form>';
  }
- result+='<p class="small-note" style="margin-top:17px;font-size:11px;color:#837664">La persona destinataria puede responder desde el enlace sin entrar a ÁGORA. Por ahora la respuesta se envía mediante correo o WhatsApp; no cambia el estado del expediente automáticamente. Administración valida y registra la decisión. No incluyas archivos bancarios en grupos abiertos.</p>';
+ if(!r.hoursOrigin)result+='<p class="small-note" style="margin-top:17px;font-size:11px;color:#837664">La persona destinataria puede responder desde el enlace sin entrar a ÁGORA. Por ahora la respuesta se envía mediante correo o WhatsApp; no cambia el estado del expediente automáticamente. Administración valida y registra la decisión. No incluyas archivos bancarios en grupos abiertos.</p>';
  return result;
 }
 async function updateRecord(r,patch,log){

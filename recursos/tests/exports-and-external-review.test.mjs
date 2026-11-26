@@ -8,7 +8,7 @@ const css=readFileSync('recursos/style.css','utf8');
 
 assert.ok(app.includes("Array.from(host.querySelectorAll('img'))"),'PNG/PDF espera imágenes reales');
 assert.ok(!app.includes("$('img',host).map"),'No se usa querySelector sobre un solo elemento como arreglo');
-assert.ok(app.includes('document-sheet print-view'),'Impresión no queda oculta por media print');
+assert.ok(app.includes("host.classList.add('print-view')"),'Impresión no queda oculta por media print');
 assert.ok(app.includes('const host=docHost(r);'),'La ventana de impresión conserva QR');
 assert.ok(app.includes('data-action="copy-email"'),'Hay acción para copiar correo');
 assert.ok(app.includes('data-action="whatsapp"'),'Hay acceso a WhatsApp');
@@ -33,6 +33,10 @@ const url=runInNewContext(
  '\napprovalReplyLink(sample);',
  {sample,TextEncoder,btoa,URL,location:{href:'https://dejavump.github.io/agora-compras-dejavu/recursos/'}} 
 );
+assert.throws(()=>runInNewContext(
+ 'const CATEGORIES={};const round=n=>n;'+fn+'\napprovalReplyLink(sample);',
+ {sample:{...sample,hoursOrigin:{eventId:'qa',personId:'qa'}},TextEncoder,btoa,URL,location:{href:'https://dejavump.github.io/agora-compras-dejavu/recursos/'}}
+),/se autorizan dentro de Finanzas/);
 const actual=new URL(url);
 assert.equal(actual.pathname,'/agora-compras-dejavu/recursos/aprobar.html');
 const encoded=actual.searchParams.get('d').replace(/-/g,'+').replace(/_/g,'/');
