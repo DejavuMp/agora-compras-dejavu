@@ -2,7 +2,7 @@
 
 ## Prioridad actual
 
-Cerrar el circuito de asignación → jornada → asistencia → validación → recibo de horas → obligación económica. Coordinación valida horas. Finanzas autoriza importes y registra pagos.
+Conciliar obligaciones históricas y comprobaciones por folio contra evidencia disponible. Coordinación valida horas. Finanzas concilia, autoriza importes y registra pagos. Continuar con las entregas y evidencias de Campo sobre el cronograma existente.
 
 ## Estado al 26 de noviembre de 2026
 
@@ -33,3 +33,9 @@ Cerrar el circuito de asignación → jornada → asistencia → validación →
 - Pendiente de sesión final agrupada: producción autenticada de historial y folios, comprobaciones y decisión sobre saldos legados identificados.
 
 - **Bitácora de conciliación.** Administración documenta la decisión con referencia y evidencia por folio. Solo los registros históricos revisados como independientes dejan de señalar el saldo como observado. Los pagos previos y ajustes quedan visibles para revisión con su evidencia. Comprobación de gastos y proveedores pueden adjuntar una referencia a un folio pagado. La bitácora no modifica obligaciones, importes ni pagos. Reservar la verificación autenticada para la sesión agrupada.
+
+## Conciliación y Campo
+
+- **Finanzas publicado y reglas verificadas.** El [PR 87](https://github.com/DejavuMp/agora-compras-dejavu/pull/87) añade la bitácora inmutable por folio en `recursos/app.js` y `firestore.rules`. La [ejecución 191](https://github.com/DejavuMp/agora-compras-dejavu/actions/runs/45795962640) aprobó 43 controles de Finanzas en emulador, respaldó las reglas previas y verificó la versión activa en Firebase. Los registros reales siguen sujetos a cotejo por Administración con sus referencias y comprobantes originales. El registro de la revisión deja intactas las obligaciones y los pagos.
+- **ÁGORA Campo.** Los [PR 88](https://github.com/DejavuMp/agora-compras-dejavu/pull/88) y [89](https://github.com/DejavuMp/agora-compras-dejavu/pull/89) integran checklists de Hot Crují Bravo y Apertura KFC, un acceso al borrador de jornada en el editor existente, un enlace a Archivos y un acuse provisional imprimible. El checklist guarda avance en el dispositivo por protocolo y folio. El acuse conserva cantidades previstas, recibidas y diferencias en la pestaña hasta imprimir o guardar el PDF. Cambios en `portal-agora/campo/`, `operaciones/cloud-v4.js` y accesos del portal. La [suite del portal](https://github.com/DejavuMp/agora-compras-dejavu/actions/runs/45796401022) aprobó 49 casos. [Publicación de Campo](https://github.com/DejavuMp/agora-compras-dejavu/actions/runs/45796399237).
+- **Continuidad.** El flujo de Campo requiere una primera visita con conexión. La prueba del service worker cubre exclusivamente archivos estáticos. Quedan pendientes la apertura y persistencia offline en dispositivos del equipo, la persistencia y sincronización de entregas, firmas y evidencias, el inventario vinculado y las rutas verificadas. Agrupar la comprobación en producción por roles, folios reales y dispositivos en una sola sesión. Mantener los registros QA y las pruebas manuales de asistencia en pausa.
