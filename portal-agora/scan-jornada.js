@@ -13,8 +13,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 import {
  shiftCandidates,shiftPreview,entryDraft,entryDocId,
- freshProvisionalId,calculateNetMinutes,approvalDraft,payrollSummary
-} from "./asistencia-policy.mjs";
+ freshProvisionalId,calculateNetMinutes,approvalDraft,payrollSummary,validatedHoursReceipt
+} from "./asistencia-policy.mjs?v=20261126-hours-receipt";
 import {parseShiftQr} from "./qr-jornada.mjs";
 
 const root=new URL("./",import.meta.url);
@@ -332,7 +332,8 @@ function renderApprovals(){
  $("scan-approvals").innerHTML=approvals.length?approvals.map(a=>
   '<div class="attendance-row"><div><strong>'+esc(a.personName)+'</strong>'+
    '<small>'+a.approvedMinutes+' min validados · '+esc(a.source)+'</small></div>'+
-   '<span class="attendance-status">Horas validadas</span></div>').join(""):
+   '<button type="button" class="profile-button profile-button-outline" data-hours-receipt="'+
+   esc(a.personId)+'">Recibo de horas</button></div>').join(""):
   '<p class="role-empty">Aún no hay horas validadas para pago.</p>';
 }
 function fillApproval(){
@@ -558,18 +559,25 @@ async function copyPaySummary(){
 }
 function printHoursSummary(){
  if(!state.isCoordinator||!state.sheet)throw Error("Solo Coordinación puede imprimir horas validadas.");
- const content=payrollSummary(state.sheet,state.approvals);
+ printValidatedHours("Horas validadas",payrollSummary(state.sheet,state.approvals));
+}
+function printHoursReceipt(personId){
+ if(!state.isCoordinator||!state.sheet)throw Error("Solo Coordinación puede imprimir horas validadas.");
+ const approval=state.approvals.find(item=>item.personId===personId);
+ printValidatedHours("Recibo de horas",validatedHoursReceipt(state.sheet,approval));
+}
+function printValidatedHours(title,content){
  const w=window.open("","_blank");
  if(!w)throw Error("El navegador bloqueó la ventana de impresión. Activa ventanas emergentes para ÁGORA.");
  w.document.open();
  w.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8">'+
-  '<title>ÁGORA · Horas validadas</title>'+
+  '<title>ÁGORA · '+esc(title)+'</title>'+
   '<style>body{font-family:Arial,sans-serif;color:#171819;margin:36px;'+
   'font-size:13px}h1{font-size:23px;margin-bottom:19px}pre{font:13px/1.8 Arial,'+
   'sans-serif;white-space:pre-wrap;overflow-wrap:anywhere}'+
   'footer{border-top:1px solid #ccc;padding-top:12px;color:#555;font-size:11px}</style></head>'+
   '<body><h1>ÁGORA · Dejavú Marketing</h1><pre>'+esc(content)+'</pre>'+
-  '<footer>Reporte de horas validadas, no comprobante de pago ni transferencia.</footer></body></html>');
+  '<footer>Constancia de las horas validadas por Coordinación.</footer></body></html>');
  w.document.close();w.focus();w.print();
 }
 async function handleQR(raw){
@@ -696,5 +704,9 @@ $("scan-review-person").addEventListener("change",fillApproval);
 $("scan-approve-hours").addEventListener("click",()=>act(approveHours));
 $("scan-copy-payroll").addEventListener("click",()=>act(copyPaySummary));
 $("scan-print-payroll").addEventListener("click",()=>act(printHoursSummary));
+$("scan-approvals").addEventListener("click",event=>{
+ const button=event.target.closest("[data-hours-receipt]");
+ if(button)act(()=>printHoursReceipt(button.dataset.hoursReceipt));
+});
 document.addEventListener("visibilitychange",()=>{if(document.hidden)hideCamera()});
 onAuthStateChanged(auth,user=>{loadView(user)});

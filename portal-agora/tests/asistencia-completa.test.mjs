@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import {
  shiftPreview,shiftCandidates,minimalRoster,entryDocId,
- freshProvisionalId,entryDraft,calculateNetMinutes,approvalDraft,payrollSummary
+ freshProvisionalId,entryDraft,calculateNetMinutes,approvalDraft,payrollSummary,validatedHoursReceipt
 } from "../asistencia-policy.mjs";
 const start=new Date("2026-11-25T09:00:00-06:00");
 const end=new Date("2026-11-25T18:00:00-06:00");
@@ -76,6 +76,13 @@ test("horas para pago son netas y no incluyen tarifas",()=>{
  const summary=payrollSummary({eventId:"j01",title:"Oficina",site:"Dejavú"},[approval]);
  assert.match(summary,/8.50 h/);
  assert.match(summary,/no autorización de transferencia/);
+ const sheet={eventId:"j01",title:"Oficina",site:"Dejavú"};
+ const receipt=validatedHoursReceipt(sheet,approval);
+ assert.match(receipt,/Recibo de horas validadas/);
+ assert.match(receipt,/Colaborador Uno/);
+ assert.match(receipt,/8\.50 h/);
+ assert.throws(()=>validatedHoursReceipt({...sheet,eventId:"j02"},approval),/esta jornada/);
+ assert.throws(()=>validatedHoursReceipt(sheet,{...approval,status:"pendiente"}),/horas validadas/);
 });
 test("interfaces y permisos no mezclan funciones o sitios",async()=>{
  const [scanner,staff,app,rules,html,css]=await Promise.all([

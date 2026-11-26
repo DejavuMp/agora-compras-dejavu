@@ -125,3 +125,30 @@ export function payrollSummary(sheet,approvals){
   "Validación de horas, no autorización de transferencia. Confirmar tarifa y datos bancarios exclusivamente en el módulo de pagos."
  ].join("\n");
 }
+
+export function validatedHoursReceipt(sheet,approval){
+ if(!sheet||approval?.eventId!==sheet.eventId||approval?.status!=="horas_validadas"||
+    !Number.isInteger(approval.approvedMinutes)||approval.approvedMinutes<1||
+    !v(approval.personId,90))throw Error("El recibo requiere horas validadas para esta jornada.");
+ const date=new Intl.DateTimeFormat("es-MX",{
+  dateStyle:"short",timeStyle:"short",timeZone:"America/Mexico_City"
+ });
+ const format=value=>{
+  const instant=time(value);
+  return Number.isFinite(instant)?date.format(instant):"Sin registrar";
+ };
+ return [
+  "Recibo de horas validadas",
+  "Jornada: "+v(sheet.title,180),
+  "Folio de jornada: "+sheet.eventId,
+  "Sede: "+v(sheet.site,180),
+  "Colaborador: "+v(approval.personName,140),
+  "ID de asignación: "+approval.personId,
+  "Entrada validada: "+format(approval.startAt),
+  "Salida validada: "+format(approval.endAt),
+  "Descanso: "+approval.breakMinutes+" min",
+  "Horas validadas: "+(approval.approvedMinutes/60).toFixed(2)+" h",
+  "Registro: "+v(approval.source,20),
+  "Hora del centro de México"
+ ].join("\n");
+}
