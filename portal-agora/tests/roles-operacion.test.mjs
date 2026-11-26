@@ -103,3 +103,16 @@ test("el selector de jornada excluye borradores y detecta empalmes entre coordin
  assert.deepEqual(options.map(x=>[x.id,x.conflictCount]),[["primera",1],["otra",1],["contigua",0]]);
  assert.deepEqual(assignmentEventOptions({payload},"2026-11-27"),[]);
 });
+
+test("la agenda distingue responsable de quien capturó sin cambiar las asignaciones",async()=>{
+ const {filterCoordinatorAgenda}=await import("../roles-operacion.mjs");
+ const schedule={payload:{events:[{id:"agenda",title:"Montaje",project:"Producción",start:"2026-11-26T10:00:00-06:00",end:"2026-11-26T11:00:00-06:00",status:"programada",
+  responsibleCoordinator:"Martín Núñez",assignedByName:"Marta",staff:[{personId:"p1"}]}]}};
+ const rows=coordinationJornadas(schedule,new Date("2026-11-26T08:00:00-06:00"));
+ assert.equal(rows[0].responsibleCoordinator,"Martín Núñez");
+ assert.equal(rows[0].recordedBy,"Marta");
+ assert.equal(rows[0].staffCount,1);
+ assert.equal(filterCoordinatorAgenda(rows,"nunez").length,1);
+ assert.equal(filterCoordinatorAgenda(rows,"produccion").length,1);
+ assert.equal(filterCoordinatorAgenda(rows,"otro").length,0);
+});

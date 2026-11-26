@@ -6,7 +6,7 @@ import {doc,getDoc,getDocFromServer,getDocs,collection,query,orderBy,limit,setDo
   from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 import {saveProfile,saveFinancial} from "../identidad/firebase-identity.js";
 import {projectTodayAssignments} from "../identidad/domain.mjs";
-import {ownJornadas,coordinationJornadas,operationTotals,validateAssignmentDraft,assignmentDraftText,REQUEST_CHANNELS,assignmentEventOptions} from "./roles-operacion.mjs?v=20261126-coordination";
+import {ownJornadas,coordinationJornadas,operationTotals,validateAssignmentDraft,assignmentDraftText,REQUEST_CHANNELS,assignmentEventOptions,filterCoordinatorAgenda} from "./roles-operacion.mjs?v=20261126-responsible-coordination";
 import {showShiftQr} from "./staff-shift-qr.js";
 import {renderStaffTasks,readStaffTasks} from "./staff-activities.js";
 import {mountRoster} from "./attendance-roster.js?v=20261126-remote-attendance";
@@ -589,6 +589,8 @@ function scheduleCard(item){
       '<span class="role-time">'+roleTime(item.start)+' – '+roleTime(item.end)+'</span></div>'+
     '<dl class="role-jornada-facts"><div><dt>Sede</dt><dd>'+esc(item.site)+'</dd></div>'+
       '<div><dt>Personal asignado</dt><dd>'+item.staffCount+'</dd></div>'+
+      '<div><dt>Coordinador responsable</dt><dd>'+esc(item.responsibleCoordinator||"Por asignar")+'</dd></div>'+
+      (item.recordedBy?'<div><dt>Capturó</dt><dd>'+esc(item.recordedBy)+'</dd></div>':'')+
       '<div><dt>Actividades registradas</dt><dd>'+item.activitiesCount+'</dd></div>'+
       '<div><dt>Estado</dt><dd>'+esc(item.status)+'</dd></div></dl></article>';
 }
@@ -775,6 +777,13 @@ async function workClaimStableId(uid,v){
   const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(tuple));
   return "claim_"+[...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,"0")).join("").slice(0,48);
 }
+function scheduleList(list,expand=false){
+  if(!list.length)return '<p class="role-empty">No hay jornadas que coincidan en el cronograma.</p>';
+  const first=expand?list:list.slice(0,6);
+  return '<div class="role-jornada-list">'+first.map(scheduleCard).join("")+'</div>'+
+    (!expand&&list.length>6?'<details class="role-more-jornadas"><summary>Ver otras jornadas ('+
+      (list.length-6)+')</summary><div class="role-jornada-list">'+list.slice(6).map(scheduleCard).join("")+'</div></details>':"");
+}
 function coordinationOperationsSpace(admin=false){
   const edit=["admin","coordinador"].includes(role());
   const list=edit?coordinationJornadas(state.roleData?.schedule,new Date(),60):[];
@@ -789,9 +798,8 @@ function coordinationOperationsSpace(admin=false){
     (edit?'<div class="role-metrics"><div><small>Jornadas hoy</small><strong>'+totals.today+'</strong></div>'+
       '<div><small>Próximas jornadas</small><strong>'+totals.upcoming+'</strong></div>'+
       '<div><small>Personal asignado (turnos)</small><strong>'+totals.assignments+'</strong></div></div>'+
-      (list.length?'<div class="role-jornada-list">'+list.slice(0,6).map(scheduleCard).join("")+'</div>'+
-        (list.length>6?'<details class="role-more-jornadas"><summary>Ver otras jornadas ('+(list.length-6)+')</summary><div class="role-jornada-list">'+list.slice(6).map(scheduleCard).join("")+'</div></details>':""):
-       '<p class="role-empty">No hay jornadas próximas en el cronograma operativo.</p>')+
+      '<label>Buscar por coordinador o proyecto <input id="coordination-search" type="search" maxlength="140"></label>'+
+      '<div id="coordination-schedule" aria-live="polite">'+scheduleList(list)+'</div>'+
       '<div class="role-legacy-links"><a class="profile-button profile-button-primary" href="'+esc(href("escanear/"))+'">Pasar lista · QR o manual</a>'+
       '<button type="button" data-action="view-attendance" class="profile-button profile-button-outline">Pase de lista</button>'+
         '<a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/"))+'">Editar agenda vigente</a>'+
@@ -827,6 +835,12 @@ function emptySpace(){
       '<img src="'+esc(iconSrc(meta.icon))+'" alt="" width="90" height="90">'+
       '<div><div class="profile-kicker">ÁGORA · Operaciones</div><h1>'+esc(meta.title)+'</h1></div></div>'+
     body+'</section>';
+  const search=document.getElementById("coordination-search");
+  if(search)search.addEventListener("input",()=>{
+    const list=coordinationJornadas(state.roleData?.schedule,new Date(),60);
+    document.getElementById("coordination-schedule").innerHTML=scheduleList(
+      filterCoordinatorAgenda(list,search.value),Boolean(clean(search.value)));
+  });
   const history=document.getElementById("assignment-history");
   if(history)showAssignmentHistory().catch(e=>{history.textContent=errorText(e)});
   loadWorkClaims().catch(e=>{console.error(e);notice(errorText(e),"error")});
