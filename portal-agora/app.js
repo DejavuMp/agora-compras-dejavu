@@ -10,7 +10,7 @@ import {ownJornadas,coordinationJornadas,operationTotals,validateAssignmentDraft
 import {showShiftQr} from "./staff-shift-qr.js";
 import {renderStaffTasks,readStaffTasks} from "./staff-activities.js";
 import {mountRoster} from "./attendance-roster.js?v=20261126-remote-attendance";
-import {requestRemoteAttendance,loadOwnRemoteRequests} from "./remote-attendance.js";
+import {requestRemoteAttendance,loadOwnRemoteRequests} from "./remote-attendance.js?v=20261126-qa";
 
 // Una sola identidad Firebase para todas las vistas. Sin módulos operativos.
 const ROOT=new URL("./",import.meta.url);
@@ -869,10 +869,12 @@ app.addEventListener("click",event=>{
     if(!shift)return notice("No se encontró tu jornada asignada.","error");
     const action=target.dataset.attendanceAction;
     if(!["entrada","salida"].includes(action))return notice("Selecciona entrada o salida.","error");
+    const event=state.roleData.staff.events?.find(item=>item.id===eventId);
+    const shiftTime=action==="entrada"?event?.start:event?.end;
     if(!confirm("Se compartirá tu ubicación GPS una sola vez con el supervisor y coordinación de esta jornada para solicitar la "+action+". La ubicación no valida automáticamente tu asistencia. ¿Continuar?"))return;
     return run(async()=>{
       const result=await requestRemoteAttendance({db,uid:state.user.uid,personId:state.roleData.staff.personId,
-        personName:name(),eventId,eventTitle:shift.title,site:shift.site,action});
+        personName:name(),eventId,eventTitle:shift.title,site:shift.site,action,shiftTime});
       if(result)await loadOwnRemoteRequests(db,state.user.uid,document.getElementById("my-remote-attendance-requests"));
       return result;
     },result=>result?"Solicitud enviada; espera la validación del responsable.":"");

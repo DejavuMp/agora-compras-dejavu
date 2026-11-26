@@ -1,5 +1,5 @@
 import {
- collection,collectionGroup,doc,getDocFromServer,getDocsFromServer,query,where,
+ collection,collectionGroup,doc,getDocsFromServer,query,where,
  serverTimestamp,setDoc
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 
@@ -25,20 +25,14 @@ function locationOnce(){
 const requestId=()=>"req_"+[...crypto.getRandomValues(new Uint8Array(16))]
  .map(value=>value.toString(16).padStart(2,"0")).join("");
 
-export async function requestRemoteAttendance({db,uid,personId,personName,eventId,eventTitle,site,action}){
+export async function requestRemoteAttendance({db,uid,personId,personName,eventId,eventTitle,site,action,shiftTime}){
  if(!uid||!personId||!eventId||!["entrada","salida"].includes(action))
   throw Error("Falta la identidad o la jornada.");
- const sheetRef=doc(db,"agora_ops_attendance_sheets",eventId);
- const rosterRef=doc(db,"agora_ops_attendance_sheets",eventId,"roster",personId);
- const [sheetSnap,rosterSnap]=await Promise.all([
-  getDocFromServer(sheetRef),getDocFromServer(rosterRef)
- ]);
- if(!sheetSnap.exists()||sheetSnap.data().active!==true||
-    sheetSnap.data().validationMode!=="remoto")
-  throw Error("Coordinación debe habilitar pase remoto para esta jornada.");
- if(!rosterSnap.exists()||rosterSnap.data().uid!==uid)
-  throw Error("Tu identidad todavía no está vinculada al personal de esta jornada.");
- personName=String(rosterSnap.data().name||personName||"").trim();
+ // The server checks the exact window, roster, mode and any existing entry.
+ const anchor=shiftTime?.toMillis?.()??new Date(shiftTime??NaN).getTime();
+ if(Number.isFinite(anchor)&&Math.abs(Date.now()-anchor)>30*60000)
+  throw Error("La ventana para solicitar esta "+action+" remota está cerrada.");
+ personName=String(personName||"").trim().slice(0,140);
  if(personName.length<2)throw Error("No se encontró el nombre registrado para esta jornada.");
  const ownRequests=await getDocsFromServer(query(
   collection(db,"agora_ops_attendance_sheets",eventId,"remote_requests"),
@@ -46,20 +40,25 @@ export async function requestRemoteAttendance({db,uid,personId,personName,eventI
  ));
  if(ownRequests.docs.some(item=>item.data().action===action&&item.data().status==="pendiente"))
   throw Error("Ya tienes una solicitud de "+action+" pendiente de revisión.");
- const entryId=personId+"__"+action+"__jornada";
- if((await getDocFromServer(doc(db,"agora_ops_attendance_sheets",eventId,"entries",entryId))).exists())
+ if(ownRequests.docs.some(item=>item.data().action===action&&item.data().status==="validado"))
   throw Error("Esta "+action+" ya fue registrada para la jornada.");
  const location=await locationOnce();
  const capturedAt=serverTimestamp();
  const id=requestId();
  const ref=doc(db,"agora_ops_attendance_sheets",eventId,"remote_requests",id);
- await setDoc(ref,{
-  id,eventId,eventTitle:String(eventTitle||sheetSnap.data().title||"Jornada").slice(0,160),
-  site:String(site||sheetSnap.data().site||"").slice(0,160),
+ try{
+  await setDoc(ref,{
+  id,eventId,eventTitle:String(eventTitle||"Jornada").slice(0,160),
+  site:String(site||"").slice(0,160),
   personId,ownerUid:uid,personName,action,activityKey:"jornada",
   location,capturedAt,createdAt:serverTimestamp(),status:"pendiente",
-  requestedBy:uid,reviewedBy:"",reviewedAt:null,validationNote:"",notes:""
- });
+  requestedBy:uid,reviewedBy:"",reviewerName:"",reviewedAt:null,validationNote:"",notes:""
+  });
+ }catch(error){
+  if(error?.code==="permission-denied")
+   throw Error("No se aceptó el pase. Verifica con Coordinación que esté habilitado, dentro del horario y sin un registro anterior.");
+  throw error;
+ }
  return {id,location,capturedAt};
 }
 
