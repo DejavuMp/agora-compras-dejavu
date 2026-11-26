@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#111216">
+<meta name="robots" content="noindex">
+<title>ÁGORA Campo</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="stylesheet" href="./campo.css">
+<script type="module" src="./campo.mjs"></script>
+</head>
+<body><main>
+<nav><a href="../">Volver a ÁGORA</a><a href="../staff/">Mis jornadas</a></nav>
+<h1>ÁGORA Campo</h1>
+<p>Checklists de campo para consultar y marcar en este dispositivo.</p>
+<p id="connection" role="status"></p>
+<label>Protocolo <select id="protocol"></select></label>
+<section><h2 id="name"></h2><div id="checklist"></div><p id="progress" aria-live="polite"></p></section>
+<div class="actions"><a id="open-draft" href="../../operaciones/">Preparar jornada en Operaciones</a><button type="button" id="print">Imprimir o guardar PDF</button><a href="../../archivos/">Abrir evidencias</a></div>
+<p id="local-status" role="status">Los avances de este checklist se guardan en este dispositivo.</p>
+</main></body></html>
