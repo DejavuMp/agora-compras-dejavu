@@ -14,7 +14,7 @@ test("el calendario se despliega en Mi perfil sólo para coordinación autorizad
   assert.match(app,/operaciones\/\?embedded=calendar/);
   assert.match(app,/calendar\.addEventListener\("toggle",loadCalendar\)/);
   assert.match(app,/href\("\?calendario=1#calendario"\)/);
-  assert.match(page,/src="\.\/app\.js\?v=20261126-calendar-inline"/);
+  assert.match(page,/src="\.\/app\.js\?v=20261126-management-inline"/);
   assert.match(css,/\.profile-calendar-inline/);
   assert.match(operations,/EMBEDDED_CALENDAR\?'calendario':'inicio'/);
   assert.match(operations,/body\.embedded-calendar \.sidebar/);

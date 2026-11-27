@@ -1429,6 +1429,7 @@ body:not(.login-mode) footer{
 .profile-calendar-inline summary span{color:#c6c8ca;font-size:14px}
 .profile-calendar-inline[open] summary{border-bottom:1px solid #41444a}
 .portal-calendar-frame{display:block;width:100%;height:max(650px,calc(100dvh - 180px));border:1px solid #41444a;border-radius:16px;background:#f5f5f3}
+.portal-management-frame{display:block;width:100%;height:max(680px,calc(100dvh - 180px));border:0;background:#11100e}
 @media(max-width:600px){.profile-calendar-inline summary{display:grid;padding:16px}.portal-calendar-frame{height:calc(100dvh - 160px);min-height:520px;border-radius:10px}}
 .assignment-history-actions .profile-button{font-size:11px}
 @media(max-width:560px){

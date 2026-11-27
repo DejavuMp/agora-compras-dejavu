@@ -249,6 +249,21 @@ async function refresh(){
   }
 }
 
+function managementMarkup(){
+  if(!activeAccount()||role()!=="admin")return "";
+  return '<details id="altas" class="profile-calendar-inline management-inline">'+
+    '<summary><strong>Altas y accesos</strong><span>Solicitudes, credenciales y coordinación</span></summary>'+
+    '<iframe class="portal-management-frame" title="Gestión de identidad y RH" data-src="'+
+      esc(href("../identidad/?embedded=management"))+'" loading="lazy"></iframe></details>';
+}
+function attachManagement(){
+  const panel=document.getElementById("altas");
+  if(!panel)return;
+  const frame=panel.querySelector("iframe");
+  const load=()=>{if(panel.open&&!frame.src)frame.src=frame.dataset.src};
+  panel.addEventListener("toggle",load);
+  load();
+}
 function renderRegistration(){
   const existing=state.identity?.registration;
   const reg=state.identity?.registry;
@@ -271,7 +286,8 @@ function renderRegistration(){
   }
   app.innerHTML='<section class="profile-error"><div class="profile-kicker">Identidad Dejavú</div>'+
     '<h1>'+esc(reg?"Credencial en revisión":existing?"Solicitud registrada":"Solicita tu ID")+'</h1>'+
-    content+'<p class="profile-muted">No se emitirá automáticamente un ID nuevo.</p></section>';
+    content+'<p class="profile-muted">No se emitirá automáticamente un ID nuevo.</p></section>'+managementMarkup();
+  attachManagement();
 }
 function credentialLink(){
   const token=state.identity?.registry?.credentialId||"";
@@ -405,6 +421,7 @@ function profile(){
         '<nav aria-label="Mis espacios autorizados" class="profile-space-list">'+cards+'</nav>'+
       '</section>'+
     '</div>'+
+    managementMarkup()+
     (allowed("agencia")&&["admin","coordinador"].includes(role())?
       '<details id="calendario" class="profile-calendar-inline"'+(calendarOpen?' open':'')+'>'+
         '<summary><strong>Calendario de operaciones</strong><span>Ver cronograma y editar actividades aquí</span></summary>'+
@@ -432,6 +449,7 @@ function profile(){
     credentialDialog()+
   '</section>';
   prepareProfilePhotos();
+  attachManagement();
   const calendar=document.getElementById("calendario");
   if(calendar){
     const frame=calendar.querySelector("iframe");
