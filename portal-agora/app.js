@@ -28,7 +28,7 @@ const PATH_SPACES=Object.freeze({
   agencia:{title:"Agencia",icon:"icono-agencia-hq.webp"},
   administrador:{title:"Administrador",icon:"icono-administrador-hq.webp"}
 });
-const routeMatch=location.pathname.match(/\/(staff|agencia|administrador|expediente|mi-operacion)\/(?:index\.html)?$/);
+const routeMatch=location.pathname.match(/\/(staff|agencia|administrador|expediente|mi-operacion|calendario)\/(?:index\.html)?$/);
 const routeSpace=routeMatch&&PATH_SPACES[routeMatch[1]]?routeMatch[1]:"";
 const routePrivate=routeMatch&&!PATH_SPACES[routeMatch[1]]?routeMatch[1]:"";
 const app=document.getElementById("app");
@@ -212,7 +212,7 @@ async function refresh(){
     state.identity=identity;
     // Los datos médicos, bancarios y jornadas SOLO se consultan al abrir
     // su propia página y únicamente para el UID de la sesión.
-    if(routePrivate&&verifiedId()){
+    if(routePrivate&&routePrivate!=="calendario"&&verifiedId()){
       try{
         const result=await readPrivateSection(user.uid,routePrivate);
         if(epoch!==state.epoch||auth.currentUser?.uid!==user.uid)return;
@@ -410,10 +410,12 @@ function profile(){
         (allowed("staff")?profileTool("staff/","Mis jornadas","Asignaciones y QR de asistencia","◷"):"")+
         (allowed("agencia")&&["admin","coordinador"].includes(role())?
           profileTool("agencia/","Coordinación","Agenda y solicitudes de asignación","▤"):"")+
+        (allowed("agencia")&&["admin","coordinador"].includes(role())?
+          profileTool("calendario/","Calendario de operaciones","Cronograma y edición de actividades","◷"):"")+
         (allowed("administrador")?
           profileTool("../recursos/?vista=obligaciones","Finanzas","Obligaciones, pagos y conciliación","▤"):"")+
         (allowed("staff")?profileTool("trabajos/","Mis trabajos y pagos","Formularios e historial personal","▤"):"")+
-        (allowed("staff")?profileTool("campo/","ÁGORA Campo","Checklists y acuses provisionales","▤"):"")+
+        (allowed("staff")?profileTool("campo/","ÁGORA Campo","Tareas de campo por folio y acuses provisionales","▤"):"")+
         '<a class="private-link" href="'+esc(href("mi-operacion/"))+'">'+
           '<span class="private-link-symbol" aria-hidden="true">◷</span>'+
           '<span><strong>Mi operación</strong><small>Mis actividades de hoy</small></span>'+
@@ -525,6 +527,13 @@ function renderPrivateSection(){
   if(state.privateError)return sectionError();
   if(routePrivate==="expediente")renderDossier();
   else if(routePrivate==="mi-operacion")renderMyOperation();
+  else if(routePrivate==="calendario"){
+    app.innerHTML='<section class="portal-calendar-page" aria-label="Calendario de operaciones">'+
+      '<div class="portal-calendar-heading"><a class="secure-back" href="'+esc(ROOT.href)+'">← Volver a Mi perfil</a>'+
+      '<div class="profile-kicker">ÁGORA · OPERACIONES</div><h1>Calendario de operaciones</h1></div>'+
+      '<iframe class="portal-calendar-frame" title="Cronograma de actividades" src="'+
+      esc(href("../operaciones/?embedded=calendar"))+'" loading="eager"></iframe></section>';
+  }
 }
 
 function routeDenied(unauthenticated=false){
@@ -822,7 +831,7 @@ function coordinationOperationsSpace(admin=false){
       '<div id="coordination-schedule" aria-live="polite">'+scheduleList(list)+'</div>'+
       '<div class="role-legacy-links"><a class="profile-button profile-button-primary" href="'+esc(href("escanear/"))+'">Pasar lista · QR o manual</a>'+
       '<button type="button" data-action="view-attendance" class="profile-button profile-button-outline">Pase de lista</button>'+
-        '<a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/"))+'">Editar agenda vigente</a>'+
+        '<a class="profile-button profile-button-outline" href="'+esc(href("calendario/"))+'">Abrir calendario de operaciones</a>'+
         '<a class="profile-button profile-button-outline" href="'+esc(href("../operaciones/control-jornadas.html"))+'">Control de asistencia</a></div>'+
       '<p class="role-transition">El cronograma original continúa como fuente oficial. Los trabajos autorregistrados se revisan aparte y no alteran marcajes existentes.</p>'+
       '<section class="work-claims"><div class="assignment-history-header"><h3>Solicitudes de jornada</h3>'+
@@ -882,7 +891,7 @@ function render(){
     return;
   }
   if(routePrivate){
-    if(verifiedId())renderPrivateSection();
+    if(routePrivate==="calendario"?allowed("agencia")&&["admin","coordinador"].includes(role()):verifiedId())renderPrivateSection();
     else routeDenied();
     return;
   }
