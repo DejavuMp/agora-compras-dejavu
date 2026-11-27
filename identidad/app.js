@@ -1,15 +1,18 @@
 import {JOBS,JOB_NAMES,csvCell,projectTodayAssignments} from "./domain.mjs";
 import {
-  approveRegistration,assignCoordinator,auth,listActiveCoordinators,listDirectory,listPendingRegistrations,loadOwnIdentity,login,logout,
+  approveRegistration,assignCoordinator,auth,db,listActiveCoordinators,listDirectory,listPendingRegistrations,loadOwnIdentity,login,logout,
   requestRegistration,saveFinancial,saveProfile,updateCredential,watchSession
 } from "./firebase-identity.js";
+import {collection,doc,getDoc,getDocs,limit,query,serverTimestamp,setDoc} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 
 const app=document.querySelector("#app");
+const EMBEDDED_MANAGEMENT=new URLSearchParams(location.search).get("embedded")==="management";
+if(EMBEDDED_MANAGEMENT)document.body.classList.add("embedded-management");
 const statusBox=document.querySelector("#system-status");
 const loginButton=document.querySelector("#login-button");
 const logoutButton=document.querySelector("#logout-button");
 const sessionLabel=document.querySelector("#session-label");
-const state={user:null,workspace:null,pending:[],directory:[],coordinators:[],managementWarnings:[],busy:false};
+const state={user:null,workspace:null,pending:[],directory:[],coordinators:[],accounts:[],managementWarnings:[],busy:false};
 const tools=[
   ["Compras y Producción","https://dejavump.github.io/agora-compras-dejavu/"],
   ["Archivos","https://dejavump.github.io/agora-compras-dejavu/archivos/"],
@@ -177,7 +180,12 @@ function management(workspace){
       <small>${Array.isArray(item.coordinatorUids)&&item.coordinatorUids.length?"Asignados: "+esc(item.coordinatorUids.map(uid=>state.coordinators.find(c=>c.uid===uid)?.name||uid).join(", ")):"Sin coordinación asignada"}</small>
       ${state.coordinators.length?`<div class="row"><select aria-label="Asignar coordinación a ${esc(item.displayName)}" data-coordinator-for="${esc(item.agoraId)}">${coordinatorOptions()}</select>
       <button type="button" class="button secondary" data-assign-coordinator="${esc(item.agoraId)}">Asignar</button></div>`:""}
-    </td>`:""}</tr>`).join("");
+    </td><td>${item.uid===state.user?.uid?'<small>Tu propio acceso se administra por separado.</small>':
+      `<select aria-label="Acceso de ${esc(item.displayName)}" data-access-for="${esc(item.uid)}">
+        <option value="inactive" ${!state.accounts.find(a=>a.id===item.uid)?.active?'selected':''}>Sin acceso de Agencia</option>
+        <option value="consulta" ${state.accounts.find(a=>a.id===item.uid)?.active&&state.accounts.find(a=>a.id===item.uid)?.role==='consulta'?'selected':''}>Consulta</option>
+        <option value="coordinador" ${state.accounts.find(a=>a.id===item.uid)?.active&&state.accounts.find(a=>a.id===item.uid)?.role==='coordinador'?'selected':''}>Coordinación</option>
+      </select><button type="button" class="button secondary" data-save-access="${esc(item.uid)}">Guardar acceso</button>`}</td>`:""}</tr>`).join("");
   const alerts=state.managementWarnings.length
     ? `<section class="panel span-12"><h2>Consultas de RH por revisar</h2>
        <p class="notice">Tu acceso personal sigue disponible. Algunas consultas administrativas fueron rechazadas y no se mostrarán como listas completas.</p>
@@ -186,10 +194,26 @@ function management(workspace){
        </section>`:"";
   return `${alerts}${pending}<section class="panel span-12"><div class="row"><div><h2>Directorio operativo</h2><p class="muted">${account.role==="admin"?"Vista RH":"Solo colaboradores asignados"}</p></div>
     <button id="export-directory" class="button secondary" type="button">Exportar CSV operativo</button></div>
-    <div class="table-wrap"><table><thead><tr><th>Identidad</th><th>Cargo</th><th>Credencial</th><th>Acción</th>${account.role==="admin"?"<th>Coordinación</th>":""}</tr></thead><tbody>${rows||`<tr><td colspan="${account.role==="admin"?5:4}">Sin registros disponibles.</td></tr>`}</tbody></table></div></section>`;
+    <div class="table-wrap"><table><thead><tr><th>Identidad</th><th>Cargo</th><th>Credencial</th><th>Acción</th>${account.role==="admin"?"<th>Coordinación</th><th>Acceso de Agencia</th>":""}</tr></thead><tbody>${rows||`<tr><td colspan="${account.role==="admin"?6:4}">Sin registros disponibles.</td></tr>`}</tbody></table></div></section>`;
 }
 
 function bindManagementActions(){
+  document.querySelectorAll("[data-save-access]").forEach(button=>button.addEventListener("click",()=>{
+    const item=state.directory.find(row=>row.uid===button.dataset.saveAccess);
+    const selected=document.querySelector(`[data-access-for="${CSS.escape(item.uid)}"]`)?.value;
+    run(async()=>{
+      if(state.workspace.account?.role!=="admin"||item.uid===state.user.uid)throw Error("Acceso no autorizado.");
+      if(!["inactive","consulta","coordinador"].includes(selected))throw Error("Selecciona un acceso válido.");
+      const ref=doc(db,"agora_users",item.uid),snap=await getDoc(ref),current=snap.data();
+      if(current?.role==="admin")throw Error("El acceso de administración se gestiona por separado.");
+      await setDoc(ref,{
+        email:item.email,name:item.displayName,
+        role:selected==="inactive"?(current?.role||"consulta"):selected,
+        active:selected!=="inactive",createdAt:current?.createdAt||serverTimestamp(),updatedAt:serverTimestamp()
+      });
+      await refresh();
+    },"Acceso actualizado.");
+  }));
   document.querySelector("#retry-management")?.addEventListener("click",()=>run(safeRefresh));
   document.querySelectorAll("[data-approve]").forEach(button=>button.addEventListener("click",()=>{
     const item=state.pending.find(row=>row.uid===button.dataset.approve);
@@ -250,14 +274,15 @@ async function refresh(){
   if(!state.user){state.workspace=null;hero();return}
   setStatus("Consultando permisos y expediente…");
   state.workspace=await loadOwnIdentity(state.user);
-  state.directory=[];state.pending=[];state.coordinators=[];state.managementWarnings=[];
+  state.directory=[];state.pending=[];state.coordinators=[];state.accounts=[];state.managementWarnings=[];
   if(["admin","coordinador"].includes(state.workspace.account?.role)){
     const admin=state.workspace.account.role==="admin";
     const jobs=[
       ["Directorio de identidades",()=>listDirectory(state.workspace.account,state.user.uid)],
       ...(admin?[
         ["Solicitudes pendientes",listPendingRegistrations],
-        ["Coordinadores",listActiveCoordinators]
+        ["Coordinadores",listActiveCoordinators],
+        ["Accesos de Agencia",async()=>{const snap=await getDocs(query(collection(db,"agora_users"),limit(200)));return snap.docs.map(d=>({id:d.id,...d.data()}))}]
       ]:[])
     ];
     // Los errores de consultas de gestión no impiden que el usuario vea
@@ -277,9 +302,18 @@ async function refresh(){
       if(index===0)state.directory=result.value;
       else if(index===1)state.pending=result.value;
       else if(index===2)state.coordinators=result.value;
+      else if(index===3)state.accounts=result.value;
     });
   }
-  if(state.workspace.registry)dashboard(state.workspace);
+  if(EMBEDDED_MANAGEMENT){
+    if(["admin","coordinador"].includes(state.workspace.account?.role)){
+      app.innerHTML='<div class="grid">'+management(state.workspace)+'</div>';
+      bindManagementActions();
+    }else{
+      app.innerHTML='<section class="panel access-error"><h1>Acceso restringido</h1><p>Esta cuenta no tiene permiso de gestión de identidad.</p></section>';
+    }
+  }
+  else if(state.workspace.registry)dashboard(state.workspace);
   else if(["admin","coordinador"].includes(state.workspace.account?.role))managementDashboard(state.workspace);
   else registration(state.workspace);
   setStatus(state.managementWarnings.length?"Sesión activa. Algunas consultas de RH requieren revisión.":"Sesión protegida activa.",state.managementWarnings.length?"error":"ok");
