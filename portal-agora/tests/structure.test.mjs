@@ -144,8 +144,8 @@ test("expediente mantiene las colecciones y funciones seguras de RH por UID",asy
   assert.match(app,/getDoc\(doc\(db,"agora_identity_profiles",uid\)\)/);
   assert.match(app,/getDoc\(doc\(db,"agora_identity_financial",uid\)\)/);
   assert.match(app,/readPrivateSection\(user\.uid,routePrivate\)/);
-  assert.match(app,/if\(routePrivate&&verifiedId\(\)\)/);
-  assert.match(app,/if\(verifiedId\(\)\)renderPrivateSection\(\)/);
+  assert.match(app,/if\(routePrivate&&routePrivate!=="calendario"&&verifiedId\(\)\)/);
+  assert.match(app,/verifiedId\(\)\)renderPrivateSection\(\)/);
   assert.match(app,/form id="private-profile-form"/);
   assert.match(app,/form id="private-financial-form"/);
   assert.match(app,/lockedByRH===true/);
