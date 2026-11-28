@@ -1,4 +1,5 @@
 import {auth,db} from "./firebase.js";
+import {mountPaymentReceipt} from "./payment-receipt.js?v=20261128";
 import {
   onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signInWithRedirect,signInWithEmailAndPassword,signOut
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
@@ -887,6 +888,11 @@ function emptySpace(){
       '<img src="'+esc(iconSrc(meta.icon))+'" alt="" width="90" height="90">'+
       '<div><div class="profile-kicker">ÁGORA · Operaciones</div><h1>'+esc(meta.title)+'</h1></div></div>'+
     body+'</section>';
+  if(routeSpace==="administrador"&&allowed("administrador")){
+    const host=document.createElement("section");
+    app.querySelector(".role-space-page").append(host);
+    mountPaymentReceipt(host);
+  }
   const search=document.getElementById("coordination-search");
   if(search)search.addEventListener("input",()=>{
     const list=coordinationJornadas(state.roleData?.schedule,new Date(),60);
