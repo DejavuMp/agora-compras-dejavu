@@ -24,7 +24,8 @@ const events = Array.from({length:6},(_,i)=>({id:"qa-"+i,title:"Jornada QA "+i,p
   staff:[{personId:staff.id,start:"2026-11-"+(23+i)+"T09:00"}]}));
 const record = {
   id:"qa-obligation",folio:"RF-QA",project:"Proyecto QA",category:"nomina",beneficiary:"Staff QA",status:"pago_parcial",
-  approvedAmount:2500,paidAmount:1500,total:2500,createdAt:"2026-11-28",payments:[
+  approvedAmount:2500,paidAmount:1500,total:2500,createdAt:"2026-11-28",
+  hoursOrigin:{eventId:"qa-0",personId:staff.id,approvedMinutes:60},paymentReferences:["QA-1500"],payments:[
     {id:"qa-payment",date:"2026-11-28",amount:1500,reference:"QA-1500",method:"transferencia"}
   ],items:[{description:"Semana QA",quantity:1,unitPrice:2500}],history:[]
 };
@@ -43,19 +44,24 @@ try {
       if (url.endsWith("/firebase-auth.js")) return script(route,`export const onAuthStateChanged=(auth,callback)=>callback(auth.currentUser);`);
       if (url.endsWith("/firebase-firestore.js")) return script(route,`
         let finance = ${JSON.stringify(record)};
+        let registered;
         const board = ${JSON.stringify({people:[staff],events})};
         const agreement = ${JSON.stringify(agreement)};
         const snapshot = (data,id) => ({data:()=>data,id,exists:()=>Boolean(data)});
         export const doc = (_,kind,id)=>({kind,id});
         export const collection = (_,kind)=>({kind});
         export const getDoc = async ()=>snapshot({active:true,role:${JSON.stringify(role)}},"qa-user");
-        export const getDocFromServer = async ref=>ref.kind==="agora_ops_control"?
-          snapshot({payload:board},ref.id):snapshot(finance,ref.id);
+        export const getDocFromServer = async ref=>{
+          if(ref.kind==="agora_ops_control")return snapshot({payload:board},ref.id);
+          if(ref.kind==="agora_ops_attendance_sheets")return snapshot({uid:"qa-staff-auth"},ref.id);
+          if(ref.kind==="agora_registered_receipts")return snapshot(registered,ref.id);
+          return snapshot(finance,ref.id);
+        };
         export const getDocs = async ref=>({docs:ref.kind==="agora_finance_requests"?[snapshot(finance,finance.id)]:
           ref.kind==="agora_payroll_weekly_agreements"?[snapshot(agreement,agreement.personId)]:[]});
         export const getDocsFromServer = getDocs;
         export const serverTimestamp = ()=>"QA";
-        export const runTransaction = async (_,cb)=>cb({get:getDocFromServer,update:(_,patch)=>{finance={...finance,...patch}}});
+        export const runTransaction = async (_,cb)=>cb({get:getDocFromServer,update:(_,patch)=>{finance={...finance,...patch}},set:(_,value)=>{registered=value}});
       `);
       if (url.endsWith("/jspdf.umd.min.js")) return route.fulfill({path:pdfScript,contentType:"text/javascript"});
       if (url.startsWith(base)) return route.continue();
@@ -92,6 +98,8 @@ try {
     assert.equal(share.origin,"https://wa.me");
     assert.match(share.searchParams.get("text"),/DVM-PAG-qa-payment/);
     assert.match(share.searchParams.get("text"),/1,500\.00/);
+    await page.getByRole("button",{name:"Enviar a Mi espacio y solicitar acuse"}).click();
+    await page.getByText("Comprobante visible en Mi espacio · Confirmación pendiente.",{exact:true}).waitFor();
     await page.getByRole("button",{name:"Volver al expediente"}).click();
     const paymentForm = page.locator("#payment-form");
     await paymentForm.locator('[name="amount"]').fill("1000");
@@ -108,5 +116,43 @@ try {
     assert.equal(await page.getByRole("button",{name:"Ver comprobante de este pago"}).count(),2);
     await page.close();
   }
-  console.log("QA Chromium móvil: permisos de interfaz, semana fija, PDF/PNG reales y liquidación con Firestore simulado.");
+
+  const staffPage = await browser.newPage({viewport:{width:390,height:844}});
+  staffPage.setDefaultTimeout(9000);
+  await staffPage.route("**/*",route=>{
+    const url=route.request().url();
+    if(url===base+"/portal-agora/firebase.js")return script(route,`export const auth={currentUser:{uid:"qa-staff-auth"}};export const db={};`);
+    if(url.endsWith("/firebase-auth.js"))return script(route,`export const onAuthStateChanged=(auth,callback)=>callback(auth.currentUser);`);
+    if(url.endsWith("/firebase-firestore.js"))return script(route,`
+      const reply = new Map();
+      const rows = [
+        {id:"qa-pago-1",date:"2026-11-28",project:"Proyecto QA",folio:"DVM-PAG-qa-pago-1",method:"transferencia",amountCents:150000,personId:"qa-staff"},
+        {id:"qa-pago-2",date:"2026-11-29",project:"Proyecto QA",folio:"DVM-PAG-qa-pago-2",method:"transferencia",amountCents:100000,personId:"qa-staff"}
+      ];
+      const snapshot=(data,id)=>({id,data:()=>data,exists:()=>Boolean(data)});
+      export const doc=(_,kind,id)=>({kind,id});
+      export const collection=(_,kind)=>({kind});
+      export const where=()=>null,query=ref=>ref;
+      export const getDoc=async ref=>snapshot(ref.kind==="agora_ops_members"?{active:true,personId:"qa-staff"}:undefined,ref.id);
+      export const getDocFromServer=async ref=>snapshot(reply.get(ref.id),ref.id);
+      export const getDocs=async ref=>({docs:ref.kind==="agora_registered_receipts"?rows.map(row=>snapshot(row,row.id)):[]});
+      export const getDocsFromServer=getDocs;
+      export const serverTimestamp=()=>({toDate:()=>new Date("2026-11-28T12:00:00Z")});
+      export const runTransaction=async (_,cb)=>cb({get:getDocFromServer,set:(ref,value)=>reply.set(ref.id,value)});
+      export const addDoc=()=>null,updateDoc=()=>null,setDoc=()=>null,writeBatch=()=>null;
+    `);
+    return url.startsWith(base)?route.continue():route.abort();
+  });
+  await staffPage.goto(base+"/portal-agora/trabajos/");
+  const confirm=staffPage.locator('form[data-receipt="qa-pago-1"]');
+  await confirm.locator("select").selectOption("recibido");
+  await confirm.getByRole("button",{name:"Registrar respuesta"}).click();
+  await staffPage.getByText(/Respuesta registrada: Pago recibido/).waitFor();
+  const clarify=staffPage.locator('form[data-receipt="qa-pago-2"]');
+  await clarify.locator("select").selectOption("aclaracion");
+  await clarify.locator("textarea").fill("El depósito tiene otra referencia.");
+  await clarify.getByRole("button",{name:"Registrar respuesta"}).click();
+  await staffPage.getByText(/Respuesta registrada: Solicito una aclaración/).waitFor();
+  await staffPage.close();
+  console.log("QA Chromium móvil: emisión privada en Finanzas, confirmación y aclaración de Staff con Firestore simulado.");
 } finally { await browser.close(); server.close(); }
