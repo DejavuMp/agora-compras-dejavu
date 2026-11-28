@@ -3,7 +3,7 @@ export function mountPaymentReceipt(host){
   if(!host)return;
   const money=n=>new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(n);
   const cents=v=>{const s=String(v).trim();if(!/^\d{1,8}(\.\d{1,2})?$/.test(s))return NaN;const [a,b=""]=s.split(".");return Number(a)*100+Number(b.padEnd(2,"0"));};
-  const today=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"America/Mexico_City",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+  const today=()=>{const p=Object.fromEntries(new Intl.DateTimeFormat("en-CA",{timeZone:"America/Mexico_City",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date()).map(x=>[x.type,x.value]));return p.year+"-"+p.month+"-"+p.day;};
   const folio=()=> "DVM-PAG-"+new Date().getFullYear()+"-"+crypto.randomUUID().slice(0,12).toUpperCase();
   host.innerHTML=`<details class="role-module" id="payment-receipt"><summary><strong>Comprobantes de pago · DEJAVÚ</strong></summary>
   <p>Genera una notificación de un pago ya realizado. No ejecuta transferencias ni guarda información en el servidor.</p>
