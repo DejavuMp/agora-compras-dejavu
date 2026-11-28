@@ -8,6 +8,7 @@ import "../firebase-init.js";
 import {assignmentPrefill} from "./assignment-prefill.mjs";
 import {protocolDraft} from "../portal-agora/campo/protocolos.mjs";
 import {projectStaffView} from "./ops-safe-view.mjs";
+import * as jornadaLifecycle from "./ops-jornada-lifecycle.mjs";
 import {availablePeople,personForLink} from "./access-link-model.mjs";
 import {createEventControl,eventPolicyEntries} from "./editor-jornadas-control.mjs";
 import {
@@ -31,7 +32,7 @@ const keys = ["people","vehicles","events","blocks","sites","campaigns","setting
 const blank = () => ({people:[],vehicles:[],events:[],blocks:[],sites:[],campaigns:[],settings:{
   dailyLimit:8,weeklyLimit:48,prepDefault:30,afterDefault:30,notificationMinutes:60,lateGraceMinutes:10,earlyGraceMinutes:10
 },audit:[],logs:[],incidents:[]});
-let account=null,role=null,personId="",baseBoard=null,saving=false,ready=false;
+let account=null,role=null,personId="",baseBoard=null,saving=false,ready=false,administration=false;
 let logs = new Map(),incidents = new Map(),requests = new Map(),clocks = new Map();
 let linkingUid=null,autoPoliciesChecked=false,ownPaySyncStarted=false;
 let unwatches=[],dirtyWaiting=false,authVersion=0,view=null;
@@ -65,7 +66,7 @@ function fail(msg){notice("No sincronizado · "+msg,"error");loading("Conexión 
 function stop(){
   opsJornadas.stop();
   for(const off of unwatches.splice(0))try{off()}catch(_){}
-  role=null;personId="";baseBoard=null;logs.clear();incidents.clear();requests.clear();clocks.clear();
+  role=null;administration=false;personId="";baseBoard=null;logs.clear();incidents.clear();requests.clear();clocks.clear();
   saving=false;ready=false;dirtyWaiting=false;autoPoliciesChecked=false;ownPaySyncStarted=false;
   app?.reset?.();
 }
@@ -308,6 +309,7 @@ async function session(u){
     if(epoch!==authVersion)return;
     const info=user.exists()?user.data():{};
     const m=member.exists()?member.data():{};
+    administration=info.active===true&&info.role==="admin";
     if(info.active===true&&["admin","coordinador"].includes(info.role))loadCoordinator();
     else if(m.active===true&&m.role==="staff"&&m.personId)loadStaff(u.uid,m.personId);
     else pendingAccess();
@@ -536,6 +538,24 @@ async function store(next){
     }else{
       const nextBoard=boardOnly(next);
       if(boardMismatch(nextBoard,baseBoard?.payload)){
+        const nextEvents=new Map(nextBoard.events.map(event=>[event.id,event]));
+        for(const prior of baseBoard?.payload?.events||[]){
+          const current=nextEvents.get(prior.id);
+          if(!current)throw Error("La jornada debe conservarse en el historial.");
+          if(canon(current.journeyHistory||[])!==canon(prior.journeyHistory||[])){
+            const history=current.journeyHistory||[];
+            const known=prior.journeyHistory||[];
+            const move=history.at(-1);
+            if(history.length!==known.length+1||canon(history.slice(0,-1))!==canon(known)||move?.byUid!==account.uid)
+              throw Error("El historial de jornadas no se puede alterar.");
+            const [expected]=jornadaLifecycle.moveJourneys([prior],[prior.id],move.state,{
+              isAdmin:administration,actor:account.uid,reason:move.note,at:move.at
+            });
+            if(canon(expected)!==canon(current))throw Error("Guarda cualquier edición por separado antes de mover la jornada.");
+          }else if(prior.status!==current.status&&[prior.status,current.status].includes("cancelado")){
+            throw Error("Usa el historial de jornadas para cancelar o restaurar.");
+          }
+        }
         const collision=hasClash(nextBoard);
         if(collision)throw Error(collision);
         const size=new Blob([JSON.stringify(nextBoard)]).size;
@@ -552,7 +572,15 @@ async function store(next){
           const accessSnaps=await Promise.all(accessRefs.map(ref=>tx.get(ref)));
           accessSnaps.forEach((snap,i)=>{
             const desired=accessChanges.get([...accessChanges.keys()][i]),ref=accessRefs[i];
-            if(!desired){if(snap.exists())tx.delete(ref);return}
+            if(!desired){
+              if(snap.exists()){
+                const stored=snap.data();
+                if(nextEvents.get(stored.eventId)?.status==="cancelado")
+                  tx.update(ref,{enabled:false,updatedBy:account.uid,updatedAt:serverTimestamp()});
+                else tx.delete(ref);
+              }
+              return;
+            }
             const existing=snap.exists()?snap.data():null;
             tx.set(ref,{...desired,enabled:existing?.enabled??true,mode:existing?.mode||"horario"});
           });
@@ -612,6 +640,9 @@ window.AGORA_OPS_BRIDGE={
   get ready(){return ready},get role(){return role},
   get coordinatorLabel(){return role==="coordinador"?(account?.displayName||account?.email||""):""},
   get personId(){return personId},
+  get jornadaActor(){return role==="coordinador"&&ready?account?.uid:""},
+  get canManageJornadas(){return ready&&administration},
+  jornadaLifecycle,
   save:store,
   openJornadasControl:()=>{if(role==="coordinador"&&ready)opsJornadas.open()},
   guardAction(action){

@@ -16,6 +16,7 @@ on:
       - "operaciones/ops-timekeeping.mjs"
       - "operaciones/ops-receipt.mjs"
       - "operaciones/ops-jornada-sheet*.mjs"
+      - "operaciones/ops-jornada-lifecycle.mjs"
       - "operaciones/ops-monthly-receipt.mjs"
       - "operaciones/ops-breaks.mjs"
       - "operaciones/ops-reminders.mjs"
@@ -93,6 +94,8 @@ jobs:
           node --check operaciones/jornadas-live.js
           node operaciones/tests/qa-staff-dashboard.mjs
 
+      - name: Verificar papelera, restauración y duplicado de jornadas
+        run: node --test operaciones/tests/qa-jornada-lifecycle.mjs
       - name: Validar control por actividad y cálculo de horarios
         run: |
           node --check operaciones/editor-jornadas-control.mjs
