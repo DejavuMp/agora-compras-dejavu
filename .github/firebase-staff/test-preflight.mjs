@@ -5,13 +5,13 @@ import {readFileSync,rmSync} from 'node:fs';
 const workflow=readFileSync('.github/workflows/dejavu-staff-firebase-rules.yml','utf8');
 assert.match(workflow,/name: respaldo-reglas-agora-antes-dejavu-staff[\s\S]*?include-hidden-files: true[\s\S]*?if-no-files-found: error/,'El respaldo real es obligatorio');
 const candidate=readFileSync('firestore.rules','utf8');
-const prior=execFileSync('git',['show','83b02731bfc668dffc10da0e89abb32dccd3478f:firestore.rules'],{encoding:'utf8'});
-const section='    // Seguimiento personal de formularios y pagos.';
+const prior=execFileSync('git',['show','2166254cb546a05f15790a18e168004b9103e982:firestore.rules'],{encoding:'utf8'});
+const section='    // Versiones inmutables de acuerdos privados de Administración, por persona y semana.';
 const closing='    match /{document=**} {';
 const first=candidate.indexOf(section),last=candidate.indexOf(closing,first);
-assert.ok(first>=0&&last>first,'Sección de trabajos presente');
-assert.equal(candidate.slice(0,first).replace(/\n\n$/,"\n")+candidate.slice(last),prior,
- 'La publicación conserva las reglas anteriores y añade el acceso individual');
+assert.ok(first>=0&&last>first,'Sección de acuerdos semanales presente');
+assert.equal(candidate.slice(0,first)+candidate.slice(last),prior,
+ 'La publicación conserva las reglas anteriores y añade acuerdos semanales');
 const drift=prior+'\n// deriva ajena\n';
 const dir='.github/firebase-staff/.preflight',rulesBackup=dir+'/antes-dejavu.rules',refBackup=dir+'/ruleset-name.txt';
 process.env.FIREBASE_PROJECT_ID='agora-dejavu-38b8c';process.env.FIREBASE_ACCESS_TOKEN='qa-token-not-real';
@@ -24,7 +24,7 @@ async function verify(label,live,shouldPass){
  assert.equal(readFileSync(rulesBackup,'utf8'),live,label+': respaldo íntegro');assert.equal(readFileSync(refBackup,'utf8'),rulesetName+'\n',label+': ruleset guardado');console.log('OK '+label);
 }
 try{
- await verify('versión de Finanzas desplegada',prior,true);
+ await verify('versión de Mis trabajos y pagos desplegada',prior,true);
  await verify('candidato ya desplegado',candidate,true);
  await verify('deriva ajena rechazada',drift,false);
 }finally{globalThis.fetch=originalFetch;rmSync(dir,{recursive:true,force:true});}

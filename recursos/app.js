@@ -1,4 +1,6 @@
 import {financeLedger,ledgerTotals} from "./finance-ledger.mjs";
+import {mountRegisteredPaymentReceipt,paymentReceipt} from "../portal-agora/payment-receipt.js?v=20261128-registered";
+import {mountWeeklyPayroll} from "./weekly-payroll-ui.mjs?v=20261128";
 // Arranque independiente de Firebase: el módulo local funciona incluso sin CDN.
 // Los SDK se importan únicamente cuando la conexión Firebase está disponible.
 let authSdk=null, dbSdk=null, firebaseSdkLoading=null;
@@ -34,8 +36,8 @@ const dateOnly=v=>v?String(v).slice(0,10):'';
 const asDate=v=>v?.toDate?.()?.toLocaleString('es-MX')||String(v||'');
 const el=(tag,cls='',txt='')=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt)e.textContent=txt;return e;};
 const state={view:'dashboard',records:[],selected:'',user:null,role:'',fb:null,cloud:false,loading:false,mode:'local',editingId:'',hoursOrigin:null,forceLocal:false};
-let idbPromise;
-let ledgerSnapshot=null,ledgerVersion=0,ledgerError='';
+let idbPromise,recordVersion=0,sessionVersion=0;
+let ledgerSnapshot=null,ledgerVersion=0,ledgerError='',weeklyPayroll;
 function dbOpen(){
  if(idbPromise)return idbPromise;
  idbPromise=new Promise((resolve,reject)=>{
@@ -60,43 +62,62 @@ function banner(message='',kind=''){const e=$('#notice');e.textContent=message;e
 function readable(error){const m=String(error?.message||error||'');if(/permission|insufficient/i.test(m))return 'Firebase rechazó el acceso. Revisa el rol en agora_users y las reglas de Recursos y Finanzas antes de sincronizar.';return m;}
 function sortRows(rows){return rows.sort((a,b)=>String(b.createdAt?.seconds||b.createdAt||'').localeCompare(String(a.createdAt?.seconds||a.createdAt||'')));}
 async function loadRecords(){
+ const version=++recordVersion;
  state.loading=true;
  try{
   if(state.cloud){
    const col=dbSdk.collection(state.fb.firestore,COLLECTION);
    const ref=state.role==='admin'?col:dbSdk.query(col,dbSdk.where('createdBy','==',state.user.uid));
    const snap=await dbSdk.getDocs(ref);
+   if(version!==recordVersion)return;
    state.records=sortRows(snap.docs.map(d=>({...d.data(),id:d.id})));
    state.mode='cloud';
    banner('Conectado a Firebase · Los datos bancarios son privados. El enlace externo permite enviar una respuesta sin acceso, pendiente de validación y registro.','success');
   }else{
-   state.records=sortRows(await dbAll());
+   const local=await dbAll();
+   if(version!==recordVersion)return;
+   state.records=sortRows(local);
    state.mode='local';
    banner('Modo local: los registros quedan solo en este navegador. La respuesta externa se envía por correo o WhatsApp; no se registra automáticamente. Descarga respaldos frecuentes.');
   }
  }catch(error){
-  if(state.cloud){state.cloud=false;state.mode='local';state.records=sortRows(await dbAll().catch(()=>[]));banner('No se pudo consultar Firebase: '+readable(error)+' Se muestra la copia local independiente.','error');}
+  if(version!==recordVersion)return;
+  if(state.cloud){
+   const local=await dbAll().catch(()=>[]);
+   if(version!==recordVersion)return;
+   state.cloud=false;state.mode='local';state.records=sortRows(local);
+   banner('No se pudo consultar Firebase: '+readable(error)+' Se muestra la copia local independiente.','error');
+  }
   else banner('No se pudo cargar la información local: '+readable(error),'error');
- }finally{state.loading=false;render();}
+ }finally{if(version===recordVersion){state.loading=false;render();}}
 }
 async function refreshCloudUser(user){
+ const session=++sessionVersion;
+ recordVersion++;
+ state.records=[];
  if(state.hoursOrigin)clearRequestForm();
  ledgerVersion++;ledgerSnapshot=null;ledgerError='';
+ weeklyPayroll.reset();modalClose();
  state.user=user;state.role='';state.cloud=false;
+ render();
  if(user&&!state.forceLocal){
   try{
    const staff=await dbSdk.getDoc(dbSdk.doc(state.fb.firestore,'agora_users',user.uid));
+   if(session!==sessionVersion)return;
    const profile=staff.data();
    if(profile?.active===true&&['admin','coordinador','consulta'].includes(profile.role)){
     state.role=profile.role;state.cloud=true;
    }else{
     showToast('Tu cuenta no tiene un perfil activo en ÁGORA. Puedes trabajar localmente.');
    }
-  }catch(error){showToast('Nube no disponible: '+readable(error));}
+  }catch(error){if(session===sessionVersion)showToast('Nube no disponible: '+readable(error));}
  }
+ if(session!==sessionVersion)return;
  await loadRecords();
+ if(session!==sessionVersion)return;
  if(location.search.includes('id='))openQueryDetail();
  else if(new URLSearchParams(location.search).get('vista')==='obligaciones'&&ledgerAccess())view('ledger');
+ else if(new URLSearchParams(location.search).get('vista')==='personal'&&ledgerAccess())view('payroll');
  else await openValidatedHours();
 }
 async function activateFirebase(){
@@ -110,8 +131,12 @@ async function activateFirebase(){
 async function toggleLocalMode(){
  state.forceLocal=!state.forceLocal;
  if(state.forceLocal){
+  sessionVersion++;recordVersion++;
+  state.records=[];
   if(state.hoursOrigin)clearRequestForm();
   state.cloud=false;
+  weeklyPayroll.reset();modalClose();
+  render();
   await loadRecords();
   if(!state.editingId)view('new');
   showToast('Modo local activado. Ya puedes llenar y guardar una solicitud.');
@@ -140,11 +165,12 @@ function view(name){
  state.view=name;
  $$('.view').forEach(e=>e.hidden=e.id!==name);
  $$('[data-view]').forEach(e=>e.classList.toggle('active',e.classList.contains('nav-item')&&e.dataset.view===name));
- $('#page-title').textContent={dashboard:'Resumen de recursos',new:'Nueva solicitud',history:'Solicitudes e historial',gastos:'Comprobación de gastos',ledger:'Historial de obligaciones'}[name]||'Recursos y Finanzas';
+ $('#page-title').textContent={dashboard:'Resumen de recursos',new:'Nueva solicitud',history:'Solicitudes e historial',gastos:'Comprobación de gastos',ledger:'Historial de obligaciones',payroll:'Administración de personal y pagos'}[name]||'Recursos y Finanzas';
  $('#sidebar').classList.remove('open');
  if(name==='new')$('#request-form').querySelector('[name="project"]').focus();
  render();
  if(['ledger','gastos'].includes(name)&&!ledgerSnapshot)void loadLedger();
+ if(name==='payroll')void weeklyPayroll.load();
 }
 async function openValidatedHours(){
  const params=new URLSearchParams(location.search);
@@ -219,6 +245,8 @@ function render(){
  $('#work-local-btn').textContent=state.forceLocal?'Reintentar nube':'Trabajar localmente';
  $('#submit-request').disabled=state.cloud&&state.role==='consulta';
  $('#ledger-nav').hidden=!ledgerAccess();
+ $('#payroll-nav').hidden=!ledgerAccess();
+ if(state.view==='payroll')weeklyPayroll.render();
  if(state.view==='ledger')renderLedger();
  if(state.view==='gastos')renderExpenseAdvances();
 }
@@ -231,7 +259,8 @@ async function loadLedger(){
  try{
   const [logs,schedule,audit]=await Promise.all([
    dbSdk.getDocsFromServer(dbSdk.collection(fs,'agora_ops_logs')),
-   dbSdk.getDocFromServer(dbSdk.doc(fs,'agora_ops_control','schedule'))
+   dbSdk.getDocFromServer(dbSdk.doc(fs,'agora_ops_control','schedule')),
+   dbSdk.getDocsFromServer(dbSdk.collection(fs,AUDIT_COLLECTION)).catch(()=>null)
   ]);
   if(version!==ledgerVersion||!ledgerAccess())return;
   ledgerSnapshot={logs:logs.docs.map(d=>({...d.data(),id:d.id})),schedule:schedule.data()?.payload,
@@ -468,7 +497,7 @@ async function copyText(value,label='Texto copiado'){
 }
 function openWhatsApp(r){window.open('https://wa.me/?text='+encodeURIComponent(shareText(r)),'_blank','noopener,noreferrer');}
 function openEmail(r){window.location.href='mailto:?subject='+encodeURIComponent(emailSubject(r))+'&body='+encodeURIComponent(emailBody(r));}
-function modalClose(){$('#modal').hidden=true;state.selected='';document.body.style.overflow='';}
+function modalClose(){$('#modal').hidden=true;$('#modal-body').replaceChildren();state.selected='';document.body.style.overflow='';}
 function openQueryDetail(){
  const id=new URLSearchParams(location.search).get('id');
  if(!id)return;
@@ -482,6 +511,20 @@ function openDetail(id){
  $('#modal-title').textContent='Solicitud '+r.folio;
  $('#modal-body').innerHTML=detailHtml(r);
  $('#modal').hidden=false;document.body.style.overflow='hidden';
+}
+async function openRegisteredReceipt(id,paymentId){
+ if(!ledgerAccess())return;
+ const actor=state.user;
+ const snap=await dbSdk.getDocFromServer(dbSdk.doc(state.fb.firestore,COLLECTION,id));
+ if(state.user!==actor||!ledgerAccess()||state.selected!==id)return;
+ const receipt=paymentReceipt({...snap.data(),id},paymentId);
+ if(!receipt)throw Error('No se encontró un pago registrado válido para emitir el comprobante.');
+ const body=$('#modal-body');
+ const back=el('button','btn btn-outline','Volver al expediente');
+ back.type='button';back.dataset.action='back';
+ const host=el('section','decision');
+ body.replaceChildren(back,host);
+ mountRegisteredPaymentReceipt(host,receipt,error=>showToast(readable(error)));
 }
 function detailHtml(r){
  const outstanding=Math.max(0,round(Number(r.approvedAmount||0)-Number(r.paidAmount||0)));
@@ -499,7 +542,10 @@ function detailHtml(r){
  '<div class="detail-card detail-full"><b>Historial de movimientos</b>'+(r.history||[]).map(h=>'<div class="history-line">'+esc(asDate(h.at))+' · '+esc(h.by)+' · '+esc(h.note)+'</div>').join('')+'</div></div>';
  if(r.hoursOrigin)result+='<div class="decision"><h4>Horas validadas en Operaciones</h4><p>'+
   esc(r.hoursOrigin.approvedMinutes)+' min · Jornada '+esc(r.hoursOrigin.eventId)+'</p></div>';
- if(r.payments?.length)result+='<div class="decision"><h4>Pagos registrados</h4>'+r.payments.map(p=>'<p>'+esc(p.date)+' · '+money(p.amount)+' · '+esc(p.method)+' · Ref. '+esc(p.reference||'Sin referencia')+'</p>').join('')+'</div>';
+ if(r.payments?.length)result+='<div class="decision"><h4>Pagos registrados</h4>'+r.payments.map(p=>
+  '<p>'+esc(p.date)+' · '+money(p.amount)+' · '+esc(p.method)+' · Ref. '+esc(p.reference||'Sin referencia')+
+  (ledgerAccess()&&p.id?'<br><button type="button" class="btn btn-outline" data-action="registered-receipt" data-payment="'+
+   esc(p.id)+'">Ver comprobante de este pago</button>':'')+'</p>').join('')+'</div>';
  if(canManage()&&['pendiente','ajustes'].includes(r.status)){
   result+='<form id="decision-form" class="decision"><h4>Registrar decisión'+(!state.cloud?' (manual / local)':'')+'</h4><select name="decision"><option value="aprobada">Autorizar importe completo</option><option value="aprobada_parcial">Autorizar parcialmente</option><option value="ajustes">Solicitar cambios</option><option value="rechazada">Rechazar</option></select><input name="approved" type="number" step="0.01" min="0" max="'+esc(r.total)+'" placeholder="Monto autorizado para autorización parcial"><textarea name="comment" rows="2" maxlength="1000" placeholder="Comentarios / motivo de la decisión"></textarea><button class="btn btn-gold" type="submit">Registrar decisión</button><p>Las decisiones tomadas en modo local son registros manuales, no autorizaciones emitidas por terceros.</p></form>';
  }
@@ -520,7 +566,7 @@ async function updateRecord(r,patch,log){
 }
 async function decide(e){
  e.preventDefault();
- const r=state.records.find(x=>x.id===state.selected),f=new FormData(e.currentTarget);
+ const r=state.records.find(x=>x.id===state.selected),f=new FormData(e.target);
  if(!r)return;
  try{
   const status=String(f.get('decision')),comment=String(f.get('comment')||'').trim();
@@ -533,26 +579,59 @@ async function decide(e){
 }
 async function pay(e){
  e.preventDefault();
- const r=state.records.find(x=>x.id===state.selected),f=new FormData(e.currentTarget);
+ const r=state.records.find(x=>x.id===state.selected),form=e.target;
  if(!r)return;
- try{
-  const amount=round(f.get('amount')),left=round(r.approvedAmount-r.paidAmount);
-  if(!(amount>0&&amount<=left))throw Error('El pago debe ser mayor a cero y no exceder el saldo autorizado.');
-  const payment={id:crypto.randomUUID?.()||String(Date.now()),amount,date:String(f.get('date')||localDate()),method:String(f.get('method')||''),reference:String(f.get('reference')||'').trim().slice(0,120)};
-  if(r.hoursOrigin){
-   if(!state.cloud||state.role!=='admin')throw Error('Ingresa a Finanzas para registrar este pago.');
-   payment.reference=payment.reference.toUpperCase();
-   if(!/^[A-Z0-9][A-Z0-9._ /-]{0,119}$/.test(payment.reference))
-    throw Error('Indica una referencia de comprobante con letras, números o separadores.');
-   if(r.paymentReferences.includes(payment.reference))throw Error('Esta referencia ya fue registrada en la obligación.');
+ const submit=form.querySelector('[type="submit"]');
+ if(submit.disabled)return;
+ const f=new FormData(form),actor=state.user;
+ const amount=round(f.get('amount'));
+ const payment={id:crypto.randomUUID?.()||String(Date.now()),amount,date:String(f.get('date')||localDate()),
+  method:String(f.get('method')||''),reference:String(f.get('reference')||'').trim().slice(0,120)};
+ const note='Pago registrado: '+money(amount)+' · '+payment.method;
+ function apply(current){
+  if(!current||!available(current))throw Error('La obligación ya no admite pagos. Actualiza el expediente.');
+  const left=round(current.approvedAmount-current.paidAmount);
+  if(!(amount>0&&amount<=left))throw Error('El pago debe ser mayor a cero y no exceder el saldo autorizado vigente.');
+  const reference=payment.reference.toUpperCase();
+  const payments=current.payments||[];
+  if(reference&&payments.some(prior=>String(prior.reference||'').trim().toUpperCase()===reference)){
+   throw Error('Esta referencia ya fue registrada en la obligación.');
   }
-  const paidAmount=round(Number(r.paidAmount||0)+amount);
-  const status=paidAmount>=r.approvedAmount?'pagada':'pago_parcial';
-  await updateRecord(r,{payments:[...(r.payments||[]),payment],paidAmount,status,
-   ...(r.hoursOrigin?{paymentReferences:[...r.paymentReferences,payment.reference]}:{})},'Pago registrado: '+money(amount)+' · '+payment.method);
+  const patch={payments:[...payments,payment],paidAmount:round(Number(current.paidAmount||0)+amount)};
+  patch.status=patch.paidAmount>=current.approvedAmount?'pagada':'pago_parcial';
+  if(current.hoursOrigin){
+   if(!ledgerAccess()||actor!==state.user)throw Error('Ingresa a Finanzas para registrar este pago.');
+   if(!/^[A-Z0-9][A-Z0-9._ /-]{0,119}$/.test(reference))throw Error('Indica una referencia de comprobante válida.');
+   if(current.paymentReferences.includes(reference))throw Error('Esta referencia ya fue registrada en la obligación.');
+   patch.payments=[...payments,{...payment,reference}];
+   patch.paymentReferences=[...current.paymentReferences,reference];
+  }
+  return patch;
+ }
+ submit.disabled=true;
+ try{
+  if(state.cloud){
+   if(!ledgerAccess())throw Error('Solo administración puede registrar pagos.');
+   const fs=state.fb.firestore,ref=dbSdk.doc(fs,COLLECTION,r.id);
+   await dbSdk.runTransaction(fs,async tx=>{
+    const stored=await tx.get(ref);
+    if(!ledgerAccess()||state.user!==actor)throw Error('La sesión cambió. Ingresa nuevamente.');
+    const current=stored.data();
+    const patch=apply(current);
+    tx.update(ref,{...patch,updatedAt:dbSdk.serverTimestamp(),updatedBy:actor.uid,
+     history:[...(current.history||[]),{kind:'evento',by:actor.email,at:iso(),note}]});
+   });
+   if(state.user!==actor||!ledgerAccess())return;
+   await loadRecords();
+   if(state.user===actor&&ledgerAccess()&&state.selected===r.id)openDetail(r.id);
+  }else{
+   await updateRecord(r,apply(r),note);
+  }
   showToast('Pago registrado correctamente.');
  }catch(error){showToast(readable(error));}
+ finally{submit.disabled=false;}
 }
+
 function htmlDoc(r){
  const link=approvalReplyLink(r);
  const code='<div class="doc-qr" id="document-qr"></div>';
@@ -770,6 +849,7 @@ function setup(){
     if(action==='approval-link')await copyApprovalLink(r);
    if(action==='preview')previewDoc(r);
    if(action==='back')openDetail(r.id);
+   if(action==='registered-receipt')await openRegisteredReceipt(r.id,e.target.closest('[data-payment]').dataset.payment);
   }catch(error){showToast(readable(error));}
  });
  document.addEventListener('submit',event=>{
@@ -781,6 +861,10 @@ function setup(){
  $('#request-form').addEventListener('submit',saveRequest);
  $('#request-form').addEventListener('reset',()=>setTimeout(()=>{clearHoursOrigin();state.editingId='';$('#submit-request').textContent='Guardar solicitud →';$('#line-items').innerHTML='';addLine();$('#request-form').querySelector('[name="dateNeeded"]').value=localDate();},0));
  $('#line-items').addEventListener('input',calc);
+ weeklyPayroll=mountWeeklyPayroll($('#payroll'),{
+  session:()=>ledgerAccess()?state.user:null,connection:()=>({sdk:dbSdk,db:state.fb.firestore}),
+  money,onError:readable,notify:showToast
+ });
  $('#ledger-search').addEventListener('input',renderLedger);
  $('#ledger-category').addEventListener('change',renderLedger);
  $('#ledger-refresh').addEventListener('click',async()=>{await loadRecords();await loadLedger();});
