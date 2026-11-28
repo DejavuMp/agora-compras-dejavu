@@ -525,6 +525,61 @@ async function openRegisteredReceipt(id,paymentId){
  const host=el('section','decision');
  body.replaceChildren(back,host);
  mountRegisteredPaymentReceipt(host,receipt,error=>showToast(readable(error)));
+ const request=snap.data();
+ if(request.hoursOrigin)void mountReceiptConfirmation(host,{id,request,paymentId,receipt,actor});
+}
+async function mountReceiptConfirmation(host,{id,request,paymentId,receipt,actor}){
+ const fs=state.fb.firestore;
+ const stillOpen=()=>host.isConnected&&state.user===actor&&ledgerAccess();
+ const ref=dbSdk.doc(fs,'agora_registered_receipts',paymentId);
+ const box=el('div','decision');
+ const labels={recibido:'Pago recibido',no_identificado:'Depósito no identificado',
+  diferencia:'Diferencia de importe',aclaracion:'Solicitud de aclaración'};
+ host.append(box);
+ try{
+  const stored=await dbSdk.getDocFromServer(ref);
+  if(!stillOpen())return;
+  if(stored.exists()){
+   const {ownerUid}=stored.data();
+   const confirmation=await dbSdk.getDocFromServer(dbSdk.doc(ref,'responses',ownerUid));
+   if(!stillOpen())return;
+   const answer=confirmation.data();
+   box.append(el('p','',answer?'Respuesta de Staff · '+labels[answer.response]+' · '+asDate(answer.createdAt):
+    'Comprobante visible en Mi espacio · Confirmación pendiente.'));
+   if(answer?.note)box.append(el('p','',answer.note));
+   return;
+  }
+  const {eventId,personId}=request.hoursOrigin;
+  const roster=await dbSdk.getDocFromServer(dbSdk.doc(fs,'agora_ops_attendance_sheets',eventId,'roster',personId));
+  if(!stillOpen())return;
+  const ownerUid=roster.data()?.uid;
+  if(!ownerUid){box.textContent='La jornada no tiene una cuenta individual vinculada para solicitar el acuse.';return;}
+  const paymentIndex=request.payments.findIndex(payment=>payment.id===paymentId);
+  const payment=request.payments[paymentIndex];
+  const button=el('button','btn btn-outline','Enviar a Mi espacio y solicitar acuse');
+  button.type='button';
+  box.append(button);
+  button.addEventListener('click',async()=>{
+   if(!stillOpen()||button.disabled)return;
+   button.disabled=true;
+   try{
+    await dbSdk.runTransaction(fs,async tx=>{
+     const prior=await tx.get(ref);
+     if(!stillOpen())throw Error('La sesión cambió.');
+     if(prior.exists()){
+      if(prior.data().requestId!==id)throw Error('El folio pertenece a otro expediente.');
+      return;
+     }
+     tx.set(ref,{requestId:id,paymentIndex,ownerUid,personId,folio:receipt.folio,
+      beneficiary:receipt.beneficiary,project:receipt.project,date:receipt.date,method:payment.method,
+      reference:receipt.reference,amountCents:receipt.total,createdBy:actor.uid,createdAt:dbSdk.serverTimestamp()});
+    });
+    if(stillOpen())box.textContent='Comprobante visible en Mi espacio · Confirmación pendiente.';
+   }catch(error){if(stillOpen())showToast(readable(error));}
+   finally{button.disabled=false;}
+  });
+ }catch(error){if(stillOpen())box.textContent='No se pudo consultar la confirmación. '+readable(error);}
+
 }
 function detailHtml(r){
  const outstanding=Math.max(0,round(Number(r.approvedAmount||0)-Number(r.paidAmount||0)));

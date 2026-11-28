@@ -2329,6 +2329,59 @@ match /agora_finance_audit/{auditId} {
       allow update, delete: if false;
     }
 
+    // Comprobantes individuales emitidos de pagos realmente registrados en Finanzas.
+    function validRegisteredReceipt(id) {
+      let d = request.resource.data;
+      let finance = get(/databases/$(database)/documents/agora_finance_requests/$(d.requestId)).data;
+      let payment = finance.payments[d.paymentIndex];
+      let origin = finance.hoursOrigin;
+      let roster = get(/databases/$(database)/documents/agora_ops_attendance_sheets/$(origin.eventId)/roster/$(origin.personId)).data;
+      let member = get(/databases/$(database)/documents/agora_ops_members/$(d.ownerUid)).data;
+      let fields = ['requestId','paymentIndex','ownerUid','personId','folio','beneficiary','project',
+        'date','method','reference','amountCents','createdBy','createdAt'];
+      return d.keys().hasAll(fields) && d.keys().hasOnly(fields) &&
+        id.matches('^[A-Za-z0-9_-]{1,80}$') &&
+        d.requestId is string && d.requestId.size() <= 197 &&
+        d.paymentIndex is int && d.paymentIndex >= 0 && d.paymentIndex < 40 &&
+        finance.status in ['pago_parcial','pagada'] && finance.category == 'nomina' &&
+        payment.id == id && payment.amount is number && payment.amount > 0 &&
+        d.amountCents is int && d.amountCents == int(math.round(payment.amount * 100)) &&
+        finance.paidAmount >= payment.amount && finance.paidAmount <= finance.approvedAmount &&
+        d.folio == 'DVM-PAG-' + id &&
+        finance.beneficiary == d.beneficiary && finance.project == d.project &&
+        payment.date == d.date && payment.method == d.method && payment.reference == d.reference &&
+        d.ownerUid is string && d.ownerUid.size() > 0 && d.ownerUid.size() <= 128 &&
+        d.personId == origin.personId && roster.uid == d.ownerUid &&
+        member.personId == d.personId && member.active == true && member.role == 'staff' &&
+        d.createdBy == request.auth.uid && d.createdAt == request.time;
+    }
+    function registeredReceiptOwner(data) {
+      return ownOpsPerson() && data.ownerUid == request.auth.uid && data.personId == opsPersonId();
+    }
+    match /agora_registered_receipts/{id} {
+      allow get, list: if isAdmin() || (ownOpsPerson() && resource.data.ownerUid == request.auth.uid);
+      allow create: if isAdmin() && validRegisteredReceipt(id);
+      allow update, delete: if false;
+      match /responses/{uid} {
+        allow get: if isAdmin() || (ownOpsPerson() && uid == request.auth.uid &&
+          registeredReceiptOwner(get(/databases/$(database)/documents/agora_registered_receipts/$(id)).data));
+        allow list: if isAdmin();
+        allow create: if signedIn() && uid == request.auth.uid && validRegisteredReceiptResponse(id);
+        allow update, delete: if false;
+      }
+    }
+    function validRegisteredReceiptResponse(id) {
+      let r = get(/databases/$(database)/documents/agora_registered_receipts/$(id)).data;
+      let d = request.resource.data;
+      let fields = ['ownerUid','folio','amountCents','response','note','verification','createdAt'];
+      return registeredReceiptOwner(r) && d.keys().hasAll(fields) && d.keys().hasOnly(fields) &&
+        d.ownerUid == request.auth.uid && d.folio == r.folio && d.amountCents == r.amountCents &&
+        d.response in ['recibido','no_identificado','diferencia','aclaracion'] &&
+        d.note is string && d.note.size() <= 500 &&
+        (!(d.response in ['diferencia','aclaracion']) || d.note.size() >= 5) &&
+        d.verification == 'identidad_dejavu' && d.createdAt == request.time;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
