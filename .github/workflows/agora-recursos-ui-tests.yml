@@ -24,3 +24,9 @@ jobs:
         run: node --input-type=module --check < recursos/app.js
       - name: Revisar exportación y respuesta externa, sin tocar Firebase
         run: node recursos/tests/exports-and-external-review.test.mjs
+      - name: Instalar Chromium y la biblioteca PDF
+        run: |
+          npm install --no-save playwright jspdf@2.5.1
+          npx playwright install --with-deps chromium
+      - name: Probar UI móvil y descargas con datos QA
+        run: node recursos/tests/weekly-payroll-browser.test.mjs

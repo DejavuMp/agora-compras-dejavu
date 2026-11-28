@@ -36,7 +36,7 @@ const dateOnly=v=>v?String(v).slice(0,10):'';
 const asDate=v=>v?.toDate?.()?.toLocaleString('es-MX')||String(v||'');
 const el=(tag,cls='',txt='')=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt)e.textContent=txt;return e;};
 const state={view:'dashboard',records:[],selected:'',user:null,role:'',fb:null,cloud:false,loading:false,mode:'local',editingId:'',hoursOrigin:null,forceLocal:false};
-let idbPromise;
+let idbPromise,recordVersion=0,sessionVersion=0;
 let ledgerSnapshot=null,ledgerVersion=0,ledgerError='',weeklyPayroll;
 function dbOpen(){
  if(idbPromise)return idbPromise;
@@ -62,42 +62,59 @@ function banner(message='',kind=''){const e=$('#notice');e.textContent=message;e
 function readable(error){const m=String(error?.message||error||'');if(/permission|insufficient/i.test(m))return 'Firebase rechazó el acceso. Revisa el rol en agora_users y las reglas de Recursos y Finanzas antes de sincronizar.';return m;}
 function sortRows(rows){return rows.sort((a,b)=>String(b.createdAt?.seconds||b.createdAt||'').localeCompare(String(a.createdAt?.seconds||a.createdAt||'')));}
 async function loadRecords(){
+ const version=++recordVersion;
  state.loading=true;
  try{
   if(state.cloud){
    const col=dbSdk.collection(state.fb.firestore,COLLECTION);
    const ref=state.role==='admin'?col:dbSdk.query(col,dbSdk.where('createdBy','==',state.user.uid));
    const snap=await dbSdk.getDocs(ref);
+   if(version!==recordVersion)return;
    state.records=sortRows(snap.docs.map(d=>({...d.data(),id:d.id})));
    state.mode='cloud';
    banner('Conectado a Firebase · Los datos bancarios son privados. El enlace externo permite enviar una respuesta sin acceso, pendiente de validación y registro.','success');
   }else{
-   state.records=sortRows(await dbAll());
+   const local=await dbAll();
+   if(version!==recordVersion)return;
+   state.records=sortRows(local);
    state.mode='local';
    banner('Modo local: los registros quedan solo en este navegador. La respuesta externa se envía por correo o WhatsApp; no se registra automáticamente. Descarga respaldos frecuentes.');
   }
  }catch(error){
-  if(state.cloud){state.cloud=false;state.mode='local';state.records=sortRows(await dbAll().catch(()=>[]));banner('No se pudo consultar Firebase: '+readable(error)+' Se muestra la copia local independiente.','error');}
+  if(version!==recordVersion)return;
+  if(state.cloud){
+   const local=await dbAll().catch(()=>[]);
+   if(version!==recordVersion)return;
+   state.cloud=false;state.mode='local';state.records=sortRows(local);
+   banner('No se pudo consultar Firebase: '+readable(error)+' Se muestra la copia local independiente.','error');
+  }
   else banner('No se pudo cargar la información local: '+readable(error),'error');
- }finally{state.loading=false;render();}
+ }finally{if(version===recordVersion){state.loading=false;render();}}
 }
 async function refreshCloudUser(user){
+ const session=++sessionVersion;
+ recordVersion++;
+ state.records=[];
  if(state.hoursOrigin)clearRequestForm();
  ledgerVersion++;ledgerSnapshot=null;ledgerError='';
  weeklyPayroll.reset();modalClose();
  state.user=user;state.role='';state.cloud=false;
+ render();
  if(user&&!state.forceLocal){
   try{
    const staff=await dbSdk.getDoc(dbSdk.doc(state.fb.firestore,'agora_users',user.uid));
+   if(session!==sessionVersion)return;
    const profile=staff.data();
    if(profile?.active===true&&['admin','coordinador','consulta'].includes(profile.role)){
     state.role=profile.role;state.cloud=true;
    }else{
     showToast('Tu cuenta no tiene un perfil activo en ÁGORA. Puedes trabajar localmente.');
    }
-  }catch(error){showToast('Nube no disponible: '+readable(error));}
+  }catch(error){if(session===sessionVersion)showToast('Nube no disponible: '+readable(error));}
  }
+ if(session!==sessionVersion)return;
  await loadRecords();
+ if(session!==sessionVersion)return;
  if(location.search.includes('id='))openQueryDetail();
  else if(new URLSearchParams(location.search).get('vista')==='obligaciones'&&ledgerAccess())view('ledger');
  else if(new URLSearchParams(location.search).get('vista')==='personal'&&ledgerAccess())view('payroll');
@@ -114,9 +131,12 @@ async function activateFirebase(){
 async function toggleLocalMode(){
  state.forceLocal=!state.forceLocal;
  if(state.forceLocal){
+  sessionVersion++;recordVersion++;
+  state.records=[];
   if(state.hoursOrigin)clearRequestForm();
   state.cloud=false;
   weeklyPayroll.reset();modalClose();
+  render();
   await loadRecords();
   if(!state.editingId)view('new');
   showToast('Modo local activado. Ya puedes llenar y guardar una solicitud.');
