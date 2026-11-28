@@ -1,6 +1,6 @@
 import {auth,db} from "../firebase.js";
 import {onAuthStateChanged} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
-import {collection,doc,getDoc,getDocs,query,where,addDoc,updateDoc,runTransaction,serverTimestamp,setDoc,writeBatch} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
+import {collection,doc,getDoc,getDocFromServer,getDocs,getDocsFromServer,query,where,addDoc,updateDoc,runTransaction,serverTimestamp,setDoc,writeBatch} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 import {ownJornadas} from "../roles-operacion.mjs";
 function ownHistory(staff){
  const active=ownJornadas(staff,new Date(),100),seen=new Set(active.map(j=>j.key));
@@ -24,7 +24,58 @@ async function load(){
  const [l,t,p,f]=await Promise.all([getDocs(query(collection(db,"agora_work_forms"))),manager?getDocs(collection(db,"agora_work_form_states")):getDocs(query(collection(db,"agora_work_form_states"),where("ownerUid","==",user.uid))),manager?Promise.resolve(null):getDocs(query(collection(db,"agora_staff_payment_views"),where("ownerUid","==",user.uid))),admin?getDocs(collection(db,"agora_staff_payment_feedback")):Promise.resolve(null)]);
  links=l.docs.map(d=>({id:d.id,...d.data()}));states=t.docs.map(d=>({id:d.id,...d.data()}));payments=p?.docs.map(d=>({id:d.id,...d.data()}))||[];feedback=f?.docs.map(d=>({id:d.id,...d.data()}))||[];
  render();note("Información actualizada.");
+ void loadReceipts(user);
 }
+
+const responses={recibido:"Pago recibido",no_identificado:"No identifico el depósito",diferencia:"El importe es diferente",aclaracion:"Solicito una aclaración"};
+const receiptMoney=cents=>new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(cents/100);
+let receiptRows=new Map();
+async function loadReceipts(actor){
+ const node=$("registered-receipts");
+ if(actor!==user||member?.active!==true||!member.personId)return;
+ try{
+  const snap=await getDocsFromServer(query(collection(db,"agora_registered_receipts"),where("ownerUid","==",actor.uid)));
+  if(actor!==user)return;
+  const rows=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.personId===member.personId);
+  const entries=await Promise.all(rows.sort((a,b)=>b.date.localeCompare(a.date)).map(async row=>{
+   const response=await getDocFromServer(doc(db,"agora_registered_receipts",row.id,"responses",actor.uid));
+   return [row.id,{...row,answer:response.data()}];
+  }));
+  if(actor!==user)return;
+  receiptRows=new Map(entries);
+  node.innerHTML=receiptRows.size?[...receiptRows.values()].map(row=>'<article><h3>'+safe(row.folio)+'</h3>'+
+   '<p>'+safe(row.project)+' · '+safe(row.date)+' · <strong>'+safe(receiptMoney(row.amountCents))+'</strong></p>'+
+   '<p>'+safe({transferencia:"Transferencia",efectivo:"Efectivo",otro:"Otro"}[row.method]||"Pago")+
+   (row.reference?' · Referencia '+safe(row.reference):'')+'</p>'+
+   (row.answer?'<p>Respuesta registrada: '+safe(responses[row.answer.response])+' · '+safe(date(row.answer.createdAt))+'</p>':
+    '<form data-receipt="'+safe(row.id)+'"><label>Selecciona tu respuesta<select name="response" required><option value="">Elegir respuesta</option>'+
+    Object.entries(responses).map(([value,label])=>'<option value="'+value+'">'+label+'</option>').join("")+
+    '</select></label><label>Comentario<textarea name="note" maxlength="500"></textarea></label><button>Registrar respuesta</button></form>')+
+   '</article>').join(""):"<p>Aún no tienes comprobantes compartidos por Administración.</p>";
+ }catch(error){if(actor===user)node.textContent="No se pudo consultar tus comprobantes.";}
+}
+async function respondToReceipt(form){
+ const actor=user, id=form.dataset.receipt, row=receiptRows.get(id);
+ if(!actor||!row||row.answer)return;
+ const fields=new FormData(form),response=String(fields.get("response")),comment=String(fields.get("note")).trim();
+ const button=form.querySelector("button");
+ if(button.disabled)return;
+ if(!Object.hasOwn(responses,response))throw Error("Selecciona una respuesta.");
+ if(["diferencia","aclaracion"].includes(response)&&comment.length<5)throw Error("Describe la diferencia o aclaración.");
+ button.disabled=true;
+ try{
+  const ref=doc(db,"agora_registered_receipts",id,"responses",actor.uid);
+  await runTransaction(db,async tx=>{
+   const prior=await tx.get(ref);
+   if(actor!==user)throw Error("La sesión cambió.");
+   if(prior.exists())return;
+   tx.set(ref,{ownerUid:actor.uid,folio:row.folio,amountCents:row.amountCents,response,note:comment,
+    verification:"identidad_dejavu",createdAt:serverTimestamp()});
+  });
+  if(actor===user){note("Respuesta registrada.");await loadReceipts(actor);}
+ }finally{button.disabled=false;}
+}
+
 function matching(link,job){
  const match={event:job.key,person:staff?.personId,project:job.project||job.title,group:job.group};
  return link.active&&String(match[link.scope]||"").toLowerCase()===String(link.scopeId).toLowerCase();
@@ -65,6 +116,7 @@ async function imageData(file){
  return result;
 }
 document.addEventListener("submit",async e=>{
+ if(e.target.matches("form[data-receipt]")){e.preventDefault();try{await respondToReceipt(e.target)}catch(error){note(error.message)}return;}
  const form=e.target; if(!form.matches("#link-form,[data-state],[data-payment]"))return;e.preventDefault();
  const button=form.querySelector("button");button.disabled=true;
  try{
@@ -124,4 +176,4 @@ $("sync-payments").addEventListener("click",async()=>{
  await load();
  }catch(error){note(error.message)}finally{button.disabled=false}
 });
-onAuthStateChanged(auth,async current=>{user=current;if(!user){note("Inicia sesión en ÁGORA para consultar tu información.");return}try{await load()}catch(error){note("No se pudo consultar la información: "+error.message)}});
+onAuthStateChanged(auth,async current=>{user=current;receiptRows.clear();$("registered-receipts").replaceChildren();if(!user){note("Inicia sesión en ÁGORA para consultar tu información.");return}try{await load()}catch(error){note("No se pudo consultar la información: "+error.message)}});

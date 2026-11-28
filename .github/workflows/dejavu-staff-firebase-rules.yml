@@ -73,6 +73,8 @@ jobs:
         run: node --test .github/firebase-staff/test-payroll-domain.mjs
       - name: Verificar permisos de acuerdos semanales con Firebase Emulator
         run: npx firebase emulators:exec --only firestore --project demo-agora-payroll --non-interactive 'node .github/firebase-staff/test-weekly-agreements-rules.mjs'
+      - name: Verificar permisos de comprobantes y acuses individuales
+        run: npx firebase emulators:exec --only firestore --project demo-dejavu-receipts --non-interactive 'node .github/firebase-staff/test-registered-receipts-rules.mjs'
       - name: Probar Finanzas - crear solicitudes, roles, autorizar y pagar
         run: npx firebase emulators:exec --only firestore --project demo-agora-finanzas --non-interactive 'node .github/firebase-staff/test-finance-rules.mjs'
       - name: Comprobar permisos individuales de trabajos y pagos
