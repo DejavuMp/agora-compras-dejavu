@@ -32,6 +32,8 @@ const agreement = {personId:staff.id,amountCents:250000,effectiveFrom:"2026-11-2
 try {
   for (const role of ["staff", "admin"]) {
     const page = await browser.newPage({viewport:{width:390,height:844},acceptDownloads:true});
+    page.setDefaultTimeout(9000);
+    page.on("pageerror",error=>console.error("Error de página QA",error));
     await page.route("**/*", async route => {
       const url = route.request().url();
       if (url.startsWith(base) && url.endsWith("/firebase-init.js")) {
@@ -87,9 +89,14 @@ try {
     await page.getByRole("button",{name:"Volver al expediente"}).click();
     const paymentForm = page.locator("#payment-form");
     await paymentForm.locator('[name="amount"]').fill("1000");
+    await paymentForm.locator('[name="date"]').fill("2026-11-28");
     await paymentForm.locator('[name="reference"]').fill("QA-1000");
+    const invalid = await paymentForm.evaluate(form=>Array.from(form.elements).filter(el=>el.validity&&!el.validity.valid)
+      .map(el=>[el.name,el.value,el.validationMessage]));
+    assert.deepEqual(invalid,[]);
     await paymentForm.getByRole("button",{name:"Guardar pago"}).click();
-    await page.getByText("Pago registrado correctamente.",{exact:true}).waitFor();
+    await page.waitForFunction(()=>Boolean(document.querySelector("#toast").textContent.trim()));
+    assert.equal(await page.locator("#toast").textContent(),"Pago registrado correctamente.");
     assert.equal(await page.getByRole("button",{name:"Ver comprobante de este pago"}).count(),2);
     await page.close();
   }
