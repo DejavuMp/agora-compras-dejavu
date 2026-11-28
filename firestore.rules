@@ -2311,6 +2311,24 @@ match /agora_finance_audit/{auditId} {
       allow update, delete: if false;
     }
 
+    // Versiones inmutables de acuerdos privados de Administración, por persona y semana.
+    function validWeeklyAgreement(id) {
+      let d = request.resource.data;
+      let fields = ['personId','effectiveFrom','amountCents','periodicity','note','authorizedBy','createdAt'];
+      return d.keys().hasAll(fields) && d.keys().hasOnly(fields) &&
+        d.personId is string && d.personId.matches('^[A-Za-z0-9_-]{1,90}$') &&
+        d.effectiveFrom is string && d.effectiveFrom.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        id == d.personId + '~' + d.effectiveFrom &&
+        d.amountCents is int && d.amountCents >= 0 && d.amountCents <= 99999999999 &&
+        d.periodicity == 'semana' && d.note is string && d.note.size() <= 500 &&
+        d.authorizedBy == request.auth.uid && d.createdAt == request.time;
+    }
+    match /agora_payroll_weekly_agreements/{id} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && validWeeklyAgreement(id);
+      allow update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

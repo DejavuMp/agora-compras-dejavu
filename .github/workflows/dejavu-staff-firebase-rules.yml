@@ -69,6 +69,10 @@ jobs:
 
       - name: Probar accesos de visitantes, personal y coordinadores
         run: npx firebase emulators:exec --only firestore --project demo-dejavu-fichas-staff --non-interactive 'node .github/firebase-staff/test-rules.mjs'
+      - name: Verificar prenómina semanal y comprobantes con datos QA
+        run: node --test .github/firebase-staff/test-payroll-domain.mjs
+      - name: Verificar permisos de acuerdos semanales con Firebase Emulator
+        run: npx firebase emulators:exec --only firestore --project demo-agora-payroll --non-interactive 'node .github/firebase-staff/test-weekly-agreements-rules.mjs'
       - name: Probar Finanzas - crear solicitudes, roles, autorizar y pagar
         run: npx firebase emulators:exec --only firestore --project demo-agora-finanzas --non-interactive 'node .github/firebase-staff/test-finance-rules.mjs'
       - name: Comprobar permisos individuales de trabajos y pagos

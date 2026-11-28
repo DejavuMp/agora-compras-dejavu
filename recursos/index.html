@@ -10,7 +10,7 @@
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script type="module" src="../firebase-init.js"></script>
-<script type="module" src="./app.js?v=20261126-finance-audit"></script>
+<script type="module" src="./app.js?v=20261128-personal-pagos"></script>
 </head>
 <body>
 <div class="layout">
@@ -22,6 +22,7 @@
     <button class="nav-item active" data-view="dashboard"><span>▦</span> Resumen</button>
     <button class="nav-item" data-view="new"><span>＋</span> Nueva solicitud</button>
     <button class="nav-item" data-view="history"><span>▤</span> Solicitudes e historial</button>
+    <button class="nav-item" id="payroll-nav" data-view="payroll" hidden>Personal y pagos</button>
     <button class="nav-item" id="ledger-nav" data-view="ledger" hidden>Historial de obligaciones</button>
     <button class="nav-item" data-view="gastos"><span>◫</span> Comprobación de gastos</button>
   </nav>
@@ -91,6 +92,29 @@
    <button id="ledger-refresh" type="button" class="btn btn-outline">Actualizar</button>
   </div>
   <div id="ledger-rows" aria-live="polite"></div>
+ </div>
+</section>
+<section id="payroll" class="view" hidden>
+ <div class="section-intro"><div><h2>Administración de personal y pagos</h2><p>Acuerdos fijos semanales y proyección del cronograma de Operaciones.</p></div></div>
+ <div class="panel">
+  <h3>Prenómina semanal estimada</h3>
+  <div id="weekly-controls" hidden>
+   <label>Semana que inicia el lunes <input type="date" id="weekly-start"></label>
+   <button id="weekly-refresh" type="button" class="btn btn-outline">Actualizar</button>
+   <p>La base se cuenta una vez por persona para toda la semana. Esta vista cubre únicamente los acuerdos semanales.</p>
+   <details><summary>Registrar acuerdo semanal</summary>
+    <form id="weekly-agreement" class="form-grid">
+     <label>Personal de Operaciones <select name="person" required></select></label>
+     <label>Vigente desde el lunes <input type="date" name="effectiveFrom" required></label>
+     <label>Importe fijo (MXN) <input type="number" name="amount" step="0.01" min="0" max="999999999.99" required></label>
+     <label>Observaciones <textarea name="note" rows="2" maxlength="500"></textarea></label>
+     <p>Registra $0 para terminar el acuerdo a partir de la semana indicada. Las versiones anteriores quedan en el historial.</p>
+     <div><button class="btn btn-gold" type="submit">Guardar versión</button></div>
+    </form>
+    <ul id="weekly-versions"></ul>
+   </details>
+  </div>
+  <div id="weekly-rows" aria-live="polite"></div>
  </div>
 </section>
 <section id="gastos" class="view" hidden>
