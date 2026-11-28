@@ -86,17 +86,25 @@ try {
       assert.ok(file.length>1000);
       assert.ok(extension===".pdf"?file.toString("ascii",0,5)===signature:file.subarray(0,8).toString("hex")===signature);
     }
+    await page.evaluate(()=>{window.open=url=>{window.qaShareUrl=url;};});
+    await page.getByRole("button",{name:"WhatsApp",exact:true}).click();
+    const share = new URL(await page.evaluate(()=>window.qaShareUrl));
+    assert.equal(share.origin,"https://wa.me");
+    assert.match(share.searchParams.get("text"),/DVM-PAG-qa-payment/);
+    assert.match(share.searchParams.get("text"),/1,500\.00/);
     await page.getByRole("button",{name:"Volver al expediente"}).click();
     const paymentForm = page.locator("#payment-form");
     await paymentForm.locator('[name="amount"]').fill("1000");
     await paymentForm.locator('[name="date"]').fill("2026-11-28");
-    await paymentForm.locator('[name="reference"]').fill("QA-1000");
+    await paymentForm.locator('[name="reference"]').fill("QA-1500");
     const invalid = await paymentForm.evaluate(form=>Array.from(form.elements).filter(el=>el.validity&&!el.validity.valid)
       .map(el=>[el.name,el.value,el.validationMessage]));
     assert.deepEqual(invalid,[]);
     await paymentForm.getByRole("button",{name:"Guardar pago"}).click();
-    await page.waitForFunction(()=>Boolean(document.querySelector("#toast").textContent.trim()));
-    assert.equal(await page.locator("#toast").textContent(),"Pago registrado correctamente.");
+    await page.getByText("Esta referencia ya fue registrada en la obligación.",{exact:true}).waitFor();
+    await paymentForm.locator('[name="reference"]').fill("QA-1000");
+    await paymentForm.getByRole("button",{name:"Guardar pago"}).click();
+    await page.getByText("Pago registrado correctamente.",{exact:true}).waitFor();
     assert.equal(await page.getByRole("button",{name:"Ver comprobante de este pago"}).count(),2);
     await page.close();
   }

@@ -566,7 +566,7 @@ async function updateRecord(r,patch,log){
 }
 async function decide(e){
  e.preventDefault();
- const r=state.records.find(x=>x.id===state.selected),f=new FormData(e.currentTarget);
+ const r=state.records.find(x=>x.id===state.selected),f=new FormData(e.target);
  if(!r)return;
  try{
   const status=String(f.get('decision')),comment=String(f.get('comment')||'').trim();
@@ -579,7 +579,7 @@ async function decide(e){
 }
 async function pay(e){
  e.preventDefault();
- const r=state.records.find(x=>x.id===state.selected),form=e.currentTarget;
+ const r=state.records.find(x=>x.id===state.selected),form=e.target;
  if(!r)return;
  const submit=form.querySelector('[type="submit"]');
  if(submit.disabled)return;
